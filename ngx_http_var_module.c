@@ -200,6 +200,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     /* Add variable to Nginx */
     flags = NGX_HTTP_VAR_CHANGEABLE | NGX_HTTP_VAR_NOCACHEABLE;
 
+    /* Use var_name without '$' prefix */
     v = ngx_http_add_variable(cf, &var_name, flags);
     if (v == NULL) {
         return NGX_CONF_ERROR;
@@ -207,8 +208,22 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (v->get_handler == NULL || v->get_handler == ngx_http_var_variable_handler) {
         v->get_handler = ngx_http_var_variable_handler;
+
         /* Store variable name in data */
-        v->data = (uintptr_t) var->name.data;
+        ngx_str_t *var_name_copy;
+
+        var_name_copy = ngx_palloc(cf->pool, sizeof(ngx_str_t));
+        if (var_name_copy == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        var_name_copy->len = var_name.len;
+        var_name_copy->data = ngx_pstrdup(cf->pool, &var_name);
+        if (var_name_copy->data == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        v->data = (uintptr_t) var_name_copy;
     } else {
         ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
                            "variable \"%V\" already has a handler", &var_name);
