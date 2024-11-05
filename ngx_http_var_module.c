@@ -231,186 +231,124 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     return NGX_CONF_OK;
 }
 
+static ngx_int_t
+ngx_http_var_find_variable(ngx_http_request_t *r, ngx_str_t *var_name,
+                           ngx_http_var_conf_t *vconf, ngx_str_t *value_str,
+                           ngx_log_t *log, const char *conf_level)
+{
+    ngx_http_var_variable_t      *vars;
+    ngx_uint_t                    n;
+    ngx_int_t                     i;
+
+    if (vconf == NULL || vconf->vars == NULL || vconf->vars->nelts == 0) {
+        return NGX_DECLINED;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
+                   "ngx_http_var_module: searching in %s conf", conf_level);
+
+    vars = vconf->vars->elts;
+    n = vconf->vars->nelts;
+
+    /* Linear search */
+    for (i = 0; i < (ngx_int_t) n; i++) {
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, log, 0,
+                       "ngx_http_var_module: checking variable \"%V\" in %s conf",
+                       &vars[i].name, conf_level);
+
+        if (vars[i].name.len == var_name->len &&
+            ngx_strncmp(vars[i].name.data, var_name->data, var_name->len) == 0)
+        {
+            /* Found the variable */
+            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
+                           "ngx_http_var_module: variable found in %s conf", conf_level);
+
+            if (ngx_http_complex_value(r, &vars[i].value, value_str) != NGX_OK) {
+                ngx_log_error(NGX_LOG_ERR, log, 0,
+                              "ngx_http_var_module: failed to compute variable value");
+                return NGX_ERROR;
+            }
+
+            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
+                           "ngx_http_var_module: variable value computed \"%V\"",
+                           value_str);
+
+            return NGX_OK;
+        }
+    }
+
+    return NGX_DECLINED;
+}
+
 /* Variable handler */
 static ngx_int_t
 ngx_http_var_variable_handler(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data)
 {
     ngx_http_var_conf_t          *vconf;
-    ngx_http_var_variable_t      *vars;
-    ngx_uint_t                    n;
     ngx_str_t                     var_name;
     ngx_str_t                     value_str;
-    ngx_int_t                     i;
     ngx_log_t                    *log = r->connection->log;
+    ngx_str_t                    *var_name_ptr;
+    ngx_int_t                     rc;
 
     /* Get variable name from data */
-    ngx_str_t *var_name_ptr;
-
     var_name_ptr = (ngx_str_t *) data;
     var_name.len = var_name_ptr->len;
     var_name.data = var_name_ptr->data;
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
-                   "ngx_http_var_module: handling variable \"%V\"", &var_name);
+                   "ngx_http_var_module: handling variable \"$%V\"", &var_name);
 
-    /* Get module configuration */
+    /* Search in location conf */
     vconf = ngx_http_get_module_loc_conf(r, ngx_http_var_module);
-    if (vconf != NULL && vconf->vars != NULL && vconf->vars->nelts > 0) {
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, log, 0,
-                       "ngx_http_var_module: searching in location conf");
-
-        vars = vconf->vars->elts;
-        n = vconf->vars->nelts;
-
-        /* Linear search */
-        for (i = 0; i < (ngx_int_t) n; i++) {
-            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
-                           "ngx_http_var_module: checking variable \"%V\" in location conf",
-                           &vars[i].name);
-
-            if (vars[i].name.len == var_name.len &&
-                ngx_strncmp(vars[i].name.data, var_name.data, var_name.len) == 0)
-            {
-                /* Found the variable */
-                ngx_log_debug0(NGX_LOG_DEBUG_HTTP, log, 0,
-                               "ngx_http_var_module: variable found in location conf");
-
-                if (ngx_http_complex_value(r, &vars[i].value, &value_str) != NGX_OK) {
-                    ngx_log_error(NGX_LOG_ERR, log, 0,
-                                  "ngx_http_var_module: failed to compute variable value");
-                    return NGX_ERROR;
-                }
-
-                ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
-                               "ngx_http_var_module: variable value computed \"%V\"",
-                               &value_str);
-
-                v->valid = 1;
-                v->no_cacheable = 1;
-                v->not_found = 0;
-                v->len = value_str.len;
-
-                /* Allocate memory for the variable value */
-                v->data = ngx_pnalloc(r->pool, value_str.len);
-                if (v->data == NULL) {
-                    ngx_log_error(NGX_LOG_ERR, log, 0,
-                                  "ngx_http_var_module: memory allocation failed");
-                    return NGX_ERROR;
-                }
-                ngx_memcpy(v->data, value_str.data, value_str.len);
-
-                return NGX_OK;
-            }
-        }
+    rc = ngx_http_var_find_variable(r, &var_name, vconf, &value_str, log, "location");
+    if (rc == NGX_OK) {
+        goto found;
+    } else if (rc == NGX_ERROR) {
+        return NGX_ERROR;
     }
 
-    /* No variables defined in location, check server level */
+    /* Search in server conf */
     vconf = ngx_http_get_module_srv_conf(r, ngx_http_var_module);
-    if (vconf != NULL && vconf->vars != NULL && vconf->vars->nelts > 0) {
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, log, 0,
-                       "ngx_http_var_module: searching in server conf");
-
-        vars = vconf->vars->elts;
-        n = vconf->vars->nelts;
-
-        /* Linear search */
-        for (i = 0; i < (ngx_int_t) n; i++) {
-            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
-                           "ngx_http_var_module: checking variable \"%V\" in server conf",
-                           &vars[i].name);
-
-            if (vars[i].name.len == var_name.len &&
-                ngx_strncmp(vars[i].name.data, var_name.data, var_name.len) == 0)
-            {
-                /* Found the variable */
-                ngx_log_debug0(NGX_LOG_DEBUG_HTTP, log, 0,
-                               "ngx_http_var_module: variable found in server conf");
-
-                if (ngx_http_complex_value(r, &vars[i].value, &value_str) != NGX_OK) {
-                    ngx_log_error(NGX_LOG_ERR, log, 0,
-                                  "ngx_http_var_module: failed to compute variable value");
-                    return NGX_ERROR;
-                }
-
-                ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
-                               "ngx_http_var_module: variable value computed \"%V\"",
-                               &value_str);
-
-                v->valid = 1;
-                v->no_cacheable = 1;
-                v->not_found = 0;
-                v->len = value_str.len;
-
-                /* Allocate memory for the variable value */
-                v->data = ngx_pnalloc(r->pool, value_str.len);
-                if (v->data == NULL) {
-                    ngx_log_error(NGX_LOG_ERR, log, 0,
-                                  "ngx_http_var_module: memory allocation failed");
-                    return NGX_ERROR;
-                }
-                ngx_memcpy(v->data, value_str.data, value_str.len);
-
-                return NGX_OK;
-            }
-        }
+    rc = ngx_http_var_find_variable(r, &var_name, vconf, &value_str, log, "server");
+    if (rc == NGX_OK) {
+        goto found;
+    } else if (rc == NGX_ERROR) {
+        return NGX_ERROR;
     }
 
-    /* No variables defined in server, check main level */
+    /* Search in main conf */
     vconf = ngx_http_get_module_main_conf(r, ngx_http_var_module);
-    if (vconf != NULL && vconf->vars != NULL && vconf->vars->nelts > 0) {
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, log, 0,
-                       "ngx_http_var_module: searching in main conf");
-
-        vars = vconf->vars->elts;
-        n = vconf->vars->nelts;
-
-        /* Linear search */
-        for (i = 0; i < (ngx_int_t) n; i++) {
-            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
-                           "ngx_http_var_module: checking variable \"%V\" in main conf",
-                           &vars[i].name);
-
-            if (vars[i].name.len == var_name.len &&
-                ngx_strncmp(vars[i].name.data, var_name.data, var_name.len) == 0)
-            {
-                /* Found the variable */
-                ngx_log_debug0(NGX_LOG_DEBUG_HTTP, log, 0,
-                               "ngx_http_var_module: variable found in main conf");
-
-                if (ngx_http_complex_value(r, &vars[i].value, &value_str) != NGX_OK) {
-                    ngx_log_error(NGX_LOG_ERR, log, 0,
-                                  "ngx_http_var_module: failed to compute variable value");
-                    return NGX_ERROR;
-                }
-
-                ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
-                               "ngx_http_var_module: variable value computed \"%V\"",
-                               &value_str);
-
-                v->valid = 1;
-                v->no_cacheable = 1;
-                v->not_found = 0;
-                v->len = value_str.len;
-
-                /* Allocate memory for the variable value */
-                v->data = ngx_pnalloc(r->pool, value_str.len);
-                if (v->data == NULL) {
-                    ngx_log_error(NGX_LOG_ERR, log, 0,
-                                  "ngx_http_var_module: memory allocation failed");
-                    return NGX_ERROR;
-                }
-                ngx_memcpy(v->data, value_str.data, value_str.len);
-
-                return NGX_OK;
-            }
-        }
+    rc = ngx_http_var_find_variable(r, &var_name, vconf, &value_str, log, "main");
+    if (rc == NGX_OK) {
+        goto found;
+    } else if (rc == NGX_ERROR) {
+        return NGX_ERROR;
     }
 
     /* Variable not found */
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
-                   "ngx_http_var_module: variable \"%V\" not found", &var_name);
+                   "ngx_http_var_module: variable \"$%V\" not found", &var_name);
 
     v->not_found = 1;
+    return NGX_OK;
+
+found:
+
+    v->valid = 1;
+    v->no_cacheable = 1;
+    v->not_found = 0;
+    v->len = value_str.len;
+
+    /* Allocate memory for the variable value */
+    v->data = ngx_pnalloc(r->pool, value_str.len);
+    if (v->data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, log, 0,
+                      "ngx_http_var_module: memory allocation failed");
+        return NGX_ERROR;
+    }
+    ngx_memcpy(v->data, value_str.data, value_str.len);
+
     return NGX_OK;
 }
