@@ -123,7 +123,6 @@ ngx_http_var_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
         conf->vars = prev->vars;
     } else if (prev->vars && prev->vars->nelts > 0) {
         /* Merge variables */
-        ngx_uint_t i;
         ngx_http_var_variable_t *var;
 
         var = ngx_array_push_n(conf->vars, prev->vars->nelts);
@@ -167,7 +166,6 @@ ngx_http_var_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
         conf->vars = prev->vars;
     } else if (prev->vars && prev->vars->nelts > 0) {
         /* Merge variables */
-        ngx_uint_t i;
         ngx_http_var_variable_t *var;
 
         var = ngx_array_push_n(conf->vars, prev->vars->nelts);
@@ -185,7 +183,6 @@ ngx_http_var_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 static char *
 ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_http_var_conf_t         *vconf;
     ngx_http_var_conf_t         *main_conf;
     ngx_str_t                   *value;
     ngx_str_t                    var_name, operator;
