@@ -178,7 +178,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         v->data = 0;
     } else {
         ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
-                           "variable \"%V\" already has another handler", &full_var_name);
+                           "variable \"%V\" already has a handler", &full_var_name);
     }
 
     return NGX_CONF_OK;
