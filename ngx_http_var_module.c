@@ -2,6 +2,13 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
+typedef enum {
+    NGX_HTTP_VAR_OP_COPY,
+    NGX_HTTP_VAR_OP_UPPER,
+    NGX_HTTP_VAR_OP_LOWER,
+    NGX_HTTP_VAR_OP_UNKNOWN
+} ngx_http_var_operator_e;
+
 typedef struct {
     ngx_array_t                    *vars;      /* array of ngx_http_var_variable_t */
 } ngx_http_var_conf_t;
@@ -9,16 +16,35 @@ typedef struct {
 typedef struct {
     ngx_str_t                   name;       /* variable name */
     ngx_http_complex_value_t    value;      /* complex value */
+    ngx_http_var_operator_e     operator;   /* operator type */
 } ngx_http_var_variable_t;
 
+typedef struct {
+    ngx_str_t                   name;       /* operator string */
+    ngx_http_var_operator_e     op;         /* operator enum */
+} ngx_http_var_operator_mapping_t;
+
+static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
+    { ngx_string("copy"),  NGX_HTTP_VAR_OP_COPY },
+    { ngx_string("upper"), NGX_HTTP_VAR_OP_UPPER },
+    { ngx_string("lower"), NGX_HTTP_VAR_OP_LOWER }
+};
+
 /* Function prototypes */
-static char *ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
-static ngx_int_t ngx_http_var_variable_handler(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data);
 static void *ngx_http_var_create_main_conf(ngx_conf_t *cf);
 static void *ngx_http_var_create_srv_conf(ngx_conf_t *cf);
 static void *ngx_http_var_create_loc_conf(ngx_conf_t *cf);
 static char *ngx_http_var_merge_conf(ngx_conf_t *cf, void *parent, void *child);
+static char *ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+static ngx_int_tngx_http_var_find_variable(ngx_http_request_t *r, ngx_str_t *var_name,
+                           ngx_http_var_conf_t *vconf, ngx_str_t *value_str,
+                           ngx_log_t *log, const char *conf_level,
+                           ngx_http_var_variable_t **found_var);
+static ngx_int_t ngx_http_var_variable_handler(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_var_operate_copy(u_char *data, size_t len, ngx_str_t *value_str);
+static ngx_int_t ngx_http_var_operate_upper(u_char *data, size_t len, ngx_str_t *value_str);
+static ngx_int_t ngx_http_var_operate_lower(u_char *data, size_t len, ngx_str_t *value_str);
 
 static ngx_command_t ngx_http_var_commands[] = {
 
@@ -138,16 +164,17 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_http_var_conf_t         *vconf = conf;
     ngx_str_t                   *value;
-    ngx_str_t                    var_name, operator;
+    ngx_str_t                    var_name, operator_str;
     ngx_http_variable_t         *v;
     ngx_http_var_variable_t     *var;
     ngx_uint_t                   flags;
-    ngx_http_compile_complex_value_t   ccv;
+    ngx_uint_t                   i;
+    ngx_http_var_operator_e      op = NGX_HTTP_VAR_OP_UNKNOWN;
 
     value = cf->args->elts;
 
     var_name = value[1];
-    operator = value[2];
+    operator_str = value[2];
 
     if (var_name.len == 0 || var_name.data[0] != '$') {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -155,17 +182,27 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    if (ngx_strcmp(operator.data, "copy") != 0) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "unsupported operator \"%V\"", &operator);
-        return NGX_CONF_ERROR;
-    }
-
-    /* Remove the leading '$' from variable name */
+    /* 移除变量名前的 '$' */
     var_name.len--;
     var_name.data++;
 
-    /* Initialize vars array if necessary */
+    /* 通过映射获取操作符的枚举值 */
+    for (i = 0; i < sizeof(ngx_http_var_operators) / sizeof(ngx_http_var_operator_mapping_t); i++) {
+        if (operator_str.len == ngx_http_var_operators[i].name.len &&
+            ngx_strncmp(operator_str.data, ngx_http_var_operators[i].name.data, operator_str.len) == 0)
+        {
+            op = ngx_http_var_operators[i].op;
+            break;
+        }
+    }
+
+    if (op == NGX_HTTP_VAR_OP_UNKNOWN) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "unsupported operator \"%V\"", &operator_str);
+        return NGX_CONF_ERROR;
+    }
+
+    /* 初始化变量数组 */
     if (vconf->vars == NULL) {
         vconf->vars = ngx_array_create(cf->pool, 4,
                                        sizeof(ngx_http_var_variable_t));
@@ -174,7 +211,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
     }
 
-    /* Add variable to configuration */
+    /* 添加变量定义 */
     var = ngx_array_push(vconf->vars);
     if (var == NULL) {
         return NGX_CONF_ERROR;
@@ -186,6 +223,11 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+    var->operator = op;
+
+    /* 编译复杂值 */
+    ngx_http_compile_complex_value_t   ccv;
+
     ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
 
     ccv.cf = cf;
@@ -196,10 +238,9 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    /* Add variable to Nginx */
+    /* 注册变量 */
     flags = NGX_HTTP_VAR_CHANGEABLE | NGX_HTTP_VAR_NOCACHEABLE;
 
-    /* Use var_name without '$' prefix */
     v = ngx_http_add_variable(cf, &var_name, flags);
     if (v == NULL) {
         return NGX_CONF_ERROR;
@@ -208,7 +249,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     if (v->get_handler == NULL || v->get_handler == ngx_http_var_variable_handler) {
         v->get_handler = ngx_http_var_variable_handler;
 
-        /* Store variable name in data */
+        /* 存储变量名 */
         ngx_str_t *var_name_copy;
 
         var_name_copy = ngx_palloc(cf->pool, sizeof(ngx_str_t));
@@ -231,10 +272,12 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     return NGX_CONF_OK;
 }
 
+/* Helper function to find and compute variable */
 static ngx_int_t
 ngx_http_var_find_variable(ngx_http_request_t *r, ngx_str_t *var_name,
                            ngx_http_var_conf_t *vconf, ngx_str_t *value_str,
-                           ngx_log_t *log, const char *conf_level)
+                           ngx_log_t *log, const char *conf_level,
+                           ngx_http_var_variable_t **found_var)
 {
     ngx_http_var_variable_t      *vars;
     ngx_uint_t                    n;
@@ -273,6 +316,8 @@ ngx_http_var_find_variable(ngx_http_request_t *r, ngx_str_t *var_name,
                            "ngx_http_var_module: variable value computed \"%V\"",
                            value_str);
 
+            *found_var = &vars[i];
+
             return NGX_OK;
         }
     }
@@ -291,6 +336,7 @@ ngx_http_var_variable_handler(ngx_http_request_t *r,
     ngx_log_t                    *log = r->connection->log;
     ngx_str_t                    *var_name_ptr;
     ngx_int_t                     rc;
+    ngx_http_var_variable_t      *found_var = NULL;
 
     /* Get variable name from data */
     var_name_ptr = (ngx_str_t *) data;
@@ -302,7 +348,7 @@ ngx_http_var_variable_handler(ngx_http_request_t *r,
 
     /* Search in location conf */
     vconf = ngx_http_get_module_loc_conf(r, ngx_http_var_module);
-    rc = ngx_http_var_find_variable(r, &var_name, vconf, &value_str, log, "location");
+    rc = ngx_http_var_find_variable(r, &var_name, vconf, &value_str, log, "location", &found_var);
     if (rc == NGX_OK) {
         goto found;
     } else if (rc == NGX_ERROR) {
@@ -311,7 +357,7 @@ ngx_http_var_variable_handler(ngx_http_request_t *r,
 
     /* Search in server conf */
     vconf = ngx_http_get_module_srv_conf(r, ngx_http_var_module);
-    rc = ngx_http_var_find_variable(r, &var_name, vconf, &value_str, log, "server");
+    rc = ngx_http_var_find_variable(r, &var_name, vconf, &value_str, log, "server", &found_var);
     if (rc == NGX_OK) {
         goto found;
     } else if (rc == NGX_ERROR) {
@@ -320,7 +366,7 @@ ngx_http_var_variable_handler(ngx_http_request_t *r,
 
     /* Search in main conf */
     vconf = ngx_http_get_module_main_conf(r, ngx_http_var_module);
-    rc = ngx_http_var_find_variable(r, &var_name, vconf, &value_str, log, "main");
+    rc = ngx_http_var_find_variable(r, &var_name, vconf, &value_str, log, "main", &found_var);
     if (rc == NGX_OK) {
         goto found;
     } else if (rc == NGX_ERROR) {
@@ -339,16 +385,74 @@ found:
     v->valid = 1;
     v->no_cacheable = 1;
     v->not_found = 0;
-    v->len = value_str.len;
 
-    /* Allocate memory for the variable value */
-    v->data = ngx_pnalloc(r->pool, value_str.len);
+    /* 分配内存 */
+    v->len = value_str.len;
+    v->data = ngx_pnalloc(r->pool, v->len);
     if (v->data == NULL) {
         ngx_log_error(NGX_LOG_ERR, log, 0,
                       "ngx_http_var_module: memory allocation failed");
         return NGX_ERROR;
     }
-    ngx_memcpy(v->data, value_str.data, value_str.len);
+
+    /* 调用对应的操作处理函数 */
+    switch (found_var->operator) {
+    case NGX_HTTP_VAR_OP_COPY:
+        rc = ngx_http_var_operate_copy(v->data, v->len, &value_str);
+        break;
+
+    case NGX_HTTP_VAR_OP_UPPER:
+        rc = ngx_http_var_operate_upper(v->data, v->len, &value_str);
+        break;
+
+    case NGX_HTTP_VAR_OP_LOWER:
+        rc = ngx_http_var_operate_lower(v->data, v->len, &value_str);
+        break;
+
+    default:
+        ngx_log_error(NGX_LOG_ERR, log, 0,
+                      "ngx_http_var_module: unknown operator");
+        return NGX_ERROR;
+    }
+
+    if (rc != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_http_var_operate_copy(u_char *data, size_t len, ngx_str_t *value_str)
+{
+    ngx_memcpy(data, value_str->data, len);
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_http_var_operate_upper(u_char *data, size_t len, ngx_str_t *value_str)
+{
+    size_t i;
+
+    ngx_memcpy(data, value_str->data, len);
+
+    for (i = 0; i < len; i++) {
+        data[i] = ngx_toupper(data[i]);
+    }
+
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_http_var_operate_lower(u_char *data, size_t len, ngx_str_t *value_str)
+{
+    size_t i;
+
+    ngx_memcpy(data, value_str->data, len);
+
+    for (i = 0; i < len; i++) {
+        data[i] = ngx_tolower(data[i]);
+    }
 
     return NGX_OK;
 }
