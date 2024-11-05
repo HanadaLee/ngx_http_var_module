@@ -20,7 +20,6 @@ static void *ngx_http_var_create_srv_conf(ngx_conf_t *cf);
 static void *ngx_http_var_create_loc_conf(ngx_conf_t *cf);
 static char *ngx_http_var_merge_conf(ngx_conf_t *cf, void *parent, void *child);
 static ngx_int_t ngx_http_var_init(ngx_conf_t *cf);
-static int ngx_libc_cdecl ngx_http_var_cmp_variables(const void *one, const void *two);
 
 static ngx_command_t ngx_http_var_commands[] = {
 
@@ -121,7 +120,6 @@ ngx_http_var_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     if (conf->vars == NULL) {
         conf->vars = prev->vars;
     } else if (prev->vars) {
-        ngx_uint_t i;
         ngx_http_var_variable_t *var;
 
         var = ngx_array_push_n(conf->vars, prev->vars->nelts);
