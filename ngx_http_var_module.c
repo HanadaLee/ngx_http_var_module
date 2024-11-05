@@ -17,9 +17,11 @@ static char *ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, vo
 static ngx_int_t ngx_http_var_variable_handler(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static void *ngx_http_var_create_main_conf(ngx_conf_t *cf);
+static char *ngx_http_var_init_main_conf(ngx_conf_t *cf, void *conf);
 static void *ngx_http_var_create_srv_conf(ngx_conf_t *cf);
+static char *ngx_http_var_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child);
 static void *ngx_http_var_create_loc_conf(ngx_conf_t *cf);
-static char *ngx_http_var_merge_conf(ngx_conf_t *cf, void *parent, void *child);
+static char *ngx_http_var_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child);
 static ngx_int_t ngx_http_var_init(ngx_conf_t *cf);
 static int ngx_libc_cdecl ngx_http_var_cmp_variables(const void *one, const void *two);
 
@@ -40,13 +42,13 @@ static ngx_http_module_t ngx_http_var_module_ctx = {
     ngx_http_var_init,                     /* postconfiguration */
 
     ngx_http_var_create_main_conf,         /* create main configuration */
-    ngx_http_var_merge_conf,               /* init main configuration */
+    ngx_http_var_init_main_conf,           /* init main configuration */
 
     ngx_http_var_create_srv_conf,          /* create server configuration */
-    ngx_http_var_merge_conf,               /* merge server configuration */
+    ngx_http_var_merge_srv_conf,           /* merge server configuration */
 
     ngx_http_var_create_loc_conf,          /* create location configuration */
-    ngx_http_var_merge_conf                /* merge location configuration */
+    ngx_http_var_merge_loc_conf            /* merge location configuration */
 };
 
 ngx_module_t ngx_http_var_module = {
@@ -80,6 +82,14 @@ ngx_http_var_create_main_conf(ngx_conf_t *cf)
     return conf;
 }
 
+/* Initialize main configuration */
+static char *
+ngx_http_var_init_main_conf(ngx_conf_t *cf, void *conf)
+{
+    /* Main configuration does not need to inherit from parent, so just return NGX_CONF_OK */
+    return NGX_CONF_OK;
+}
+
 /* Create server configuration */
 static void *
 ngx_http_var_create_srv_conf(ngx_conf_t *cf)
@@ -94,6 +104,20 @@ ngx_http_var_create_srv_conf(ngx_conf_t *cf)
     conf->vars = NULL;
 
     return conf;
+}
+
+/* Merge server configurations */
+static char *
+ngx_http_var_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
+{
+    ngx_http_var_conf_t *prev = parent;
+    ngx_http_var_conf_t *conf = child;
+
+    if (conf->vars == NULL) {
+        conf->vars = prev->vars;
+    }
+
+    return NGX_CONF_OK;
 }
 
 /* Create location configuration */
@@ -112,17 +136,15 @@ ngx_http_var_create_loc_conf(ngx_conf_t *cf)
     return conf;
 }
 
-/* Merge configurations */
+/* Merge location configurations */
 static char *
-ngx_http_var_merge_conf(ngx_conf_t *cf, void *parent, void *child)
+ngx_http_var_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 {
     ngx_http_var_conf_t *prev = parent;
     ngx_http_var_conf_t *conf = child;
 
     if (conf->vars == NULL) {
-        if (prev->vars != NULL) {
-            conf->vars = prev->vars;
-        }
+        conf->vars = prev->vars;
     }
 
     return NGX_CONF_OK;
@@ -184,11 +206,11 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     /* Determine configuration level */
     if (cf->cmd_type & NGX_HTTP_LOC_CONF) {
-        var->conf_level = NGX_HTTP_LOC_CONF;
+        var->conf_level = 0; /* Location level */
     } else if (cf->cmd_type & NGX_HTTP_SRV_CONF) {
-        var->conf_level = NGX_HTTP_SRV_CONF;
+        var->conf_level = 1; /* Server level */
     } else {
-        var->conf_level = NGX_HTTP_MAIN_CONF;
+        var->conf_level = 2; /* Main level */
     }
 
     ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
