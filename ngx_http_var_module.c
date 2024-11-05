@@ -246,8 +246,11 @@ ngx_http_var_variable_handler(ngx_http_request_t *r,
     ngx_log_t                    *log = r->connection->log;
 
     /* Get variable name from data */
-    var_name.len = ngx_strlen((u_char *) data);
-    var_name.data = (u_char *) data;
+    ngx_str_t *var_name_ptr;
+
+    var_name_ptr = (ngx_str_t *) data;
+    var_name.len = var_name_ptr->len;
+    var_name.data = var_name_ptr->data;
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
                    "ngx_http_var_module: handling variable \"%V\"", &var_name);
