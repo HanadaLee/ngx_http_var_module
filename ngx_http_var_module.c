@@ -8,7 +8,7 @@ typedef struct {
 
 typedef struct {
     ngx_str_t                   name;       /* variable name */
-    ngx_uint_t                  level;      /* configuration level */
+    ngx_uint_t                  conf_level; /* configuration level */
     ngx_http_complex_value_t    value;      /* complex value */
 } ngx_http_var_variable_t;
 
@@ -119,20 +119,9 @@ ngx_http_var_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_http_var_conf_t *prev = parent;
     ngx_http_var_conf_t *conf = child;
 
-    if (conf->vars == NULL && prev->vars != NULL) {
-        conf->vars = ngx_array_create(cf->pool, prev->vars->nelts,
-                                      sizeof(ngx_http_var_variable_t));
-        if (conf->vars == NULL) {
-            return NGX_CONF_ERROR;
-        }
-
-        ngx_http_var_variable_t *prev_vars = prev->vars->elts;
-        for (ngx_uint_t i = 0; i < prev->vars->nelts; i++) {
-            ngx_http_var_variable_t *var = ngx_array_push(conf->vars);
-            if (var == NULL) {
-                return NGX_CONF_ERROR;
-            }
-            *var = prev_vars[i];
+    if (conf->vars == NULL) {
+        if (prev->vars != NULL) {
+            conf->vars = prev->vars;
         }
     }
 
@@ -188,13 +177,19 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     var->name.len = var_name.len;
-    var->name.data = ngx_pnalloc(cf->pool, var_name.len);
+    var->name.data = ngx_pstrdup(cf->pool, &var_name);
     if (var->name.data == NULL) {
         return NGX_CONF_ERROR;
     }
-    ngx_memcpy(var->name.data, var_name.data, var_name.len);
 
-    var->level = cf->cmd_type;
+    /* Determine configuration level */
+    if (cf->cmd_type & NGX_HTTP_LOC_CONF) {
+        var->conf_level = NGX_HTTP_LOC_CONF;
+    } else if (cf->cmd_type & NGX_HTTP_SRV_CONF) {
+        var->conf_level = NGX_HTTP_SRV_CONF;
+    } else {
+        var->conf_level = NGX_HTTP_MAIN_CONF;
+    }
 
     ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
 
@@ -219,7 +214,11 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (v->get_handler == NULL || v->get_handler == ngx_http_var_variable_handler) {
         v->get_handler = ngx_http_var_variable_handler;
-        v->data = 0;
+        /* Store variable name in data */
+        v->data = (uintptr_t) ngx_pstrdup(cf->pool, &var_name);
+        if ((u_char *) v->data == NULL) {
+            return NGX_CONF_ERROR;
+        }
     } else {
         ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
                            "variable \"%V\" already has a handler", &full_var_name);
@@ -235,22 +234,19 @@ ngx_http_var_variable_handler(ngx_http_request_t *r,
 {
     ngx_http_var_conf_t          *vconf[3];
     ngx_http_var_variable_t      *vars;
-    ngx_uint_t                    n, i;
+    ngx_uint_t                    n;
     ngx_str_t                     var_name;
     ngx_str_t                     value_str;
     ngx_int_t                     level;
 
-    /* Get variable name without leading '$' */
-    var_name.len = v->len;
-    var_name.data = v->data;
+    /* Get variable name from data */
+    var_name.len = ngx_strlen((u_char *) data);
+    var_name.data = (u_char *) data;
 
     /* Get configurations */
     vconf[0] = ngx_http_get_module_loc_conf(r, ngx_http_var_module);
     vconf[1] = ngx_http_get_module_srv_conf(r, ngx_http_var_module);
     vconf[2] = ngx_http_get_module_main_conf(r, ngx_http_var_module);
-
-    /* Level mapping */
-    ngx_uint_t levels[3] = { NGX_HTTP_LOC_CONF, NGX_HTTP_SRV_CONF, NGX_HTTP_MAIN_CONF };
 
     for (level = 0; level < 3; level++) {
         if (vconf[level] == NULL || vconf[level]->vars == NULL || vconf[level]->vars->nelts == 0) {
@@ -319,8 +315,8 @@ ngx_http_var_cmp_variables(const void *one, const void *two)
         return cmp;
     }
 
-    /* If variable names are the same, compare levels to maintain definition order */
-    return (int)first->level - (int)second->level;
+    /* If variable names are the same, compare conf_level to maintain definition order */
+    return (int)first->conf_level - (int)second->conf_level;
 }
 
 /* Module postconfiguration */
@@ -329,19 +325,21 @@ ngx_http_var_init(ngx_conf_t *cf)
 {
     ngx_http_var_conf_t      *vconf;
 
-    /* Configuration hierarchy: main, server, location */
+    /* Sort variables in main conf */
     vconf = ngx_http_conf_get_module_main_conf(cf, ngx_http_var_module);
     if (vconf && vconf->vars && vconf->vars->nelts > 0) {
         ngx_qsort(vconf->vars->elts, vconf->vars->nelts,
                   sizeof(ngx_http_var_variable_t), ngx_http_var_cmp_variables);
     }
 
+    /* Sort variables in server conf */
     vconf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_var_module);
     if (vconf && vconf->vars && vconf->vars->nelts > 0) {
         ngx_qsort(vconf->vars->elts, vconf->vars->nelts,
                   sizeof(ngx_http_var_variable_t), ngx_http_var_cmp_variables);
     }
 
+    /* Sort variables in location conf */
     vconf = ngx_http_conf_get_module_loc_conf(cf, ngx_http_var_module);
     if (vconf && vconf->vars && vconf->vars->nelts > 0) {
         ngx_qsort(vconf->vars->elts, vconf->vars->nelts,
