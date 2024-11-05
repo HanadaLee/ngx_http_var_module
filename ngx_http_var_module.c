@@ -19,7 +19,6 @@ static void *ngx_http_var_create_main_conf(ngx_conf_t *cf);
 static void *ngx_http_var_create_srv_conf(ngx_conf_t *cf);
 static void *ngx_http_var_create_loc_conf(ngx_conf_t *cf);
 static char *ngx_http_var_merge_conf(ngx_conf_t *cf, void *parent, void *child);
-static ngx_int_t ngx_http_var_init(ngx_conf_t *cf);
 
 static ngx_command_t ngx_http_var_commands[] = {
 
@@ -35,7 +34,7 @@ static ngx_command_t ngx_http_var_commands[] = {
 
 static ngx_http_module_t ngx_http_var_module_ctx = {
     NULL,                                  /* preconfiguration */
-    ngx_http_var_init,                     /* postconfiguration */
+    NULL,                     /* postconfiguration */
 
     ngx_http_var_create_main_conf,         /* create main configuration */
     NULL,                                  /* init main configuration */
@@ -413,13 +412,5 @@ ngx_http_var_variable_handler(ngx_http_request_t *r,
                    "ngx_http_var_module: variable \"%V\" not found", &var_name);
 
     v->not_found = 1;
-    return NGX_OK;
-}
-
-/* Module postconfiguration */
-static ngx_int_t
-ngx_http_var_init(ngx_conf_t *cf)
-{
-    /* No additional initialization required */
     return NGX_OK;
 }
