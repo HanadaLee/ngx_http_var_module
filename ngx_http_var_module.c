@@ -3,7 +3,7 @@
 #include <ngx_http.h>
 
 typedef struct {
-    ngx_array_t *vars; /* array of ngx_http_var_variable_t */
+    ngx_array_t                *vars;      /* array of ngx_http_var_variable_t */
 } ngx_http_var_loc_conf_t;
 
 typedef struct {
@@ -17,6 +17,8 @@ static ngx_int_t ngx_http_var_variable_handler(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static void *ngx_http_var_create_loc_conf(ngx_conf_t *cf);
 static char *ngx_http_var_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child);
+static ngx_int_t ngx_http_var_init(ngx_conf_t *cf);
+static int ngx_libc_cdecl ngx_http_var_cmp_variables(const void *one, const void *two);
 
 static ngx_command_t ngx_http_var_commands[] = {
 
@@ -32,7 +34,7 @@ static ngx_command_t ngx_http_var_commands[] = {
 
 static ngx_http_module_t ngx_http_var_module_ctx = {
     NULL,                                  /* preconfiguration */
-    NULL,                                  /* postconfiguration */
+    ngx_http_var_init,                     /* postconfiguration */
 
     NULL,                                  /* create main configuration */
     NULL,                                  /* init main configuration */
@@ -191,7 +193,7 @@ ngx_http_var_variable_handler(ngx_http_request_t *r,
 {
     ngx_http_var_loc_conf_t      *vlcf;
     ngx_http_var_variable_t      *vars;
-    ngx_uint_t                    i, j;
+    ngx_uint_t                    i;
     ngx_str_t                     var_name;
     ngx_str_t                     value_str;
 
@@ -208,19 +210,26 @@ ngx_http_var_variable_handler(ngx_http_request_t *r,
 
     for (i = 0; i < 3; i++) {
         vlcf = conf_list[i];
-        if (vlcf == NULL || vlcf->vars == NULL) {
+        if (vlcf == NULL || vlcf->vars == NULL || vlcf->vars->nelts == 0) {
             continue;
         }
 
         vars = vlcf->vars->elts;
         ngx_uint_t n = vlcf->vars->nelts;
 
-        /* Since we need to use the first defined variable, we iterate from the beginning */
-        for (j = 0; j < n; j++) {
-            if (vars[j].name.len == var_name.len &&
-                ngx_strncmp(vars[j].name.data, var_name.data, var_name.len) == 0)
-            {
-                if (ngx_http_complex_value(r, &vars[j].value, &value_str) != NGX_OK) {
+        /* Binary search */
+        ngx_int_t low = 0;
+        ngx_int_t high = n - 1;
+        ngx_int_t mid;
+        int cmp;
+
+        while (low <= high) {
+            mid = (low + high) / 2;
+            cmp = ngx_strcmp(var_name.data, vars[mid].name.data);
+
+            if (cmp == 0) {
+                /* Found the variable */
+                if (ngx_http_complex_value(r, &vars[mid].value, &value_str) != NGX_OK) {
                     return NGX_ERROR;
                 }
 
@@ -237,11 +246,60 @@ ngx_http_var_variable_handler(ngx_http_request_t *r,
                 ngx_memcpy(v->data, value_str.data, value_str.len);
 
                 return NGX_OK;
+            } else if (cmp < 0) {
+                high = mid - 1;
+            } else {
+                low = mid + 1;
             }
         }
     }
 
     /* Variable not found */
     v->not_found = 1;
+    return NGX_OK;
+}
+
+/* Compare function for qsort */
+static int ngx_libc_cdecl
+ngx_http_var_cmp_variables(const void *one, const void *two)
+{
+    ngx_http_var_variable_t *first = (ngx_http_var_variable_t *) one;
+    ngx_http_var_variable_t *second = (ngx_http_var_variable_t *) two;
+
+    return ngx_strcmp(first->name.data, second->name.data);
+}
+
+/* Module postconfiguration */
+static ngx_int_t
+ngx_http_var_init(ngx_conf_t *cf)
+{
+    ngx_http_var_loc_conf_t      *vlcf;
+
+    /* Configuration hierarchy: main, server, location */
+    ngx_http_conf_ctx_t *ctx = cf->ctx;
+
+    /* Sort variables in main conf */
+    vlcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_var_module);
+    if (vlcf && vlcf->vars && vlcf->vars->nelts > 0) {
+        ngx_qsort(vlcf->vars->elts, vlcf->vars->nelts,
+                  sizeof(ngx_http_var_variable_t), ngx_http_var_cmp_variables);
+    }
+
+    /* Sort variables in server conf */
+    if (ctx->srv_conf) {
+        vlcf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_var_module);
+        if (vlcf && vlcf->vars && vlcf->vars->nelts > 0) {
+            ngx_qsort(vlcf->vars->elts, vlcf->vars->nelts,
+                      sizeof(ngx_http_var_variable_t), ngx_http_var_cmp_variables);
+        }
+    }
+
+    /* Sort variables in location conf */
+    vlcf = ngx_http_conf_get_module_loc_conf(cf, ngx_http_var_module);
+    if (vlcf && vlcf->vars && vlcf->vars->nelts > 0) {
+        ngx_qsort(vlcf->vars->elts, vlcf->vars->nelts,
+                  sizeof(ngx_http_var_variable_t), ngx_http_var_cmp_variables);
+    }
+
     return NGX_OK;
 }
