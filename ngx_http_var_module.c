@@ -44,7 +44,7 @@ static void *ngx_http_var_create_loc_conf(ngx_conf_t *cf);
 static char *ngx_http_var_merge_conf(ngx_conf_t *cf, void *parent, void *child);
 static char *ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static ngx_int_t ngx_http_var_find_variable(ngx_http_request_t *r, ngx_str_t *var_name,
-                           ngx_http_var_conf_t *vconf, ngx_str_t *value_str,
+                           ngx_http_var_conf_t *vconf,
                            ngx_log_t *log, const char *conf_level,
                            ngx_http_var_variable_t **found_var);
 static ngx_int_t ngx_http_var_variable_handler(ngx_http_request_t *r,
