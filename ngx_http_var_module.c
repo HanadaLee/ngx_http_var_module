@@ -355,7 +355,6 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         sc.variables = ngx_http_script_variables_count(&assign_value_str);
         sc.complete_lengths = 1;
         sc.complete_values = 1;
-        sc.captures_mask = NGX_HTTP_SCRIPT_REGEX_CAPTURE;
 
         if (ngx_http_script_compile(&sc) != NGX_OK) {
             return NGX_CONF_ERROR;
@@ -877,7 +876,6 @@ ngx_http_var_operate_re_match(ngx_http_request_t *r,
     ngx_str_t                    subject;
     ngx_int_t                    rc;
     int                         *captures;
-    ngx_uint_t                   n;
     ngx_str_t                    assign_value;
 
     /* 获取待匹配的字符串，通常为请求的 URI */
@@ -901,24 +899,25 @@ ngx_http_var_operate_re_match(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    /* 设置脚本引擎 */
-    ngx_http_script_engine_t   e;
-    ngx_http_script_len_code_pt lcode;
+    /* 保存捕获信息到请求中 */
+    r->captures = captures;
+    r->captures_data = subject.data;
+    r->ncaptures = ncaptures;
+
+    /* 运行脚本引擎 */
     ngx_http_script_code_pt    code;
+    ngx_http_script_engine_t   e;
 
     ngx_memzero(&e, sizeof(ngx_http_script_engine_t));
 
     e.ip = var->assign_lengths->elts;
     e.request = r;
     e.flushed = 1;
-    e.captures = captures;
-    e.ncaptures = ncaptures;
-    e.captures_data = subject.data;
 
     /* 计算结果长度 */
     assign_value.len = 0;
     while (*(uintptr_t *) e.ip) {
-        lcode = *(ngx_http_script_len_code_pt *) e.ip;
+        ngx_http_script_len_code_pt lcode = *(ngx_http_script_len_code_pt *) e.ip;
         assign_value.len += lcode(&e);
     }
 
@@ -941,6 +940,14 @@ ngx_http_var_operate_re_match(ngx_http_request_t *r,
     /* 设置变量值 */
     v->len = assign_value.len;
     v->data = assign_value.data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    /* 清理请求中的捕获信息 */
+    r->captures = NULL;
+    r->captures_data = NULL;
+    r->ncaptures = 0;
 
     return NGX_OK;
 }
