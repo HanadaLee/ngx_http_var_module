@@ -6,6 +6,9 @@ typedef enum {
     NGX_HTTP_VAR_OP_COPY,
     NGX_HTTP_VAR_OP_UPPER,
     NGX_HTTP_VAR_OP_LOWER,
+    NGX_HTTP_VAR_OP_MAX,
+    NGX_HTTP_VAR_OP_MIN,
+    NGX_HTTP_VAR_OP_RAND,
     NGX_HTTP_VAR_OP_UNKNOWN
 } ngx_http_var_operator_e;
 
@@ -15,22 +18,26 @@ typedef struct {
 
 typedef struct {
     ngx_str_t                   name;       /* variable name */
-    ngx_http_complex_value_t    value;      /* complex value */
     ngx_http_var_operator_e     operator;   /* operator type */
+    ngx_array_t                *args;       /* array of ngx_http_complex_value_t for multi-argument operators */
 } ngx_http_var_variable_t;
 
 typedef struct {
     ngx_str_t                   name;       /* operator string */
     ngx_http_var_operator_e     op;         /* operator enum */
+    ngx_uint_t                  min_args;   /* minimum number of arguments */
+    ngx_uint_t                  max_args;   /* maximum number of arguments */
 } ngx_http_var_operator_mapping_t;
 
 static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
-    { ngx_string("copy"),  NGX_HTTP_VAR_OP_COPY },
-    { ngx_string("upper"), NGX_HTTP_VAR_OP_UPPER },
-    { ngx_string("lower"), NGX_HTTP_VAR_OP_LOWER }
+    { ngx_string("copy"),    NGX_HTTP_VAR_OP_COPY,    1, 1 },
+    { ngx_string("upper"),   NGX_HTTP_VAR_OP_UPPER,   1, 1 },
+    { ngx_string("lower"),   NGX_HTTP_VAR_OP_LOWER,   1, 1 },
+    { ngx_string("max"),     NGX_HTTP_VAR_OP_MAX,     2, 2 },
+    { ngx_string("min"),     NGX_HTTP_VAR_OP_MIN,     2, 2 },
+    { ngx_string("rand"),    NGX_HTTP_VAR_OP_RAND,    0, 0 }
 };
 
-/* Function prototypes */
 static void *ngx_http_var_create_main_conf(ngx_conf_t *cf);
 static void *ngx_http_var_create_srv_conf(ngx_conf_t *cf);
 static void *ngx_http_var_create_loc_conf(ngx_conf_t *cf);
@@ -42,9 +49,20 @@ static ngx_int_t ngx_http_var_find_variable(ngx_http_request_t *r, ngx_str_t *va
                            ngx_http_var_variable_t **found_var);
 static ngx_int_t ngx_http_var_variable_handler(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
-static ngx_int_t ngx_http_var_operate_copy(u_char *data, size_t len, ngx_str_t *value_str);
-static ngx_int_t ngx_http_var_operate_upper(u_char *data, size_t len, ngx_str_t *value_str);
-static ngx_int_t ngx_http_var_operate_lower(u_char *data, size_t len, ngx_str_t *value_str);
+static ngx_int_t ngx_http_var_expr(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_copy(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_upper(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_lower(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_max(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_min(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_rand(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 static ngx_command_t ngx_http_var_commands[] = {
 
@@ -168,10 +186,18 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_http_variable_t         *v;
     ngx_http_var_variable_t     *var;
     ngx_uint_t                   flags;
-    ngx_uint_t                   i;
+    ngx_uint_t                   i, n;
     ngx_http_var_operator_e      op = NGX_HTTP_VAR_OP_UNKNOWN;
+    ngx_uint_t                   min_args = 0, max_args = 0;
+    ngx_uint_t                   args_count;
 
     value = cf->args->elts;
+
+    if (cf->args->nelts < 3) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "invalid number of arguments in \"var\" directive");
+        return NGX_CONF_ERROR;
+    }
 
     var_name = value[1];
     operator_str = value[2];
@@ -182,16 +208,18 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    /* 移除变量名前的 '$' */
+    /* Remove the leading '$' from variable name */
     var_name.len--;
     var_name.data++;
 
-    /* 通过映射获取操作符的枚举值 */
+    /* Map operator string to enum and get argument counts */
     for (i = 0; i < sizeof(ngx_http_var_operators) / sizeof(ngx_http_var_operator_mapping_t); i++) {
         if (operator_str.len == ngx_http_var_operators[i].name.len &&
             ngx_strncmp(operator_str.data, ngx_http_var_operators[i].name.data, operator_str.len) == 0)
         {
             op = ngx_http_var_operators[i].op;
+            min_args = ngx_http_var_operators[i].min_args;
+            max_args = ngx_http_var_operators[i].max_args;
             break;
         }
     }
@@ -202,7 +230,15 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    /* 初始化变量数组 */
+    args_count = cf->args->nelts - 3; /* Subtract var name and operator */
+
+    if (args_count < min_args || args_count > max_args) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "invalid number of arguments for operator \"%V\"", &operator_str);
+        return NGX_CONF_ERROR;
+    }
+
+    /* Initialize vars array if necessary */
     if (vconf->vars == NULL) {
         vconf->vars = ngx_array_create(cf->pool, 4,
                                        sizeof(ngx_http_var_variable_t));
@@ -211,7 +247,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
     }
 
-    /* 添加变量定义 */
+    /* Add variable definition */
     var = ngx_array_push(vconf->vars);
     if (var == NULL) {
         return NGX_CONF_ERROR;
@@ -225,20 +261,35 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     var->operator = op;
 
-    /* 编译复杂值 */
-    ngx_http_compile_complex_value_t   ccv;
-
-    ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
-
-    ccv.cf = cf;
-    ccv.value = &value[3];
-    ccv.complex_value = &var->value;
-
-    if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+    /* Initialize args array */
+    var->args = ngx_array_create(cf->pool, args_count ? args_count : 1,
+                                 sizeof(ngx_http_complex_value_t));
+    if (var->args == NULL) {
         return NGX_CONF_ERROR;
     }
 
-    /* 注册变量 */
+    /* Compile all arguments */
+    for (n = 0; n < args_count; n++) {
+        ngx_http_complex_value_t   *cv;
+        ngx_http_compile_complex_value_t   ccv;
+
+        cv = ngx_array_push(var->args);
+        if (cv == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+
+        ccv.cf = cf;
+        ccv.value = &value[3 + n];
+        ccv.complex_value = cv;
+
+        if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+            return NGX_CONF_ERROR;
+        }
+    }
+
+    /* Add variable to Nginx */
     flags = NGX_HTTP_VAR_CHANGEABLE | NGX_HTTP_VAR_NOCACHEABLE;
 
     v = ngx_http_add_variable(cf, &var_name, flags);
@@ -249,7 +300,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     if (v->get_handler == NULL || v->get_handler == ngx_http_var_variable_handler) {
         v->get_handler = ngx_http_var_variable_handler;
 
-        /* 存储变量名 */
+        /* Store variable name */
         ngx_str_t *var_name_copy;
 
         var_name_copy = ngx_palloc(cf->pool, sizeof(ngx_str_t));
@@ -386,35 +437,8 @@ found:
     v->no_cacheable = 1;
     v->not_found = 0;
 
-    /* 分配内存 */
-    v->len = value_str.len;
-    v->data = ngx_pnalloc(r->pool, v->len);
-    if (v->data == NULL) {
-        ngx_log_error(NGX_LOG_ERR, log, 0,
-                      "ngx_http_var_module: memory allocation failed");
-        return NGX_ERROR;
-    }
-
-    /* 调用对应的操作处理函数 */
-    switch (found_var->operator) {
-    case NGX_HTTP_VAR_OP_COPY:
-        rc = ngx_http_var_operate_copy(v->data, v->len, &value_str);
-        break;
-
-    case NGX_HTTP_VAR_OP_UPPER:
-        rc = ngx_http_var_operate_upper(v->data, v->len, &value_str);
-        break;
-
-    case NGX_HTTP_VAR_OP_LOWER:
-        rc = ngx_http_var_operate_lower(v->data, v->len, &value_str);
-        break;
-
-    default:
-        ngx_log_error(NGX_LOG_ERR, log, 0,
-                      "ngx_http_var_module: unknown operator");
-        return NGX_ERROR;
-    }
-
+    /* Handle variable based on operator */
+    rc = ngx_http_var_variable_expr(r, v, found_var);
     if (rc != NGX_OK) {
         return NGX_ERROR;
     }
@@ -422,37 +446,312 @@ found:
     return NGX_OK;
 }
 
+/* Expression evaluation function */
 static ngx_int_t
-ngx_http_var_operate_copy(u_char *data, size_t len, ngx_str_t *value_str)
+ngx_http_var_expr(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_memcpy(data, value_str->data, len);
-    return NGX_OK;
+    ngx_int_t rc;
+
+    switch (var->operator) {
+    case NGX_HTTP_VAR_OP_COPY:
+        rc = ngx_http_var_operate_copy(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_UPPER:
+        rc = ngx_http_var_operate_upper(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_LOWER:
+        rc = ngx_http_var_operate_lower(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_MAX:
+        rc = ngx_http_var_operate_max(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_MIN:
+        rc = ngx_http_var_operate_min(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_RAND:
+        rc = ngx_http_var_operate_rand(r, v, var);
+        break;
+
+    default:
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: unknown operator");
+        return NGX_ERROR;
+    }
+
+    return rc;
 }
 
 static ngx_int_t
-ngx_http_var_operate_upper(u_char *data, size_t len, ngx_str_t *value_str)
+ngx_http_var_operate_copy(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    size_t i;
+    ngx_str_t value_str;
 
-    ngx_memcpy(data, value_str->data, len);
+    if (var->args->nelts != 1) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: invalid number of arguments for copy operator");
+        return NGX_ERROR;
+    }
 
-    for (i = 0; i < len; i++) {
-        data[i] = ngx_toupper(data[i]);
+    ngx_http_complex_value_t *cv = (ngx_http_complex_value_t *) var->args->elts;
+
+    if (ngx_http_complex_value(r, &cv[0], &value_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: failed to compute variable value");
+        return NGX_ERROR;
+    }
+
+    v->len = value_str.len;
+    v->data = ngx_pnalloc(r->pool, v->len);
+    if (v->data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: memory allocation failed");
+        return NGX_ERROR;
+    }
+
+    ngx_memcpy(v->data, value_str.data, v->len);
+
+    return NGX_OK;
+}
+
+/* Uppercase operation */
+static ngx_int_t
+ngx_http_var_operate_upper(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t value_str;
+    ngx_http_complex_value_t *cv;
+
+    if (var->args->nelts != 1) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: upper operator requires exactly one argument");
+        return NGX_ERROR;
+    }
+
+    cv = (ngx_http_complex_value_t *) var->args->elts;
+
+    if (ngx_http_complex_value(r, &cv[0], &value_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: failed to compute argument for upper operator");
+        return NGX_ERROR;
+    }
+
+    v->len = value_str.len;
+    v->data = ngx_pnalloc(r->pool, v->len);
+    if (v->data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: memory allocation failed");
+        return NGX_ERROR;
+    }
+
+    ngx_memcpy(v->data, value_str.data, v->len);
+
+    /* Convert to uppercase */
+    ngx_uint_t i;
+    for (i = 0; i < v->len; i++) {
+        v->data[i] = ngx_toupper(v->data[i]);
+    }
+
+    return NGX_OK;
+}
+
+/* Lowercase operation */
+static ngx_int_t
+ngx_http_var_operate_lower(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t value_str;
+    ngx_http_complex_value_t *cv;
+
+    if (var->args->nelts != 1) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: lower operator requires exactly one argument");
+        return NGX_ERROR;
+    }
+
+    cv = (ngx_http_complex_value_t *) var->args->elts;
+
+    if (ngx_http_complex_value(r, &cv[0], &value_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: failed to compute argument for lower operator");
+        return NGX_ERROR;
+    }
+
+    v->len = value_str.len;
+    v->data = ngx_pnalloc(r->pool, v->len);
+    if (v->data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: memory allocation failed");
+        return NGX_ERROR;
+    }
+
+    ngx_memcpy(v->data, value_str.data, v->len);
+
+    /* Convert to lowercase */
+    ngx_uint_t i;
+    for (i = 0; i < v->len; i++) {
+        v->data[i] = ngx_tolower(v->data[i]);
     }
 
     return NGX_OK;
 }
 
 static ngx_int_t
-ngx_http_var_operate_lower(u_char *data, size_t len, ngx_str_t *value_str)
+ngx_http_var_operate_max(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    size_t i;
+    ngx_http_complex_value_t *cvp;
+    ngx_str_t                 arg_str1, arg_str2;
+    ngx_int_t                 num1, num2, max;
 
-    ngx_memcpy(data, value_str->data, len);
-
-    for (i = 0; i < len; i++) {
-        data[i] = ngx_tolower(data[i]);
+    if (var->args->nelts != 2) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: max operator requires exactly two arguments");
+        return NGX_ERROR;
     }
+
+    cvp = var->args->elts;
+
+    /* Evaluate first argument */
+    if (ngx_http_complex_value(r, &cvp[0], &arg_str1) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: failed to compute first argument");
+        return NGX_ERROR;
+    }
+
+    /* Evaluate second argument */
+    if (ngx_http_complex_value(r, &cvp[1], &arg_str2) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: failed to compute second argument");
+        return NGX_ERROR;
+    }
+
+    /* Convert arguments to integers */
+    num1 = ngx_atoi(arg_str1.data, arg_str1.len);
+    if (num1 == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: invalid number \"%V\"", &arg_str1);
+        return NGX_ERROR;
+    }
+
+    num2 = ngx_atoi(arg_str2.data, arg_str2.len);
+    if (num2 == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: invalid number \"%V\"", &arg_str2);
+        return NGX_ERROR;
+    }
+
+    /* Compute max */
+    max = (num1 > num2) ? num1 : num2;
+
+    /* Convert result to string */
+    u_char *p;
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: memory allocation failed");
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%i", max) - p;
+    v->data = p;
+
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_http_var_operate_min(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t *cvp;
+    ngx_str_t                 arg_str1, arg_str2;
+    ngx_int_t                 num1, num2, min;
+
+    if (var->args->nelts != 2) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: min operator requires exactly two arguments");
+        return NGX_ERROR;
+    }
+
+    cvp = var->args->elts;
+
+    /* Evaluate first argument */
+    if (ngx_http_complex_value(r, &cvp[0], &arg_str1) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: failed to compute first argument");
+        return NGX_ERROR;
+    }
+
+    /* Evaluate second argument */
+    if (ngx_http_complex_value(r, &cvp[1], &arg_str2) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: failed to compute second argument");
+        return NGX_ERROR;
+    }
+
+    /* Convert arguments to integers */
+    num1 = ngx_atoi(arg_str1.data, arg_str1.len);
+    if (num1 == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: invalid number \"%V\"", &arg_str1);
+        return NGX_ERROR;
+    }
+
+    num2 = ngx_atoi(arg_str2.data, arg_str2.len);
+    if (num2 == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: invalid number \"%V\"", &arg_str2);
+        return NGX_ERROR;
+    }
+
+    /* Compute min */
+    min = (num1 < num2) ? num1 : num2;
+
+    /* Convert result to string */
+    u_char *p;
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: memory allocation failed");
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%i", min) - p;
+    v->data = p;
+
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_http_var_operate_rand(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    if (var->args->nelts != 0) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: rand operator does not accept arguments");
+        return NGX_ERROR;
+    }
+
+    /* Generate a random number */
+    ngx_uint_t rand_num = ngx_random();
+
+    /* Convert to string */
+    u_char *p;
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: memory allocation failed");
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%ui", rand_num) - p;
+    v->data = p;
 
     return NGX_OK;
 }
