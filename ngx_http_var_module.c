@@ -588,7 +588,7 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
         break;
 
     case NGX_HTTP_VAR_OP_RE_MATCH:
-        rc = ngx_http_var_operate_rand(r, v, var);
+        rc = ngx_http_var_operate_re_match(r, v, var);
         break;
 
     default:
