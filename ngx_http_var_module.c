@@ -67,7 +67,7 @@ static ngx_int_t ngx_http_var_operate_rand(ngx_http_request_t *r,
 static ngx_command_t ngx_http_var_commands[] = {
 
     { ngx_string("var"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE3,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_1MORE,
       ngx_http_var_create_variable,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
@@ -193,21 +193,14 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     value = cf->args->elts;
 
-    if (cf->args->nelts < 2) {
+    if (cf->args->nelts < 3) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "invalid number of arguments in \"var\" directive");
         return NGX_CONF_ERROR;
     }
 
     var_name = value[1];
-
-    if (cf->args->nelts >= 3) {
-        operator_str = value[2];
-    } else {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "missing operator in \"var\" directive");
-        return NGX_CONF_ERROR;
-    }
+    operator_str = value[2];
 
     if (var_name.len == 0 || var_name.data[0] != '$') {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
