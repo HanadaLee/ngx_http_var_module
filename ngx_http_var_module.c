@@ -13,7 +13,7 @@ typedef enum {
 } ngx_http_var_operator_e;
 
 typedef struct {
-    ngx_array_t                    *vars;      /* array of ngx_http_var_variable_t */
+    ngx_array_t                *vars;      /* array of ngx_http_var_variable_t */
 } ngx_http_var_conf_t;
 
 typedef struct {
@@ -189,18 +189,25 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_uint_t                   i, n;
     ngx_http_var_operator_e      op = NGX_HTTP_VAR_OP_UNKNOWN;
     ngx_uint_t                   min_args = 0, max_args = 0;
-    ngx_uint_t                   args_count;
+    ngx_int_t                    args_count;
 
     value = cf->args->elts;
 
-    if (cf->args->nelts < 3) {
+    if (cf->args->nelts < 2) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "invalid number of arguments in \"var\" directive");
         return NGX_CONF_ERROR;
     }
 
     var_name = value[1];
-    operator_str = value[2];
+
+    if (cf->args->nelts >= 3) {
+        operator_str = value[2];
+    } else {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "missing operator in \"var\" directive");
+        return NGX_CONF_ERROR;
+    }
 
     if (var_name.len == 0 || var_name.data[0] != '$') {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -230,9 +237,12 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    args_count = cf->args->nelts - 3; /* Subtract var name and operator */
+    args_count = cf->args->nelts - 3;
+    if (args_count < 0) {
+        args_count = 0;
+    }
 
-    if (args_count < min_args || args_count > max_args) {
+    if ((ngx_uint_t) args_count < min_args || (ngx_uint_t) args_count > max_args) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "invalid number of arguments for operator \"%V\"", &operator_str);
         return NGX_CONF_ERROR;
@@ -269,7 +279,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     /* Compile all arguments */
-    for (n = 0; n < args_count; n++) {
+    for (n = 0; n < (ngx_uint_t) args_count; n++) {
         ngx_http_complex_value_t   *cv;
         ngx_http_compile_complex_value_t   ccv;
 
