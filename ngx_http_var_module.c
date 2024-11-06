@@ -26,8 +26,6 @@ typedef struct {
     /* 以下字段用于 re_match 操作符 */
     ngx_regex_t                *regex;          /* compiled regular expression */
     ngx_uint_t                  ncaptures;      /* number of captures */
-    ngx_array_t                *assign_lengths; /* script lengths */
-    ngx_array_t                *assign_values;  /* script values */
 } ngx_http_var_variable_t;
 
 typedef struct {
@@ -44,7 +42,7 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("max"),     NGX_HTTP_VAR_OP_MAX,       2, 2 },
     { ngx_string("min"),     NGX_HTTP_VAR_OP_MIN,       2, 2 },
     { ngx_string("rand"),    NGX_HTTP_VAR_OP_RAND,      0, 0 },
-    { ngx_string("re_match"), NGX_HTTP_VAR_OP_RE_MATCH, 2, 2 }
+    { ngx_string("re_match"), NGX_HTTP_VAR_OP_RE_MATCH, 3, 3 }
 };
 
 static void *ngx_http_var_create_main_conf(ngx_conf_t *cf);
@@ -188,6 +186,7 @@ ngx_http_var_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 }
 
 /* "var" directive handler */
+/* "var" directive handler */
 static char *
 ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -306,17 +305,53 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    if (op == NGX_HTTP_VAR_OP_RE_MATCH) {
-        /* Handle re_match operator */
+    /* Initialize args array */
+    var->args = ngx_array_create(cf->pool, args_count ? args_count : 1,
+                                 sizeof(ngx_http_complex_value_t));
+    if (var->args == NULL) {
+        return NGX_CONF_ERROR;
+    }
 
-        if (args_count != 2) {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "re_match operator requires a regex and an assign value");
+    /* Compile all arguments */
+    for (n = 0; n < args_count; n++) {
+        ngx_http_complex_value_t            *cv;
+        ngx_http_compile_complex_value_t     ccv;
+
+        cv = ngx_array_push(var->args);
+        if (cv == NULL) {
             return NGX_CONF_ERROR;
         }
 
-        /* Compile the regular expression */
-        ngx_str_t             regex_str = value[arg_index];
+        ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+
+        ccv.cf = cf;
+        ccv.value = &value[arg_index + n];
+        ccv.complex_value = cv;
+
+        if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+            return NGX_CONF_ERROR;
+        }
+    }
+
+    /* For re_match operator, compile the regex */
+    if (op == NGX_HTTP_VAR_OP_RE_MATCH) {
+        /* The regex is the second argument (args[1]) */
+        ngx_http_complex_value_t *regex_cv = ((ngx_http_complex_value_t *)var->args->elts) + 1;
+
+        if (regex_cv->value.len == 0) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "regex pattern cannot be empty");
+            return NGX_CONF_ERROR;
+        }
+
+        if (regex_cv->lengths != NULL) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "regex pattern cannot contain variables");
+            return NGX_CONF_ERROR;
+        }
+
+        ngx_str_t regex_str = regex_cv->value;
+
         ngx_regex_compile_t   rc;
 
         ngx_memzero(&rc, sizeof(ngx_regex_compile_t));
@@ -338,58 +373,6 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         var->regex = rc.regex;
         var->ncaptures = rc.captures;
-
-        arg_index++;
-
-        /* Compile assign_value with script engine */
-        ngx_str_t assign_value_str = value[arg_index];
-
-        ngx_http_script_compile_t sc;
-
-        ngx_memzero(&sc, sizeof(ngx_http_script_compile_t));
-
-        sc.cf = cf;
-        sc.source = &assign_value_str;
-        sc.lengths = &var->assign_lengths;
-        sc.values = &var->assign_values;
-        sc.variables = ngx_http_script_variables_count(&assign_value_str);
-        sc.complete_lengths = 1;
-        sc.complete_values = 1;
-
-        if (ngx_http_script_compile(&sc) != NGX_OK) {
-            return NGX_CONF_ERROR;
-        }
-
-    } else {
-        /* Handle other operators */
-
-        /* Initialize args array */
-        var->args = ngx_array_create(cf->pool, args_count ? args_count : 1,
-                                     sizeof(ngx_http_complex_value_t));
-        if (var->args == NULL) {
-            return NGX_CONF_ERROR;
-        }
-
-        /* Compile all arguments */
-        for (n = 0; n < args_count; n++) {
-            ngx_http_complex_value_t            *cv;
-            ngx_http_compile_complex_value_t     ccv;
-
-            cv = ngx_array_push(var->args);
-            if (cv == NULL) {
-                return NGX_CONF_ERROR;
-            }
-
-            ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
-
-            ccv.cf = cf;
-            ccv.value = &value[arg_index + n];
-            ccv.complex_value = cv;
-
-            if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
-                return NGX_CONF_ERROR;
-            }
-        }
     }
 
     /* Add variable definition to the configuration */
@@ -873,22 +856,25 @@ static ngx_int_t
 ngx_http_var_operate_re_match(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                    subject;
+    ngx_str_t                    subject, assign_value;
     ngx_int_t                    rc;
     int                         *captures;
-    ngx_str_t                    assign_value;
+    ngx_uint_t                   ncaptures;
 
-    /* 获取待匹配的字符串，通常为请求的 URI */
-    subject = r->uri;
+    ngx_http_complex_value_t    *args = var->args->elts;
 
-    /* 分配捕获组数组 */
-    ngx_uint_t ncaptures = (var->ncaptures + 1) * 3;
+    /* Evaluate src_string */
+    if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    /* Execute regex matching */
+    ncaptures = (var->ncaptures + 1) * 3;
     captures = ngx_palloc(r->pool, ncaptures * sizeof(int));
     if (captures == NULL) {
         return NGX_ERROR;
     }
 
-    /* 执行正则匹配 */
     rc = ngx_regex_exec(var->regex, &subject, captures, ncaptures);
     if (rc == NGX_REGEX_NO_MATCHED) {
         v->not_found = 1;
@@ -899,52 +885,24 @@ ngx_http_var_operate_re_match(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    /* 保存捕获信息到请求中 */
+    /* Save captures in the request */
     r->captures = captures;
     r->captures_data = subject.data;
     r->ncaptures = ncaptures;
 
-    /* 运行脚本引擎 */
-    ngx_http_script_code_pt    code;
-    ngx_http_script_engine_t   e;
-
-    ngx_memzero(&e, sizeof(ngx_http_script_engine_t));
-
-    e.ip = var->assign_lengths->elts;
-    e.request = r;
-    e.flushed = 1;
-
-    /* 计算结果长度 */
-    assign_value.len = 0;
-    while (*(uintptr_t *) e.ip) {
-        ngx_http_script_len_code_pt lcode = *(ngx_http_script_len_code_pt *) e.ip;
-        assign_value.len += lcode(&e);
-    }
-
-    /* 分配内存 */
-    assign_value.data = ngx_pnalloc(r->pool, assign_value.len);
-    if (assign_value.data == NULL) {
+    /* Evaluate assign_value */
+    if (ngx_http_complex_value(r, &args[2], &assign_value) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    /* 重置脚本引擎 */
-    e.ip = var->assign_values->elts;
-    e.pos = assign_value.data;
-
-    /* 运行脚本，生成最终的变量值 */
-    while (*(uintptr_t *) e.ip) {
-        code = *(ngx_http_script_code_pt *) e.ip;
-        code((ngx_http_script_engine_t *) &e);
-    }
-
-    /* 设置变量值 */
+    /* Set variable value */
     v->len = assign_value.len;
     v->data = assign_value.data;
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
 
-    /* 清理请求中的捕获信息 */
+    /* Clean up captures */
     r->captures = NULL;
     r->captures_data = NULL;
     r->ncaptures = 0;
