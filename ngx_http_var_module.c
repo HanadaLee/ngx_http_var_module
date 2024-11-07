@@ -565,6 +565,10 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
     case NGX_HTTP_VAR_OP_RE_MATCH:
         rc = ngx_http_var_operate_re_match(r, v, var);
         break;
+
+    case NGX_HTTP_VAR_OP_RE_SUB:
+        rc = ngx_http_var_operate_re_sub(r, v, var);
+        break;
 #endif
 
     default:
