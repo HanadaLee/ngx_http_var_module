@@ -680,8 +680,8 @@ ngx_http_var_operate_upper(ngx_http_request_t *r,
 
     if (ngx_http_complex_value(r, &cv[0], &value_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: failed to compute argument
-                       for upper operator");
+                      "http_var: failed to compute argument "
+                      "for upper operator");
         return NGX_ERROR;
     }
 
@@ -716,8 +716,8 @@ ngx_http_var_operate_lower(ngx_http_request_t *r,
 
     if (ngx_http_complex_value(r, &cv[0], &value_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: failed to compute argument
-                       for lower operator");
+                      "http_var: failed to compute argument "
+                      "for lower operator");
         return NGX_ERROR;
     }
 
