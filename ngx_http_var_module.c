@@ -645,7 +645,7 @@ ngx_http_var_operate_copy(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_str_t value_str;
-    ngx_http_complex_value_t *cv 
+    ngx_http_complex_value_t *cv;
 
     cv = (ngx_http_complex_value_t *) var->args->elts;
 
