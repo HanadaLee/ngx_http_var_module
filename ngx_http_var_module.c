@@ -616,6 +616,7 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
     case NGX_HTTP_VAR_OP_RE_MATCH:
         rc = ngx_http_var_operate_re_match(r, v, var);
         break;
+#endif
 
     default:
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
