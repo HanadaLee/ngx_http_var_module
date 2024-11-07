@@ -376,7 +376,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         rc.options = var->flags;
 
         var->regex = ngx_http_regex_compile(cf, &rc);
-        if (regex->regex == NULL) {
+        if (var->regex == NULL) {
             return NGX_CONF_ERROR;
         }
 
