@@ -24,8 +24,7 @@ typedef struct {
     ngx_uint_t                  flags;          /* general flags, e.g., NGX_REGEX_CASELESS */
     unsigned                    global:1;       /* whether to perform global matching */
     /* 以下字段用于 re_match 操作符 */
-    ngx_regex_t                *regex;          /* compiled regular expression */
-    ngx_uint_t                  ncaptures;      /* number of captures */
+    ngx_http_regex_t           *regex;          /* compiled regex */
 } ngx_http_var_variable_t;
 
 typedef struct {
@@ -36,13 +35,17 @@ typedef struct {
 } ngx_http_var_operator_mapping_t;
 
 static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
-    { ngx_string("copy"),    NGX_HTTP_VAR_OP_COPY,      1, 1 },
-    { ngx_string("upper"),   NGX_HTTP_VAR_OP_UPPER,     1, 1 },
-    { ngx_string("lower"),   NGX_HTTP_VAR_OP_LOWER,     1, 1 },
-    { ngx_string("max"),     NGX_HTTP_VAR_OP_MAX,       2, 2 },
-    { ngx_string("min"),     NGX_HTTP_VAR_OP_MIN,       2, 2 },
-    { ngx_string("rand"),    NGX_HTTP_VAR_OP_RAND,      0, 0 },
-    { ngx_string("re_match"), NGX_HTTP_VAR_OP_RE_MATCH, 3, 3 }
+    { ngx_string("copy"),     NGX_HTTP_VAR_OP_COPY,      1, 1 },
+    { ngx_string("upper"),    NGX_HTTP_VAR_OP_UPPER,     1, 1 },
+    { ngx_string("lower"),    NGX_HTTP_VAR_OP_LOWER,     1, 1 },
+    { ngx_string("max"),      NGX_HTTP_VAR_OP_MAX,       2, 2 },
+    { ngx_string("min"),      NGX_HTTP_VAR_OP_MIN,       2, 2 },
+
+#if (NGX_PCRE)
+    { ngx_string("re_match"), NGX_HTTP_VAR_OP_RE_MATCH,  3, 3 },
+#endif
+
+    { ngx_string("rand"),     NGX_HTTP_VAR_OP_RAND,      0, 0 }
 };
 
 static void *ngx_http_var_create_main_conf(ngx_conf_t *cf);
@@ -70,8 +73,11 @@ static ngx_int_t ngx_http_var_operate_min(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_rand(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+
+#if (NGX_PCRE)
 static ngx_int_t ngx_http_var_operate_re_match(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+#endif
 
 static ngx_command_t ngx_http_var_commands[] = {
 
@@ -186,13 +192,12 @@ ngx_http_var_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 }
 
 /* "var" directive handler */
-/* "var" directive handler */
 static char *
 ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_http_var_conf_t         *vconf = conf;
     ngx_str_t                   *value;
-    ngx_str_t                    var_name, operator_str;
+    ngx_str_t                    var_name, operator_str, regex_pattern;
     ngx_http_variable_t         *v;
     ngx_http_var_variable_t     *var;
     ngx_uint_t                   flags;
@@ -305,74 +310,111 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    /* Initialize args array */
-    var->args = ngx_array_create(cf->pool, args_count ? args_count : 1,
-                                 sizeof(ngx_http_complex_value_t));
-    if (var->args == NULL) {
-        return NGX_CONF_ERROR;
-    }
+    if (op == NGX_HTTP_VAR_OP_RE_MATCH) {
+#if (NGX_PCRE)
+        /* re_match 操作符需要 3 个参数：src_string, regex_pattern, assign_value */
+        if (args_count != 3) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "re_match operator requires 3 arguments");
+            return NGX_CONF_ERROR;
+        }
 
-    /* Compile all arguments */
-    for (n = 0; n < args_count; n++) {
-        ngx_http_complex_value_t            *cv;
-        ngx_http_compile_complex_value_t     ccv;
+        /* Initialize args array */
+        var->args = ngx_array_create(cf->pool, 2, sizeof(ngx_http_complex_value_t));
+        if (var->args == NULL) {
+            return NGX_CONF_ERROR;
+        }
 
-        cv = ngx_array_push(var->args);
-        if (cv == NULL) {
+        /* Compile src_string */
+        ngx_http_complex_value_t *cv_src;
+        ngx_http_compile_complex_value_t ccv;
+
+        cv_src = ngx_array_push(var->args);
+        if (cv_src == NULL) {
             return NGX_CONF_ERROR;
         }
 
         ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
 
         ccv.cf = cf;
-        ccv.value = &value[arg_index + n];
-        ccv.complex_value = cv;
+        ccv.value = &value[arg_index++];
+        ccv.complex_value = cv_src;
 
         if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
             return NGX_CONF_ERROR;
         }
-    }
 
-    /* For re_match operator, compile the regex */
-    if (op == NGX_HTTP_VAR_OP_RE_MATCH) {
-        /* The regex is the second argument (args[1]) */
-        ngx_http_complex_value_t *regex_cv = ((ngx_http_complex_value_t *)var->args->elts) + 1;
+        /* Get regex_pattern */
+        regex_pattern = value[arg_index++];
 
-        if (regex_cv->value.len == 0) {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "regex pattern cannot be empty");
+        /* Compile assign_value */
+        ngx_http_complex_value_t *cv_assign;
+
+        cv_assign = ngx_array_push(var->args);
+        if (cv_assign == NULL) {
             return NGX_CONF_ERROR;
         }
 
-        if (regex_cv->lengths != NULL) {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "regex pattern cannot contain variables");
+        ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+
+        ccv.cf = cf;
+        ccv.value = &value[arg_index++];
+        ccv.complex_value = cv_assign;
+
+        if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
             return NGX_CONF_ERROR;
         }
 
-        ngx_str_t regex_str = regex_cv->value;
+        /* Compile regex */
+        ngx_http_regex_compile_t   rc;
+        ngx_str_t                  err;
 
-        ngx_regex_compile_t   rc;
+        ngx_memzero(&rc, sizeof(ngx_http_regex_compile_t));
 
-        ngx_memzero(&rc, sizeof(ngx_regex_compile_t));
-
-        rc.pattern = regex_str;
+        rc.pattern = regex_pattern;
         rc.pool = cf->pool;
+        rc.err = &err;
         rc.options = var->flags;
-        rc.err.len = NGX_MAX_CONF_ERRSTR;
-        rc.err.data = ngx_pnalloc(cf->pool, NGX_MAX_CONF_ERRSTR);
-        if (rc.err.data == NULL) {
-            return NGX_CONF_ERROR;
-        }
 
-        if (ngx_regex_compile(&rc) != NGX_OK) {
+        if (ngx_http_regex_compile(cf, &rc) != NGX_OK) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "failed to compile regex \"%V\": %V", &regex_str, &rc.err);
+                               "failed to compile regex \"%V\": %V", &regex_pattern, &err);
             return NGX_CONF_ERROR;
         }
 
         var->regex = rc.regex;
-        var->ncaptures = rc.captures;
+
+#else
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "PCRE library is required for \"re_match\" operator");
+        return NGX_CONF_ERROR;
+#endif
+    } else {
+        /* Handle other operators */
+        var->args = ngx_array_create(cf->pool, args_count, sizeof(ngx_http_complex_value_t));
+        if (var->args == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        for (n = 0; n < args_count; n++) {
+            ngx_http_complex_value_t            *cv;
+            ngx_http_compile_complex_value_t     ccv;
+
+            cv = ngx_array_push(var->args);
+            if (cv == NULL) {
+                return NGX_CONF_ERROR;
+            }
+
+            ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+
+            ccv.cf = cf;
+            ccv.value = &value[arg_index + n];
+            ccv.complex_value = cv;
+
+            if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+                return NGX_CONF_ERROR;
+            }
+        }
     }
 
     /* Add variable definition to the configuration */
@@ -570,6 +612,7 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
         rc = ngx_http_var_operate_rand(r, v, var);
         break;
 
+#if (NGX_PCRE)
     case NGX_HTTP_VAR_OP_RE_MATCH:
         rc = ngx_http_var_operate_re_match(r, v, var);
         break;
@@ -852,60 +895,49 @@ ngx_http_var_operate_rand(ngx_http_request_t *r,
     return NGX_OK;
 }
 
+#if (NGX_PCRE)
 static ngx_int_t
 ngx_http_var_operate_re_match(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_str_t                    subject, assign_value;
     ngx_int_t                    rc;
-    int                         *captures;
-    ngx_uint_t                   ncaptures;
 
     ngx_http_complex_value_t    *args = var->args->elts;
 
-    /* Evaluate src_string */
+    /* 计算 src_string 的值 */
     if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    /* Execute regex matching */
-    ncaptures = (var->ncaptures + 1) * 3;
-    captures = ngx_palloc(r->pool, ncaptures * sizeof(int));
-    if (captures == NULL) {
-        return NGX_ERROR;
-    }
-
-    rc = ngx_regex_exec(var->regex, &subject, captures, ncaptures);
-    if (rc == NGX_REGEX_NO_MATCHED) {
+    /* 执行正则匹配 */
+    rc = ngx_http_regex_exec(r, var->regex, &subject);
+    if (rc == NGX_DECLINED) {
         v->not_found = 1;
         return NGX_OK;
-    } else if (rc < 0) {
+    } else if (rc != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "ngx_http_var_module: regex match failed");
         return NGX_ERROR;
     }
 
-    /* Save captures in the request */
-    r->captures = captures;
-    r->captures_data = subject.data;
-    r->ncaptures = ncaptures;
-
-    /* Evaluate assign_value */
-    if (ngx_http_complex_value(r, &args[2], &assign_value) != NGX_OK) {
+    /* 计算 assign_value 的值 */
+    if (ngx_http_complex_value(r, &args[1], &assign_value) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    /* Set variable value */
+    /* 设置变量值 */
     v->len = assign_value.len;
-    v->data = assign_value.data;
+    v->data = ngx_pnalloc(r->pool, v->len);
+    if (v->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_memcpy(v->data, assign_value.data, v->len);
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
 
-    /* Clean up captures */
-    r->captures = NULL;
-    r->captures_data = NULL;
-    r->ncaptures = 0;
-
     return NGX_OK;
 }
+#endif
