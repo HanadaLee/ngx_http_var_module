@@ -312,7 +312,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (op == NGX_HTTP_VAR_OP_RE_MATCH) {
 #if (NGX_PCRE)
-        /* re_match 操作符需要 3 个参数：src_string, regex_pattern, assign_value */
+        /* re_match operator requires 3 arguments: src_string, regex_pattern, assign_value */
         if (args_count != 3) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "re_match operator requires 3 arguments");
@@ -366,19 +366,20 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
 
         /* Compile regex */
-        ngx_http_regex_compile_t   rc;
-        ngx_str_t                  err;
+        ngx_regex_compile_t        rc;
+        u_char                     errstr[NGX_MAX_CONF_ERRSTR];
 
-        ngx_memzero(&rc, sizeof(ngx_http_regex_compile_t));
+        ngx_memzero(&rc, sizeof(ngx_regex_compile_t));
 
         rc.pattern = regex_pattern;
         rc.pool = cf->pool;
-        rc.err = &err;
+        rc.err.len = NGX_MAX_CONF_ERRSTR;
+        rc.err.data = errstr;
         rc.options = var->flags;
 
         if (ngx_http_regex_compile(cf, &rc) != NGX_OK) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "failed to compile regex \"%V\": %V", &regex_pattern, &err);
+                               "failed to compile regex \"%V\": %V", &regex_pattern, &rc.err);
             return NGX_CONF_ERROR;
         }
 
