@@ -15,39 +15,42 @@ typedef enum {
 } ngx_http_var_operator_e;
 
 typedef struct {
-    ngx_array_t                *vars;       /* array of ngx_http_var_variable_t */
+    ngx_array_t                *vars;        /* array of ngx_http_var_variable_t */
 } ngx_http_var_conf_t;
 
 typedef struct {
-    ngx_str_t                   name;       /* variable name */
-    ngx_http_var_operator_e     operator;   /* operator type */
-    ngx_array_t                *args;       /* array of ngx_http_complex_value_t */
+    ngx_str_t                   name;        /* variable name */
+    ngx_http_var_operator_e     operator;    /* operator type */
+    ngx_array_t                *args;        /* array of ngx_http_complex_value_t */
 #if (NGX_PCRE)
-    ngx_http_regex_t           *regex;      /* compiled regex */
-    void                       *value;      /* regex value */
+    ngx_http_regex_t           *regex;       /* compiled regex */
+    void                       *value;       /* regex value */
 #endif
 } ngx_http_var_variable_t;
 
 typedef struct {
-    ngx_str_t                   name;       /* operator string */
-    ngx_http_var_operator_e     op;         /* operator enum */
-    ngx_uint_t                  min_args;   /* minimum number of arguments */
-    ngx_uint_t                  max_args;   /* maximum number of arguments */
+    ngx_str_t                   name;        /* operator string */
+    ngx_http_var_operator_e     op;          /* operator enum */
+    ngx_uint_t                  ignore_case; /* ignore case for regex */
+    ngx_uint_t                  min_args;    /* minimum number of arguments */
+    ngx_uint_t                  max_args;    /* maximum number of arguments */
 } ngx_http_var_operator_mapping_t;
 
 static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
-    { ngx_string("copy"),     NGX_HTTP_VAR_OP_COPY,     1, 1 },
-    { ngx_string("upper"),    NGX_HTTP_VAR_OP_UPPER,    1, 1 },
-    { ngx_string("lower"),    NGX_HTTP_VAR_OP_LOWER,    1, 1 },
-    { ngx_string("max"),      NGX_HTTP_VAR_OP_MAX,      2, 2 },
-    { ngx_string("min"),      NGX_HTTP_VAR_OP_MIN,      2, 2 },
+    { ngx_string("copy"),       NGX_HTTP_VAR_OP_COPY,     0, 1, 1 },
+    { ngx_string("upper"),      NGX_HTTP_VAR_OP_UPPER,    0, 1, 1 },
+    { ngx_string("lower"),      NGX_HTTP_VAR_OP_LOWER,    0, 1, 1 },
+    { ngx_string("max"),        NGX_HTTP_VAR_OP_MAX,      0, 2, 2 },
+    { ngx_string("min"),        NGX_HTTP_VAR_OP_MIN,      0, 2, 2 },
 
 #if (NGX_PCRE)
-    { ngx_string("re_match"), NGX_HTTP_VAR_OP_RE_MATCH, 3, 3 },
-    { ngx_string("re_sub"),   NGX_HTTP_VAR_OP_RE_SUB,   3, 3 },
+    { ngx_string("re_match"),   NGX_HTTP_VAR_OP_RE_MATCH, 0, 3, 3 },
+    { ngx_string("re_match_i"), NGX_HTTP_VAR_OP_RE_MATCH, 1, 3, 3 },
+    { ngx_string("re_sub"),     NGX_HTTP_VAR_OP_RE_SUB,   0, 3, 3 },
+    { ngx_string("re_sub_i"),   NGX_HTTP_VAR_OP_RE_SUB,   1, 3, 3 },
 #endif
 
-    { ngx_string("rand"),     NGX_HTTP_VAR_OP_RAND,     0, 0 }
+    { ngx_string("rand"),       NGX_HTTP_VAR_OP_RAND,     0, 0, 0 }
 };
 
 static void *ngx_http_var_create_main_conf(ngx_conf_t *cf);
@@ -207,7 +210,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_uint_t                   flags;
     ngx_uint_t                   i, n;
     ngx_http_var_operator_e      op = NGX_HTTP_VAR_OP_UNKNOWN;
-    ngx_uint_t                   min_args = 0, max_args = 0;
+    ngx_uint_t                   ignore_case = 0, min_args = 0, max_args = 0;
     ngx_uint_t                   args_count;
 
     value = cf->args->elts;
@@ -237,6 +240,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             ngx_strncmp(operator_str.data, ngx_http_var_operators[i].name.data, operator_str.len) == 0)
         {
             op = ngx_http_var_operators[i].op;
+            ignore_case = ngx_http_var_operators[i].ignore_case;
             min_args = ngx_http_var_operators[i].min_args;
             max_args = ngx_http_var_operators[i].max_args;
             break;
@@ -342,6 +346,10 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         rc.pool = cf->pool;
         rc.err.len = NGX_MAX_CONF_ERRSTR;
         rc.err.data = errstr;
+
+        if (ignore_case == 1) {
+            rc.options = NGX_REGEX_CASELESS;
+        }
 
         var->regex = ngx_http_regex_compile(cf, &rc);
         if (var->regex == NULL) {
