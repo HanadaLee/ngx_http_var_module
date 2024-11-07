@@ -305,7 +305,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
 
         ccv.cf = cf;
-        ccv.value = &value[arg_index++];
+        ccv.value = &value[3];
         ccv.complex_value = cv_src;
 
         if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
@@ -313,7 +313,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
 
         /* 获取正则表达式 */
-        regex_pattern = value[arg_index++];
+        regex_pattern = value[4];
 
         /* 编译目标值（assign_value） */
         var->value = ngx_pcalloc(cf->pool, sizeof(ngx_http_complex_value_t));
@@ -324,7 +324,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
 
         ccv.cf = cf;
-        ccv.value = &value[arg_index++];
+        ccv.value = &value[5];
         ccv.complex_value = var->value;
 
         if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
