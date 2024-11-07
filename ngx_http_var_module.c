@@ -246,9 +246,6 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     args_count = cf->args->nelts - 3;
-    if (args_count < 0) {
-        args_count = 0;
-    }
 
     if (args_count < min_args || args_count > max_args) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
