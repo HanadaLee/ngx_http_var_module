@@ -14,18 +14,17 @@ typedef enum {
 } ngx_http_var_operator_e;
 
 typedef struct {
-    ngx_array_t                *vars;      /* array of ngx_http_var_variable_t */
+    ngx_array_t                *vars;       /* array of ngx_http_var_variable_t */
 } ngx_http_var_conf_t;
 
 typedef struct {
-    ngx_str_t                   name;           /* variable name */
-    ngx_http_var_operator_e     operator;       /* operator type */
-    ngx_array_t                *args;           /* array of ngx_http_complex_value_t */
-    ngx_uint_t                  flags;          /* general flags, e.g., NGX_REGEX_CASELESS */
-    unsigned                    global:1;       /* whether to perform global matching */
-    /* 以下字段用于 re_match 操作符 */
-    ngx_http_regex_t           *regex;          /* compiled regex */
-    void                       *value;          /* regex value */
+    ngx_str_t                   name;       /* variable name */
+    ngx_http_var_operator_e     operator;   /* operator type */
+    ngx_array_t                *args;       /* array of ngx_http_complex_value_t */
+#if (NGX_PCRE)
+    ngx_http_regex_t           *regex;      /* compiled regex */
+    void                       *value;      /* regex value */
+#endif
 } ngx_http_var_variable_t;
 
 typedef struct {
@@ -206,7 +205,6 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_http_var_operator_e      op = NGX_HTTP_VAR_OP_UNKNOWN;
     ngx_uint_t                   min_args = 0, max_args = 0;
     ngx_uint_t                   args_count;
-    ngx_uint_t                   arg_index;
 
     value = cf->args->elts;
 
@@ -217,6 +215,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     var_name = value[1];
+    operator_str = value[2];
 
     if (var_name.len == 0 || var_name.data[0] != '$') {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -224,65 +223,11 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    /* 移除变量名前面的 '$' */
+    /* Remove the leading '$' from variable name */
     var_name.len--;
     var_name.data++;
 
-    /* 初始化变量定义 */
-    var = ngx_pcalloc(cf->pool, sizeof(ngx_http_var_variable_t));
-    if (var == NULL) {
-        return NGX_CONF_ERROR;
-    }
-
-    var->name.len = var_name.len;
-    var->name.data = ngx_pstrdup(cf->pool, &var_name);
-    if (var->name.data == NULL) {
-        return NGX_CONF_ERROR;
-    }
-
-    /* 初始化通用标志 */
-    var->flags = 0;
-    var->global = 0;
-
-    /* 从第三个参数开始解析 */
-    arg_index = 2;
-
-    /* 解析通用选项 */
-    while (arg_index < cf->args->nelts) {
-        ngx_str_t *arg = &value[arg_index];
-        if (arg->len >= 2 && arg->data[0] == '-') {
-            u_char *flag = arg->data + 1;
-            for (; *flag; flag++) {
-                switch (*flag) {
-                case 'i':
-                    var->flags |= NGX_REGEX_CASELESS;
-                    break;
-                case 'g':
-                    var->global = 1;
-                    break;
-                default:
-                    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                                       "invalid flag \"%c\"", *flag);
-                    return NGX_CONF_ERROR;
-                }
-            }
-            arg_index++;
-        } else {
-            break;
-        }
-    }
-
-    /* 检查是否有足够的参数用于操作符 */
-    if (cf->args->nelts - arg_index < 1) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "missing operator in \"var\" directive");
-        return NGX_CONF_ERROR;
-    }
-
-    /* 获取操作符 */
-    operator_str = value[arg_index++];
-
-    /* 映射操作符字符串到枚举值，并获取参数数量 */
+    /* Map operator string to enum and get argument counts */
     for (i = 0; i < sizeof(ngx_http_var_operators) / sizeof(ngx_http_var_operator_mapping_t); i++) {
         if (operator_str.len == ngx_http_var_operators[i].name.len &&
             ngx_strncmp(operator_str.data, ngx_http_var_operators[i].name.data, operator_str.len) == 0)
@@ -300,10 +245,10 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    var->operator = op;
-
-    /* 计算剩余参数数量 */
-    args_count = cf->args->nelts - arg_index;
+    args_count = cf->args->nelts - 3;
+    if (args_count < 0) {
+        args_count = 0;
+    }
 
     if (args_count < min_args || args_count > max_args) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -311,8 +256,31 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    if (op == NGX_HTTP_VAR_OP_RE_MATCH) {
+    /* Initialize vars array if necessary */
+    if (vconf->vars == NULL) {
+        vconf->vars = ngx_array_create(cf->pool, 4,
+                                       sizeof(ngx_http_var_variable_t));
+        if (vconf->vars == NULL) {
+            return NGX_CONF_ERROR;
+        }
+    }
+
+    /* Add variable definition */
+    var = ngx_array_push(vconf->vars);
+    if (var == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    var->name.len = var_name.len;
+    var->name.data = ngx_pstrdup(cf->pool, &var_name);
+    if (var->name.data == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    var->operator = op;
+
 #if (NGX_PCRE)
+    if (op == NGX_HTTP_VAR_OP_RE_MATCH) {
         /* re_match 操作符需要 3 个参数：src_string, regex_pattern, assign_value */
         if (args_count != 3) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -379,22 +347,20 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         if (var->regex == NULL) {
             return NGX_CONF_ERROR;
         }
-
-#else
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "PCRE library is required for \"re_match\" operator");
-        return NGX_CONF_ERROR;
-#endif
     } else {
-        /* 处理其他操作符 */
-        var->args = ngx_array_create(cf->pool, args_count, sizeof(ngx_http_complex_value_t));
+#endif
+
+        /* Initialize args array */
+        var->args = ngx_array_create(cf->pool, args_count ? args_count : 1,
+                                    sizeof(ngx_http_complex_value_t));
         if (var->args == NULL) {
             return NGX_CONF_ERROR;
         }
 
+        /* Compile all arguments */
         for (n = 0; n < args_count; n++) {
-            ngx_http_complex_value_t            *cv;
-            ngx_http_compile_complex_value_t     ccv;
+            ngx_http_complex_value_t   *cv;
+            ngx_http_compile_complex_value_t   ccv;
 
             cv = ngx_array_push(var->args);
             if (cv == NULL) {
@@ -404,32 +370,19 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
 
             ccv.cf = cf;
-            ccv.value = &value[arg_index + n];
+            ccv.value = &value[3 + n];
             ccv.complex_value = cv;
 
             if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
                 return NGX_CONF_ERROR;
             }
         }
+
+#if (NGX_PCRE)
     }
+#endif
 
-    /* 将变量定义添加到配置中 */
-    if (vconf->vars == NULL) {
-        vconf->vars = ngx_array_create(cf->pool, 4,
-                                       sizeof(ngx_http_var_variable_t *));
-        if (vconf->vars == NULL) {
-            return NGX_CONF_ERROR;
-        }
-    }
-
-    ngx_http_var_variable_t **varp = ngx_array_push(vconf->vars);
-    if (varp == NULL) {
-        return NGX_CONF_ERROR;
-    }
-
-    *varp = var;
-
-    /* 注册变量 */
+    /* Add variable to Nginx */
     flags = NGX_HTTP_VAR_CHANGEABLE | NGX_HTTP_VAR_NOCACHEABLE;
 
     v = ngx_http_add_variable(cf, &var_name, flags);
@@ -440,7 +393,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     if (v->get_handler == NULL || v->get_handler == ngx_http_var_variable_handler) {
         v->get_handler = ngx_http_var_variable_handler;
 
-        /* 存储变量名 */
+        /* Store variable name */
         ngx_str_t *var_name_copy;
 
         var_name_copy = ngx_palloc(cf->pool, sizeof(ngx_str_t));
