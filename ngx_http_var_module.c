@@ -1021,9 +1021,9 @@ ngx_http_var_operate_re_gsub(ngx_http_request_t *r,
     }
 
     /* 初始化结果字符串，初始分配10倍原始长度，最小1KB */
-    allocated = subject.len * 10;
-    if (allocated < 1024) {
-        allocated = 1024;
+    allocated = subject.len * 2;
+    if (allocated < 256) {  /* 设置一个较小的初始缓冲区下限，避免极小字符串过度分配 */
+        allocated = 256;
     }
     result.len = 0;
     result.data = ngx_pnalloc(r->pool, allocated);
