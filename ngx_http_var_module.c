@@ -1001,7 +1001,6 @@ static ngx_int_t
 ngx_http_var_operate_re_gsub(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-#if (NGX_PCRE)
     ngx_str_t                    subject, replacement, result;
     ngx_http_complex_value_t    *args = var->args->elts;
     ngx_uint_t                   offset = 0;
