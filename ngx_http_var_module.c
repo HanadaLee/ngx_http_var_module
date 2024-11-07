@@ -1006,6 +1006,8 @@ ngx_http_var_operate_re_gsub(ngx_http_request_t *r,
     ngx_uint_t                   offset = 0;
     u_char                      *p;
     ngx_int_t                    rc;
+    int                         *captures;
+    ngx_uint_t                   allocated;
 
     /* 计算 src_string 的值 */
     if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
@@ -1017,9 +1019,10 @@ ngx_http_var_operate_re_gsub(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    /* 初始化结果字符串 */
+    /* 初始化结果字符串，分配足够的内存 */
     result.len = 0;
-    result.data = ngx_pnalloc(r->pool, subject.len * 2);
+    allocated = subject.len * 2; // 初始分配2倍长度
+    result.data = ngx_pnalloc(r->pool, allocated);
     if (result.data == NULL) {
         return NGX_ERROR;
     }
@@ -1036,6 +1039,17 @@ ngx_http_var_operate_re_gsub(ngx_http_request_t *r,
 
         if (rc == NGX_DECLINED) {
             /* 没有更多匹配，复制剩余的部分 */
+            if ((p - result.data) + sub.len > allocated) {
+                /* 需要扩展缓冲区 */
+                allocated *= 2;
+                u_char *new_data = ngx_pnalloc(r->pool, allocated);
+                if (new_data == NULL) {
+                    return NGX_ERROR;
+                }
+                ngx_memcpy(new_data, result.data, p - result.data);
+                result.data = new_data;
+                p = new_data + (p - result.data);
+            }
             ngx_memcpy(p, sub.data, sub.len);
             p += sub.len;
             result.len += sub.len;
@@ -1047,33 +1061,48 @@ ngx_http_var_operate_re_gsub(ngx_http_request_t *r,
         }
 
         /* 获取捕获组信息 */
-        ngx_uint_t *captures = r->captures;
-        ngx_uint_t  match_start = captures[0];
-        ngx_uint_t  match_end = captures[1];
+        captures = r->captures;
+        /* capture[0] 和 capture[1] 是整体匹配的起始和结束位置 */
+        int match_start = captures[0];
+        int match_end = captures[1];
 
         /* 复制匹配前的部分 */
-        ngx_uint_t prefix_len = match_start;
-        ngx_memcpy(p, sub.data, prefix_len);
-        p += prefix_len;
-        result.len += prefix_len;
+        if (match_start > 0) {
+            if ((p - result.data) + match_start > allocated) {
+                /* 需要扩展缓冲区 */
+                allocated *= 2;
+                u_char *new_data = ngx_pnalloc(r->pool, allocated);
+                if (new_data == NULL) {
+                    return NGX_ERROR;
+                }
+                ngx_memcpy(new_data, result.data, p - result.data);
+                result.data = new_data;
+                p = new_data + (p - result.data);
+            }
+            ngx_memcpy(p, sub.data, match_start);
+            p += match_start;
+            result.len += match_start;
+        }
 
-        /* 计算替换字符串，捕获组会被替换 */
+        /* 计算替换字符串，处理其中的 $n */
         ngx_str_t replaced;
         if (ngx_http_complex_value(r, var->value, &replaced) != NGX_OK) {
             return NGX_ERROR;
         }
 
-        /* 确保结果缓冲区有足够的空间 */
-        ngx_uint_t required_len = result.len + replaced.len + (subject.len - offset - match_end);
-        if (required_len > (subject.len * 2)) {
+        /* 确保替换后的字符串有足够的空间 */
+        if ((p - result.data) + replaced.len + (subject.len - offset - match_end) > allocated) {
             /* 需要扩展缓冲区 */
-            u_char *new_data = ngx_pnalloc(r->pool, required_len * 2);
+            while ((p - result.data) + replaced.len + (subject.len - offset - match_end) > allocated) {
+                allocated *= 2;
+            }
+            u_char *new_data = ngx_pnalloc(r->pool, allocated);
             if (new_data == NULL) {
                 return NGX_ERROR;
             }
-            ngx_memcpy(new_data, result.data, result.len);
-            p = new_data + result.len;
+            ngx_memcpy(new_data, result.data, p - result.data);
             result.data = new_data;
+            p = new_data + (p - result.data);
         }
 
         /* 复制替换字符串 */
@@ -1081,7 +1110,7 @@ ngx_http_var_operate_re_gsub(ngx_http_request_t *r,
         p += replaced.len;
         result.len += replaced.len;
 
-        /* 更新偏移量 */
+        /* 更新偏移量到匹配结束位置 */
         offset += match_end;
 
         /* 防止无限循环 */
@@ -1094,7 +1123,7 @@ ngx_http_var_operate_re_gsub(ngx_http_request_t *r,
     }
 
     /* 设置变量值 */
-    v->len = result.len;
+    v->len = p - result.data;
     v->data = result.data;
     v->valid = 1;
     v->no_cacheable = 0;
