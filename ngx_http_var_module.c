@@ -899,25 +899,22 @@ static ngx_int_t
 ngx_http_var_operate_re_sub(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                    subject, result;
+    ngx_str_t                    subject, replacement, result;
     ngx_int_t                    rc;
-    ngx_uint_t                   n, len;
     u_char                      *p;
-    ngx_uint_t                   ncaptures;
-    int                         *captures;
-    u_char                      *replace;
+    ngx_uint_t                   start, end, len;
 
     ngx_http_complex_value_t    *args = var->args->elts;
 
-    /* 计算 src_string 的值 */
+    /* Calculate the value of src_string */
     if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    /* 执行正则匹配 */
+    /* Perform regex match */
     rc = ngx_http_regex_exec(r, var->regex, &subject);
     if (rc == NGX_DECLINED) {
-        /* 未匹配，返回原始字符串 */
+        /* No match, return the original string */
         v->len = subject.len;
         v->data = ngx_pnalloc(r->pool, v->len);
         if (v->data == NULL) {
@@ -934,21 +931,23 @@ ngx_http_var_operate_re_sub(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    /* 获取捕获组信息 */
-    ncaptures = r->ncaptures;
-    captures = r->captures;
+    /* Ensure captures are available */
+    if (r->ncaptures < 2) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: insufficient captures");
+        return NGX_ERROR;
+    }
 
-    /* 计算替换字符串的值 */
-    ngx_str_t replacement;
+    /* Compute the replacement string */
     if (ngx_http_complex_value(r, var->value, &replacement) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    /* 执行替换 */
-    len = 0;
+    /* Build the result string */
+    start = r->captures[0];
+    end = r->captures[1];
 
-    /* 预估替换后字符串的长度 */
-    len = subject.len + replacement.len;
+    len = start + replacement.len + (subject.len - end);
 
     result.data = ngx_pnalloc(r->pool, len);
     if (result.data == NULL) {
@@ -957,26 +956,21 @@ ngx_http_var_operate_re_sub(ngx_http_request_t *r,
 
     p = result.data;
 
-    /* 复制匹配前的内容 */
-    ngx_uint_t prefix_len = captures[0];
-    ngx_memcpy(p, subject.data, prefix_len);
-    p += prefix_len;
+    /* Copy the part before the match */
+    ngx_memcpy(p, subject.data, start);
+    p += start;
 
-    /* 替换匹配的部分 */
-    ngx_str_t replaced;
-    ngx_http_script_run(r, &replaced, var->value->lengths->elts, 0, var->value->values->elts);
+    /* Copy the replacement */
+    ngx_memcpy(p, replacement.data, replacement.len);
+    p += replacement.len;
 
-    ngx_memcpy(p, replaced.data, replaced.len);
-    p += replaced.len;
-
-    /* 复制匹配后的内容 */
-    ngx_uint_t suffix_len = subject.len - captures[1];
-    ngx_memcpy(p, subject.data + captures[1], suffix_len);
-    p += suffix_len;
+    /* Copy the part after the match */
+    ngx_memcpy(p, subject.data + end, subject.len - end);
+    p += subject.len - end;
 
     result.len = p - result.data;
 
-    /* 设置变量值 */
+    /* Set the variable value */
     v->len = result.len;
     v->data = result.data;
     v->valid = 1;
@@ -985,5 +979,4 @@ ngx_http_var_operate_re_sub(ngx_http_request_t *r,
 
     return NGX_OK;
 }
-
 #endif
