@@ -2,7 +2,7 @@
 
 ## Name
 
-`ngx_http_var_module` is an nginx module that dynamically assigns new variables through predefined functions.
+`ngx_http_var_module` is a nginx module that dynamically assigns new variables through predefined functions.
 
 # Table of Content
 
