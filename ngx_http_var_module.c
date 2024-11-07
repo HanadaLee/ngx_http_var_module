@@ -341,7 +341,6 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         rc.pool = cf->pool;
         rc.err.len = NGX_MAX_CONF_ERRSTR;
         rc.err.data = errstr;
-        rc.options = var->flags;
 
         var->regex = ngx_http_regex_compile(cf, &rc);
         if (var->regex == NULL) {
