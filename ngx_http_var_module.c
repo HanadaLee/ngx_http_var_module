@@ -375,13 +375,10 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         rc.err.data = errstr;
         rc.options = var->flags;
 
-        if (ngx_http_regex_compile(cf, &rc) != NGX_OK) {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "failed to compile regex \"%V\": %V", &regex_pattern, &rc.err);
+        var->regex = ngx_http_regex_compile(cf, &rc);
+        if (regex->regex == NULL) {
             return NGX_CONF_ERROR;
         }
-
-        var->regex = rc.regex;
 
 #else
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
