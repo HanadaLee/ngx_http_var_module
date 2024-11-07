@@ -10,6 +10,7 @@ typedef enum {
     NGX_HTTP_VAR_OP_MIN,
     NGX_HTTP_VAR_OP_RAND,
     NGX_HTTP_VAR_OP_RE_MATCH,
+    NGX_HTTP_VAR_OP_RE_SUB,
     NGX_HTTP_VAR_OP_UNKNOWN
 } ngx_http_var_operator_e;
 
@@ -35,17 +36,18 @@ typedef struct {
 } ngx_http_var_operator_mapping_t;
 
 static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
-    { ngx_string("copy"),     NGX_HTTP_VAR_OP_COPY,      1, 1 },
-    { ngx_string("upper"),    NGX_HTTP_VAR_OP_UPPER,     1, 1 },
-    { ngx_string("lower"),    NGX_HTTP_VAR_OP_LOWER,     1, 1 },
-    { ngx_string("max"),      NGX_HTTP_VAR_OP_MAX,       2, 2 },
-    { ngx_string("min"),      NGX_HTTP_VAR_OP_MIN,       2, 2 },
+    { ngx_string("copy"),     NGX_HTTP_VAR_OP_COPY,     1, 1 },
+    { ngx_string("upper"),    NGX_HTTP_VAR_OP_UPPER,    1, 1 },
+    { ngx_string("lower"),    NGX_HTTP_VAR_OP_LOWER,    1, 1 },
+    { ngx_string("max"),      NGX_HTTP_VAR_OP_MAX,      2, 2 },
+    { ngx_string("min"),      NGX_HTTP_VAR_OP_MIN,      2, 2 },
 
 #if (NGX_PCRE)
-    { ngx_string("re_match"), NGX_HTTP_VAR_OP_RE_MATCH,  3, 3 },
+    { ngx_string("re_match"), NGX_HTTP_VAR_OP_RE_MATCH, 3, 3 },
+    { ngx_string("re_sub"),   NGX_HTTP_VAR_OP_RE_SUB,   3, 3 },
 #endif
 
-    { ngx_string("rand"),     NGX_HTTP_VAR_OP_RAND,      0, 0 }
+    { ngx_string("rand"),     NGX_HTTP_VAR_OP_RAND,     0, 0 }
 };
 
 static void *ngx_http_var_create_main_conf(ngx_conf_t *cf);
@@ -76,6 +78,8 @@ static ngx_int_t ngx_http_var_operate_rand(ngx_http_request_t *r,
 
 #if (NGX_PCRE)
 static ngx_int_t ngx_http_var_operate_re_match(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_re_sub(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 #endif
 
@@ -277,7 +281,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     var->operator = op;
 
 #if (NGX_PCRE)
-    if (op == NGX_HTTP_VAR_OP_RE_MATCH) {
+    if (op == NGX_HTTP_VAR_OP_RE_MATCH || op == NGX_HTTP_VAR_OP_RE_SUB) {
         /* re_match 操作符需要 3 个参数：src_string, regex_pattern, assign_value */
         if (args_count != 3) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -886,4 +890,96 @@ ngx_http_var_operate_re_match(ngx_http_request_t *r,
 
     return NGX_OK;
 }
+
+static ngx_int_t
+ngx_http_var_operate_re_sub(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                    subject, result;
+    ngx_int_t                    rc;
+    ngx_uint_t                   n, len;
+    u_char                      *p;
+    ngx_uint_t                   ncaptures;
+    int                         *captures;
+    u_char                      *replace;
+
+    ngx_http_complex_value_t    *args = var->args->elts;
+
+    /* 计算 src_string 的值 */
+    if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    /* 执行正则匹配 */
+    rc = ngx_http_regex_exec(r, var->regex, &subject);
+    if (rc == NGX_DECLINED) {
+        /* 未匹配，返回原始字符串 */
+        v->len = subject.len;
+        v->data = ngx_pnalloc(r->pool, v->len);
+        if (v->data == NULL) {
+            return NGX_ERROR;
+        }
+        ngx_memcpy(v->data, subject.data, v->len);
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+        return NGX_OK;
+    } else if (rc != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "ngx_http_var_module: regex substitution failed");
+        return NGX_ERROR;
+    }
+
+    /* 获取捕获组信息 */
+    ncaptures = r->ncaptures;
+    captures = r->captures;
+
+    /* 计算替换字符串的值 */
+    ngx_str_t replacement;
+    if (ngx_http_complex_value(r, var->value, &replacement) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    /* 执行替换 */
+    len = 0;
+
+    /* 预估替换后字符串的长度 */
+    len = subject.len + replacement.len;
+
+    result.data = ngx_pnalloc(r->pool, len);
+    if (result.data == NULL) {
+        return NGX_ERROR;
+    }
+
+    p = result.data;
+
+    /* 复制匹配前的内容 */
+    ngx_uint_t prefix_len = captures[0];
+    ngx_memcpy(p, subject.data, prefix_len);
+    p += prefix_len;
+
+    /* 替换匹配的部分 */
+    ngx_str_t replaced;
+    ngx_http_script_run(r, &replaced, var->value->lengths->elts, 0, var->value->values->elts);
+
+    ngx_memcpy(p, replaced.data, replaced.len);
+    p += replaced.len;
+
+    /* 复制匹配后的内容 */
+    ngx_uint_t suffix_len = subject.len - captures[1];
+    ngx_memcpy(p, subject.data + captures[1], suffix_len);
+    p += suffix_len;
+
+    result.len = p - result.data;
+
+    /* 设置变量值 */
+    v->len = result.len;
+    v->data = result.data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
 #endif
