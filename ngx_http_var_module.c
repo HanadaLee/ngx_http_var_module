@@ -1001,6 +1001,7 @@ static ngx_int_t
 ngx_http_var_operate_re_gsub(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
+#if (NGX_PCRE)
     ngx_str_t                    subject, replacement, result;
     ngx_http_complex_value_t    *args = var->args->elts;
     ngx_uint_t                   offset = 0;
@@ -1008,6 +1009,7 @@ ngx_http_var_operate_re_gsub(ngx_http_request_t *r,
     ngx_int_t                    rc;
     int                         *captures;
     ngx_uint_t                   allocated;
+    ngx_uint_t                   required;
 
     /* 计算 src_string 的值 */
     if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
@@ -1019,9 +1021,12 @@ ngx_http_var_operate_re_gsub(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    /* 初始化结果字符串，分配足够的内存 */
+    /* 初始化结果字符串，初始分配10倍原始长度，最小1KB */
+    allocated = subject.len * 10;
+    if (allocated < 1024) {
+        allocated = 1024;
+    }
     result.len = 0;
-    allocated = subject.len * 2; // 初始分配2倍长度
     result.data = ngx_pnalloc(r->pool, allocated);
     if (result.data == NULL) {
         return NGX_ERROR;
@@ -1039,9 +1044,12 @@ ngx_http_var_operate_re_gsub(ngx_http_request_t *r,
 
         if (rc == NGX_DECLINED) {
             /* 没有更多匹配，复制剩余的部分 */
-            if ((p - result.data) + sub.len > allocated) {
+            required = (ngx_uint_t)(p - result.data) + sub.len;
+            if (required > allocated) {
                 /* 需要扩展缓冲区 */
-                allocated *= 2;
+                while (required > allocated) {
+                    allocated *= 2;
+                }
                 u_char *new_data = ngx_pnalloc(r->pool, allocated);
                 if (new_data == NULL) {
                     return NGX_ERROR;
@@ -1062,15 +1070,18 @@ ngx_http_var_operate_re_gsub(ngx_http_request_t *r,
 
         /* 获取捕获组信息 */
         captures = r->captures;
-        /* capture[0] 和 capture[1] 是整体匹配的起始和结束位置 */
+        /* captures是一个int数组，捕获组的起始和结束位置 */
         int match_start = captures[0];
         int match_end = captures[1];
 
         /* 复制匹配前的部分 */
         if (match_start > 0) {
-            if ((p - result.data) + match_start > allocated) {
+            required = (ngx_uint_t)(p - result.data) + match_start;
+            if (required > allocated) {
                 /* 需要扩展缓冲区 */
-                allocated *= 2;
+                while (required > allocated) {
+                    allocated *= 2;
+                }
                 u_char *new_data = ngx_pnalloc(r->pool, allocated);
                 if (new_data == NULL) {
                     return NGX_ERROR;
@@ -1091,9 +1102,10 @@ ngx_http_var_operate_re_gsub(ngx_http_request_t *r,
         }
 
         /* 确保替换后的字符串有足够的空间 */
-        if ((p - result.data) + replaced.len + (subject.len - offset - match_end) > allocated) {
-            /* 需要扩展缓冲区 */
-            while ((p - result.data) + replaced.len + (subject.len - offset - match_end) > allocated) {
+        required = (ngx_uint_t)(p - result.data) + replaced.len + (subject.len - offset - match_end);
+        if (required > allocated) {
+            /* 扩展缓冲区到足够大小 */
+            while (required > allocated) {
                 allocated *= 2;
             }
             u_char *new_data = ngx_pnalloc(r->pool, allocated);
