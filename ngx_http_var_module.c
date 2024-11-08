@@ -718,27 +718,27 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
         break;
 
     case NGX_HTTP_VAR_OP_HEX_ENCODE:
-        rc = ngx_http_var_operate_hex_encode(r, v, var)
+        rc = ngx_http_var_operate_hex_encode(r, v, var);
         break;
     
     case NGX_HTTP_VAR_OP_HEX_DECODE:
-        rc = ngx_http_var_operate_hex_decode(r, v, var)
+        rc = ngx_http_var_operate_hex_decode(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_ESCAPE_URI:
-        rc = ngx_http_var_operate_escape_uri(r, v, var)
+        rc = ngx_http_var_operate_escape_uri(r, v, var);
         break;
     
     case NGX_HTTP_VAR_OP_ESCAPE_ARGS:
-        rc = ngx_http_var_operate_escape_args(r, v, var)
+        rc = ngx_http_var_operate_escape_args(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_ESCAPE_URI_COMPONENT:
-        rc = ngx_http_var_operate_escape_uri_component(r, v, var)
+        rc = ngx_http_var_operate_escape_uri_component(r, v, var);
         break;
     
     case NGX_HTTP_VAR_OP_UNESCAPE_URI:
-        rc = ngx_http_var_operate_unescape_uri(r, v, var)
+        rc = ngx_http_var_operate_unescape_uri(r, v, var);
         break;
 
 #if (NGX_PCRE)
