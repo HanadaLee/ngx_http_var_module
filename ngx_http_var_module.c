@@ -3349,7 +3349,7 @@ ngx_http_var_operate_sha256sum(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (EVP_DigestInit_ex(md, VP_sha256(), NULL) == 0) {
+    if (EVP_DigestInit_ex(md, EVP_sha256(), NULL) == 0) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "EVP_DigestInit_ex() failed");
         return NGX_ERROR;
@@ -3415,7 +3415,7 @@ ngx_http_var_operate_sha384sum(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (EVP_DigestInit_ex(md, VP_sha384(), NULL) == 0) {
+    if (EVP_DigestInit_ex(md, EVP_sha384(), NULL) == 0) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "EVP_DigestInit_ex() failed");
         return NGX_ERROR;
@@ -3481,7 +3481,7 @@ ngx_http_var_operate_sha512sum(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (EVP_DigestInit_ex(md, VP_sha512(), NULL) == 0) {
+    if (EVP_DigestInit_ex(md, EVP_sha512(), NULL) == 0) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "EVP_DigestInit_ex() failed");
         return NGX_ERROR;
