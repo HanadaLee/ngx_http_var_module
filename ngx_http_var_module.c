@@ -38,6 +38,8 @@ typedef enum {
     NGX_HTTP_VAR_OP_DIV,
     NGX_HTTP_VAR_OP_MOD,
     NGX_HTTP_VAR_OP_ROUND,
+    NGX_HTTP_VAR_OP_FLOOR,
+    NGX_HTTP_VAR_OP_CEIL,
     NGX_HTTP_VAR_OP_RAND,
     NGX_HTTP_VAR_OP_RAND_RANGE,
 
@@ -114,6 +116,8 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("div"),           NGX_HTTP_VAR_OP_DIV,           0, 2, 2 },
     { ngx_string("mod"),           NGX_HTTP_VAR_OP_MOD,           0, 2, 2 },
     { ngx_string("round"),         NGX_HTTP_VAR_OP_ROUND,         0, 2, 2 },
+    { ngx_string("floor"),         NGX_HTTP_VAR_OP_FLOOR,         0, 2, 2 },
+    { ngx_string("ceil"),          NGX_HTTP_VAR_OP_CEIL,          0, 2, 2 },
     { ngx_string("rand"),          NGX_HTTP_VAR_OP_RAND,          0, 0, 0 },
     { ngx_string("rand_range"),    NGX_HTTP_VAR_OP_RAND_RANGE,    0, 2, 2 },
 
@@ -202,6 +206,10 @@ static ngx_int_t ngx_http_var_operate_div(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_operate_mod(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_round(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_floor(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_ceil(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_rand(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -810,6 +818,14 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
 
     case NGX_HTTP_VAR_OP_ROUND:
         rc = ngx_http_var_operate_round(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_FLOOR:
+        rc = ngx_http_var_operate_floor(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_CEIL:
+        rc = ngx_http_var_operate_ceil(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_RAND:
@@ -2177,9 +2193,9 @@ ngx_http_var_operate_round(ngx_http_request_t *r,
 {
     ngx_str_t                  num_str, precision_str;
     ngx_http_complex_value_t  *args;
-    ngx_int_t                 precision, i, j, decimal_point = -1, len;
-    u_char                   *num_data, *result;
-    size_t                    num_len;
+    ngx_int_t                  precision, i, j, decimal_point = -1, len;
+    u_char                    *num_data, *result;
+    size_t                     num_len;
 
     args = var->args->elts;
 
@@ -2281,6 +2297,152 @@ ngx_http_var_operate_round(ngx_http_request_t *r,
     }
 
     v->data = result;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_floor(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  num_str;
+    ngx_http_complex_value_t  *args;
+    ngx_int_t                  i, decimal_point = -1;
+    u_char                    *num_data, *result;
+    size_t                     num_len;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &num_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "floor operator");
+        return NGX_ERROR;
+    }
+
+    num_data = num_str.data;
+    num_len = num_str.len;
+
+    /* Find the decimal point */
+    for (i = 0; i < (ngx_int_t)num_len; i++) {
+        if (num_data[i] == '.') {
+            decimal_point = i;
+            break;
+        }
+    }
+
+    /* If there's no decimal point, it's already an integer */
+    if (decimal_point == -1) {
+        v->data = num_str.data;
+        v->len = num_str.len;
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+        return NGX_OK;
+    }
+
+    /* Truncate everything after the decimal point */
+    result = ngx_palloc(r->pool, decimal_point + 1);
+    if (result == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_memcpy(result, num_data, decimal_point);
+    result[decimal_point] = '\0';
+
+    v->data = result;
+    v->len = decimal_point;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_ceil(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  num_str;
+    ngx_http_complex_value_t  *args;
+    ngx_int_t                  i, decimal_point = -1;
+    u_char                    *num_data, *result;
+    size_t                     num_len;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &num_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "ceil operator");
+        return NGX_ERROR;
+    }
+
+    num_data = num_str.data;
+    num_len = num_str.len;
+
+    /* Find the decimal point */
+    for (i = 0; i < (ngx_int_t)num_len; i++) {
+        if (num_data[i] == '.') {
+            decimal_point = i;
+            break;
+        }
+    }
+
+    /* If there's no decimal point, it's already an integer */
+    if (decimal_point == -1) {
+        v->data = num_str.data;
+        v->len = num_str.len;
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+        return NGX_OK;
+    }
+
+    /* Truncate everything after the decimal point and add 1 if necessary */
+    result = ngx_palloc(r->pool, decimal_point + 2);
+    if (result == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_memcpy(result, num_data, decimal_point);
+    result[decimal_point] = '\0';
+
+    /* Check if we need to round up */
+    if (num_data[decimal_point + 1] > '0') {
+        for (i = decimal_point - 1; i >= 0; i--) {
+            if (result[i] < '9') {
+                result[i]++;
+                break;
+            } else {
+                result[i] = '0';
+                if (i == 0) {
+                    u_char *new_result = ngx_palloc(r->pool,
+                        decimal_point + 2);
+                    if (new_result == NULL) {
+                        return NGX_ERROR;
+                    }
+                    new_result[0] = '1';
+                    ngx_memcpy(new_result + 1, result, decimal_point);
+                    new_result[decimal_point + 1] = '\0';
+                    v->data = new_result;
+                    v->len = decimal_point + 1;
+                    v->valid = 1;
+                    v->no_cacheable = 0;
+                    v->not_found = 0;
+                    return NGX_OK;
+                }
+            }
+        }
+    }
+
+    v->data = result;
+    v->len = decimal_point;
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
