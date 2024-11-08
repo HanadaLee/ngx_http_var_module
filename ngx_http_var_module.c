@@ -39,6 +39,10 @@ typedef enum {
     NGX_HTTP_VAR_OP_ESCAPE_ARGS,
     NGX_HTTP_VAR_OP_ESCAPE_URI_COMPONENT,
     NGX_HTTP_VAR_OP_UNESCAPE_URI,
+    NGX_HTTP_VAR_OP_BASE64_ENCODE,
+    NGX_HTTP_VAR_OP_BASE64URL_ENCODE,
+    NGX_HTTP_VAR_OP_BASE64_DECODE,
+    NGX_HTTP_VAR_OP_BASE64URL_ENCODE,
 
     NGX_HTTP_VAR_OP_UNKNOWN
 } ngx_http_var_operator_e;
@@ -71,40 +75,47 @@ typedef struct {
 
 
 static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
-    { ngx_string("copy"),         NGX_HTTP_VAR_OP_COPY,         0, 1, 1 },
-    { ngx_string("len"),          NGX_HTTP_VAR_OP_LEN,          0, 1, 1 },
-    { ngx_string("upper"),        NGX_HTTP_VAR_OP_UPPER,        0, 1, 1 },
-    { ngx_string("lower"),        NGX_HTTP_VAR_OP_LOWER,        0, 1, 1 },
-    { ngx_string("trim"),         NGX_HTTP_VAR_OP_TRIM,         0, 1, 1 },
-    { ngx_string("ltrim"),        NGX_HTTP_VAR_OP_LTRIM,        0, 1, 1 },
-    { ngx_string("rtrim"),        NGX_HTTP_VAR_OP_RTRIM,        0, 1, 1 },
-    { ngx_string("reverse"),      NGX_HTTP_VAR_OP_REVERSE,      0, 1, 1 },
-    { ngx_string("position"),     NGX_HTTP_VAR_OP_POSITION,     0, 2, 2 },
-    { ngx_string("repeat"),       NGX_HTTP_VAR_OP_REPEAT,       0, 2, 2 },
-    { ngx_string("substr"),       NGX_HTTP_VAR_OP_SUBSTR,       0, 3, 3 },
-    { ngx_string("replace"),       NGX_HTTP_VAR_OP_REPLACE,     0, 3, 3 },
+    { ngx_string("copy"),          NGX_HTTP_VAR_OP_COPY,          0, 1, 1 },
+    { ngx_string("len"),           NGX_HTTP_VAR_OP_LEN,           0, 1, 1 },
+    { ngx_string("upper"),         NGX_HTTP_VAR_OP_UPPER,         0, 1, 1 },
+    { ngx_string("lower"),         NGX_HTTP_VAR_OP_LOWER,         0, 1, 1 },
+    { ngx_string("trim"),          NGX_HTTP_VAR_OP_TRIM,          0, 1, 1 },
+    { ngx_string("ltrim"),         NGX_HTTP_VAR_OP_LTRIM,         0, 1, 1 },
+    { ngx_string("rtrim"),         NGX_HTTP_VAR_OP_RTRIM,         0, 1, 1 },
+    { ngx_string("reverse"),       NGX_HTTP_VAR_OP_REVERSE,       0, 1, 1 },
+    { ngx_string("position"),      NGX_HTTP_VAR_OP_POSITION,      0, 2, 2 },
+    { ngx_string("repeat"),        NGX_HTTP_VAR_OP_REPEAT,        0, 2, 2 },
+    { ngx_string("substr"),        NGX_HTTP_VAR_OP_SUBSTR,        0, 3, 3 },
+    { ngx_string("replace"),       NGX_HTTP_VAR_OP_REPLACE,       0, 3, 3 },
 
 #if (NGX_PCRE)
-    { ngx_string("re_match"),     NGX_HTTP_VAR_OP_RE_MATCH,     0, 3, 3 },
-    { ngx_string("re_match_i"),   NGX_HTTP_VAR_OP_RE_MATCH,     1, 3, 3 },
-    { ngx_string("re_sub"),       NGX_HTTP_VAR_OP_RE_SUB,       0, 3, 3 },
-    { ngx_string("re_sub_i"),     NGX_HTTP_VAR_OP_RE_SUB,       1, 3, 3 },
-    { ngx_string("re_gsub"),      NGX_HTTP_VAR_OP_RE_GSUB,      0, 3, 3 },
-    { ngx_string("re_gsub_i"),    NGX_HTTP_VAR_OP_RE_GSUB,      1, 3, 3 },
+    { ngx_string("re_match"),      NGX_HTTP_VAR_OP_RE_MATCH,      0, 3, 3 },
+    { ngx_string("re_match_i"),    NGX_HTTP_VAR_OP_RE_MATCH,      1, 3, 3 },
+    { ngx_string("re_sub"),        NGX_HTTP_VAR_OP_RE_SUB,        0, 3, 3 },
+    { ngx_string("re_sub_i"),      NGX_HTTP_VAR_OP_RE_SUB,        1, 3, 3 },
+    { ngx_string("re_gsub"),       NGX_HTTP_VAR_OP_RE_GSUB,       0, 3, 3 },
+    { ngx_string("re_gsub_i"),     NGX_HTTP_VAR_OP_RE_GSUB,       1, 3, 3 },
 #endif
 
 
-    { ngx_string("max"),          NGX_HTTP_VAR_OP_MAX,          0, 2, 2 },
-    { ngx_string("min"),          NGX_HTTP_VAR_OP_MIN,          0, 2, 2 },
-    { ngx_string("rand"),         NGX_HTTP_VAR_OP_RAND,         0, 0, 0 },
+    { ngx_string("max"),           NGX_HTTP_VAR_OP_MAX,           0, 2, 2 },
+    { ngx_string("min"),           NGX_HTTP_VAR_OP_MIN,           0, 2, 2 },
+    { ngx_string("rand"),          NGX_HTTP_VAR_OP_RAND,          0, 0, 0 },
 
-    { ngx_string("hex_encode"),   NGX_HTTP_VAR_OP_HEX_ENCODE,   0, 1, 1 },
-    { ngx_string("hex_decode"),   NGX_HTTP_VAR_OP_HEX_DECODE,   0, 1, 1 },
-    { ngx_string("escape_uri"),   NGX_HTTP_VAR_OP_ESCAPE_URI,   0, 1, 1 },
-    { ngx_string("escape_args"),  NGX_HTTP_VAR_OP_ESCAPE_ARGS,  0, 1, 1 },
+    { ngx_string("hex_encode"),    NGX_HTTP_VAR_OP_HEX_ENCODE,    0, 1, 1 },
+    { ngx_string("hex_decode"),    NGX_HTTP_VAR_OP_HEX_DECODE,    0, 1, 1 },
+    { ngx_string("escape_uri"),    NGX_HTTP_VAR_OP_ESCAPE_URI,    0, 1, 1 },
+    { ngx_string("escape_args"),   NGX_HTTP_VAR_OP_ESCAPE_ARGS,   0, 1, 1 },
     { ngx_string("escape_uri_component"),
-                          NGX_HTTP_VAR_OP_ESCAPE_URI_COMPONENT, 0, 1, 1 },
-    { ngx_string("unescape_uri"), NGX_HTTP_VAR_OP_UNESCAPE_URI, 0, 1, 1 }
+                           NGX_HTTP_VAR_OP_ESCAPE_URI_COMPONENT,  0, 1, 1 },
+    { ngx_string("unescape_uri"),  NGX_HTTP_VAR_OP_UNESCAPE_URI,  0, 1, 1 },
+    { ngx_string("unescape_uri"),  NGX_HTTP_VAR_OP_UNESCAPE_URI,  0, 1, 1 },
+    { ngx_string("base64_encode"), NGX_HTTP_VAR_OP_BASE64_ENCODE, 0, 1, 1 },
+    { ngx_string("base64url_encode"),
+                               NGX_HTTP_VAR_OP_BASE64URL_ENCODE,  0, 1, 1 },
+    { ngx_string("base64_decode"), NGX_HTTP_VAR_OP_BASE64_DECODE, 0, 1, 1 },
+    { ngx_string("base64url_decode"),
+                                NGX_HTTP_VAR_OP_BASE64URL_DECODE, 0, 1, 1 }
 };
 
 
@@ -179,7 +190,14 @@ static ngx_int_t ngx_http_var_operate_escape_uri_component(
     ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_unescape_uri(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-
+static ngx_int_t ngx_http_var_operate_base64_encode(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_base64url_encode(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_base64_decode(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_base64url_decode(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 static ngx_command_t ngx_http_var_commands[] = {
 
@@ -761,6 +779,22 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
     
     case NGX_HTTP_VAR_OP_UNESCAPE_URI:
         rc = ngx_http_var_operate_unescape_uri(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_BASE64_ENCODE:
+        rc = ngx_http_var_operate_base64_encode(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_BASE64URL_ENCODE:
+        rc = ngx_http_var_operate_base64url_encode(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_BASE64_DECODE:
+        rc = ngx_http_var_operate_base64_decode(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_BASE64URL_DECODE:
+        rc = ngx_http_var_operate_base64url_decode(r, v, var);
         break;
 
     default:
@@ -2115,6 +2149,177 @@ ngx_http_var_operate_unescape_uri(ngx_http_request_t *r,
 
     v->len = unescaped_str.len;
     v->data = unescaped_str.data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_base64_encode(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  src_str, encoded_str;
+    ngx_http_complex_value_t  *args;
+    size_t                     len;
+
+    args = var->args->elts;
+
+    /* Compute the source string */
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "base64_encode operator");
+        return NGX_ERROR;
+    }
+
+    len = ngx_base64_encoded_length(src_str.len);
+
+    encoded_str.data = ngx_pnalloc(r->pool, len);
+    if (encoded_str.data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for base64_encode");
+        return NGX_ERROR;
+    }
+
+    ngx_encode_base64(&encoded_str, &src_str);
+
+    /* Set variable value */
+    v->len = encoded_str.len;
+    v->data = encoded_str.data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_base64url_encode(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  src_str, encoded_str;
+    ngx_http_complex_value_t  *args;
+    size_t                     len;
+
+    args = var->args->elts;
+
+    /* Compute the source string */
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "base64url_encode operator");
+        return NGX_ERROR;
+    }
+
+    len = ngx_base64_encoded_length(src_str.len);
+
+    encoded_str.data = ngx_pnalloc(r->pool, len);
+    if (encoded_str.data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for "
+                      "base64url_encode");
+        return NGX_ERROR;
+    }
+
+    ngx_encode_base64url(&encoded_str, &src_str);
+
+    /* Set variable value */
+    v->len = encoded_str.len;
+    v->data = encoded_str.data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_base64_decode(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  src_str, decoded_str;
+    ngx_http_complex_value_t  *args;
+    size_t                     len;
+
+    args = var->args->elts;
+
+    /* Compute the source string */
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "base64_decode operator");
+        return NGX_ERROR;
+    }
+
+    len = ngx_base64_decoded_length(src_str.len);
+
+    decoded_str.data = ngx_pnalloc(r->pool, len);
+    if (decoded_str.data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for "
+                      "base64_decode");
+        return NGX_ERROR;
+    }
+
+    if (ngx_decode_base64(&decoded_str, &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to decode base64 string");
+        return NGX_ERROR;
+    }
+
+    /* Set variable value */
+    v->len = decoded_str.len;
+    v->data = decoded_str.data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_base64url_decode(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  src_str, decoded_str;
+    ngx_http_complex_value_t  *args;
+    size_t                     len;
+
+    args = var->args->elts;
+
+    /* Compute the source string */
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "base64url_decode operator");
+        return NGX_ERROR;
+    }
+
+    len = ngx_base64_decoded_length(src_str.len);
+
+    decoded_str.data = ngx_pnalloc(r->pool, len);
+    if (decoded_str.data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for "
+                      "base64url_decode");
+        return NGX_ERROR;
+    }
+
+    if (ngx_decode_base64url(&decoded_str, &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to decode base64url string");
+        return NGX_ERROR;
+    }
+
+    /* Set variable value */
+    v->len = decoded_str.len;
+    v->data = decoded_str.data;
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
