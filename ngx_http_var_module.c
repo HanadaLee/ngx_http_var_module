@@ -3554,7 +3554,7 @@ ngx_http_var_operate_hmac_sha1(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (ngx_http_complex_value(r, &args[2], &secret_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[1], &secret_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "HMAC_SHA1 secret");
@@ -3562,7 +3562,7 @@ ngx_http_var_operate_hmac_sha1(ngx_http_request_t *r,
     }
 
     HMAC(EVP_sha1(), secret_str.data, secret_str.len,
-         src_str.data, src_str.len, md, &md_len);
+        src_str.data, src_str.len, md, &md_len);
 
     if (md_len == 0 || md_len > EVP_MAX_MD_SIZE) {
         return NGX_ERROR;
@@ -3575,7 +3575,7 @@ ngx_http_var_operate_hmac_sha1(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    ngx_memcpy(v->data, md, md_len);
+    ngx_memcpy(v->data, &md, md_len);
     v->len = md_len;
     v->valid = 1;
     v->no_cacheable = 0;
@@ -3603,7 +3603,7 @@ ngx_http_var_operate_hmac_sha256(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (ngx_http_complex_value(r, &args[2], &secret_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[1], &secret_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "HMAC_SHA256 secret");
@@ -3624,7 +3624,7 @@ ngx_http_var_operate_hmac_sha256(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    ngx_memcpy(v->data, md, md_len);
+    ngx_memcpy(v->data, &md, md_len);
     v->len = md_len;
     v->valid = 1;
     v->no_cacheable = 0;
