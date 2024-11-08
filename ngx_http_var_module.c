@@ -2177,9 +2177,9 @@ ngx_http_var_operate_round(ngx_http_request_t *r,
 {
     ngx_str_t                  num_str, precision_str;
     ngx_http_complex_value_t  *args;
-    double                     num, rounded_value;
-    ngx_int_t                  precision;
-    u_char                    *p;
+    ngx_int_t                 precision, i, j, decimal_point = -1, len;
+    u_char                   *num_data, *result;
+    size_t                    num_len;
 
     args = var->args->elts;
 
@@ -2191,32 +2191,96 @@ ngx_http_var_operate_round(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    num = ngx_atofp(num_str.data, num_str.len, NGX_MAX_FLOAT_PRECISION);
-    if (num == NGX_ERROR) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid number value for round operator");
-        return NGX_ERROR;
-    }
-
     precision = ngx_atoi(precision_str.data, precision_str.len);
-    if (precision == NGX_ERROR) {
+    if (precision == NGX_ERROR || precision < 0) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: invalid precision value for round operator");
         return NGX_ERROR;
     }
 
-    double factor = pow(10, precision);
-    rounded_value = round(num * factor) / factor;
+    num_data = num_str.data;
+    num_len = num_str.len;
 
-    p = ngx_pnalloc(r->pool, NGX_DOUBLE_LEN);
-    if (p == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for round result");
+    /* Find the decimal point */
+    for (i = 0; i < (ngx_int_t)num_len; i++) {
+        if (num_data[i] == '.') {
+            decimal_point = i;
+            break;
+        }
+    }
+
+    /* If there's no decimal point, add one and append zeros */
+    if (decimal_point == -1) {
+        decimal_point = num_len;
+        num_len += precision + 1;
+        num_data = ngx_palloc(r->pool, num_len + 1);
+        if (num_data == NULL) {
+            return NGX_ERROR;
+        }
+        ngx_memcpy(num_data, num_str.data, num_str.len);
+        num_data[decimal_point] = '.';
+        for (i = decimal_point + 1; i < (ngx_int_t)num_len; i++) {
+            num_data[i] = '0';
+        }
+        num_data[num_len] = '\0';
+    }
+
+    len = decimal_point + precision + 1;
+    if (len > (ngx_int_t)num_len) {
+        len = num_len;
+    }
+
+    result = ngx_palloc(r->pool, len + 1);
+    if (result == NULL) {
         return NGX_ERROR;
     }
 
-    v->len = ngx_sprintf(p, "%.f", rounded_value) - p;
-    v->data = p;
+    ngx_memcpy(result, num_data, len);
+    result[len] = '\0';
+
+    /* Round the number if needed */
+    if (len < (ngx_int_t)num_len && num_data[len] >= '5') {
+        for (j = len - 1; j >= 0; j--) {
+            if (result[j] == '.') {
+                continue;
+            }
+
+            if (result[j] < '9') {
+                result[j]++;
+                break;
+            } else {
+                result[j] = '0';
+                if (j == 0) {
+                    u_char *new_result = ngx_palloc(r->pool, len + 2);
+                    if (new_result == NULL) {
+                        return NGX_ERROR;
+                    }
+                    new_result[0] = '1';
+                    ngx_memcpy(new_result + 1, result, len);
+                    new_result[len + 1] = '\0';
+                    v->data = new_result;
+                    v->len = len + 1;
+                    v->valid = 1;
+                    v->no_cacheable = 0;
+                    v->not_found = 0;
+                    return NGX_OK;
+                }
+            }
+        }
+    }
+
+    /* Append zeros if necessary */
+    if (len < (decimal_point + precision + 1)) {
+        for (i = len; i < (decimal_point + precision + 1); i++) {
+            result[i] = '0';
+        }
+        result[decimal_point + precision + 1] = '\0';
+        v->len = decimal_point + precision + 1;
+    } else {
+        v->len = len;
+    }
+
+    v->data = result;
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
