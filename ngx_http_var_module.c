@@ -1706,46 +1706,96 @@ ngx_http_var_operate_re_gsub(ngx_http_request_t *r,
 
 
 static ngx_int_t
+ngx_http_var_operate_abs(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t *cvp;
+    ngx_str_t                 num_str;
+    ngx_int_t                 num;
+
+    cvp = var->args->elts;
+
+    /* Evaluate argument */
+    if (ngx_http_complex_value(r, &cvp[0], &num_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute first argument");
+        return NGX_ERROR;
+    }
+
+    /* Convert arguments to integers */
+    if (num_str.len > 0 && num_str.data[0] == '-') {
+        num = ngx_atoi(num_str.data + 1, num_str.len - 1);
+    } else {
+        num = ngx_atoi(num_str.data, num_str.len);
+    }
+
+    if (num == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: invalid number for abs operator");
+        return NGX_ERROR;
+    }
+
+    /* Convert result to string */
+    u_char *p;
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed");
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%i", num) - p;
+    v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_http_var_operate_max(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t *cvp;
-    ngx_str_t                 arg_str1, arg_str2;
-    ngx_int_t                 num1, num2, max;
+    ngx_str_t                 int_str1, int_str2;
+    ngx_int_t                 int1, int2, max;
 
     cvp = var->args->elts;
 
     /* Evaluate first argument */
-    if (ngx_http_complex_value(r, &cvp[0], &arg_str1) != NGX_OK) {
+    if (ngx_http_complex_value(r, &cvp[0], &int_str1) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute first argument");
         return NGX_ERROR;
     }
 
     /* Evaluate second argument */
-    if (ngx_http_complex_value(r, &cvp[1], &arg_str2) != NGX_OK) {
+    if (ngx_http_complex_value(r, &cvp[1], &int_str2) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute second argument");
         return NGX_ERROR;
     }
 
     /* Convert arguments to integers */
-    num1 = ngx_atoi(arg_str1.data, arg_str1.len);
-    if (num1 == NGX_ERROR) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid number \"%V\"", &arg_str1);
-        return NGX_ERROR;
+    if (int1_str.len > 0 && int1_str.data[0] == '-') {
+        int1 = -ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+    } else {
+        int1 = ngx_atoi(int1_str.data, int1_str.len);
     }
 
-    num2 = ngx_atoi(arg_str2.data, arg_str2.len);
-    if (num2 == NGX_ERROR) {
+    if (int2_str.len > 0 && int2_str.data[0] == '-') {
+        int2 = -ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+    } else {
+        int2 = ngx_atoi(int2_str.data, int2_str.len);
+    }
+
+    if (int1 == NGX_ERROR || int2 == NGX_ERROR) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid number \"%V\"", &arg_str2);
+                      "http_var: invalid number for max operator");
         return NGX_ERROR;
     }
 
     /* Compute max */
-    max = (num1 > num2) ? num1 : num2;
+    max = (int1 > int2) ? int1 : int2;
 
     /* Convert result to string */
     u_char *p;
@@ -1768,42 +1818,46 @@ ngx_http_var_operate_min(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t *cvp;
-    ngx_str_t                 arg_str1, arg_str2;
-    ngx_int_t                 num1, num2, min;
+    ngx_str_t                 int_str1, int_str2;
+    ngx_int_t                 int1, int2, min;
 
     cvp = var->args->elts;
 
     /* Evaluate first argument */
-    if (ngx_http_complex_value(r, &cvp[0], &arg_str1) != NGX_OK) {
+    if (ngx_http_complex_value(r, &cvp[0], &int_str1) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute first argument");
         return NGX_ERROR;
     }
 
     /* Evaluate second argument */
-    if (ngx_http_complex_value(r, &cvp[1], &arg_str2) != NGX_OK) {
+    if (ngx_http_complex_value(r, &cvp[1], &int_str2) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute second argument");
         return NGX_ERROR;
     }
 
     /* Convert arguments to integers */
-    num1 = ngx_atoi(arg_str1.data, arg_str1.len);
-    if (num1 == NGX_ERROR) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid number \"%V\"", &arg_str1);
-        return NGX_ERROR;
+    if (int1_str.len > 0 && int1_str.data[0] == '-') {
+        int1 = -ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+    } else {
+        int1 = ngx_atoi(int1_str.data, int1_str.len);
     }
 
-    num2 = ngx_atoi(arg_str2.data, arg_str2.len);
-    if (num2 == NGX_ERROR) {
+    if (int2_str.len > 0 && int2_str.data[0] == '-') {
+        int2 = -ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+    } else {
+        int2 = ngx_atoi(int2_str.data, int2_str.len);
+    }
+
+    if (int1 == NGX_ERROR || int2 == NGX_ERROR) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid number \"%V\"", &arg_str2);
+                      "http_var: invalid number for max operator");
         return NGX_ERROR;
     }
 
     /* Compute min */
-    min = (num1 < num2) ? num1 : num2;
+    min = (int1 < int2) ? int1 : int2;
 
     /* Convert result to string */
     u_char *p;
