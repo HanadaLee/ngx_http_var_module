@@ -29,6 +29,7 @@ typedef enum {
     NGX_HTTP_VAR_OP_RE_GSUB,
 #endif
 
+    NGX_HTTP_VAR_OP_ABS,
     NGX_HTTP_VAR_OP_MAX,
     NGX_HTTP_VAR_OP_MIN,
     NGX_HTTP_VAR_OP_ADD,
@@ -103,6 +104,7 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("re_gsub_i"),     NGX_HTTP_VAR_OP_RE_GSUB,       1, 3, 3 },
 #endif
 
+    { ngx_string("abs"),           NGX_HTTP_VAR_OP_ABS,           0, 1, 1 },
     { ngx_string("max"),           NGX_HTTP_VAR_OP_MAX,           0, 2, 2 },
     { ngx_string("min"),           NGX_HTTP_VAR_OP_MIN,           0, 2, 2 },
     { ngx_string("add"),           NGX_HTTP_VAR_OP_ADD,           0, 2, 2 },
@@ -181,6 +183,8 @@ static ngx_int_t ngx_http_var_operate_re_gsub(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 #endif
 
+static ngx_int_t ngx_http_var_operate_abs(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_max(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_min(ngx_http_request_t *r,
@@ -767,6 +771,10 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
         rc = ngx_http_var_operate_re_gsub(r, v, var);
         break;
 #endif
+
+    case NGX_HTTP_VAR_OP_ABS:
+        rc = ngx_http_var_operate_abs(r, v, var);
+        break;
 
     case NGX_HTTP_VAR_OP_MAX:
         rc = ngx_http_var_operate_max(r, v, var);
