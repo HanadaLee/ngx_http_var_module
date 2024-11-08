@@ -116,8 +116,8 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("div"),           NGX_HTTP_VAR_OP_DIV,           0, 2, 2 },
     { ngx_string("mod"),           NGX_HTTP_VAR_OP_MOD,           0, 2, 2 },
     { ngx_string("round"),         NGX_HTTP_VAR_OP_ROUND,         0, 2, 2 },
-    { ngx_string("floor"),         NGX_HTTP_VAR_OP_FLOOR,         0, 2, 2 },
-    { ngx_string("ceil"),          NGX_HTTP_VAR_OP_CEIL,          0, 2, 2 },
+    { ngx_string("floor"),         NGX_HTTP_VAR_OP_FLOOR,         0, 1, 1 },
+    { ngx_string("ceil"),          NGX_HTTP_VAR_OP_CEIL,          0, 1, 1 },
     { ngx_string("rand"),          NGX_HTTP_VAR_OP_RAND,          0, 0, 0 },
     { ngx_string("rand_range"),    NGX_HTTP_VAR_OP_RAND_RANGE,    0, 2, 2 },
 
