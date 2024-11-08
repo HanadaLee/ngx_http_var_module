@@ -9,6 +9,7 @@
 #include <ngx_http.h>
 #include <ngx_md5.h>
 #include <ngx_sha1.h>
+#include <openssl/evp.h>
 
 
 typedef enum {
@@ -58,6 +59,12 @@ typedef enum {
 
     NGX_HTTP_VAR_OP_MD5SUM,
     NGX_HTTP_VAR_OP_SHA1SUM,
+
+#if (NGX_HTTP_SSL)
+    NGX_HTTP_VAR_OP_SHA256SUM,
+    NGX_HTTP_VAR_OP_SHA384SUM,
+    NGX_HTTP_VAR_OP_SHA512SUM,
+#endif
 
     NGX_HTTP_VAR_OP_UNKNOWN
 } ngx_http_var_operator_e;
@@ -140,8 +147,16 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("base64_decode"), NGX_HTTP_VAR_OP_BASE64_DECODE, 0, 1, 1 },
     { ngx_string("base64url_decode"),
                                 NGX_HTTP_VAR_OP_BASE64URL_DECODE, 0, 1, 1 },
+#if (NGX_HTTP_SSL)
+    { ngx_string("md5sum"),        NGX_HTTP_VAR_OP_MD5SUM,        0, 1, 1 },
+    { ngx_string("sha1sum"),       NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 },
+    { ngx_string("sha256sum"),     NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 },
+    { ngx_string("sha384sum"),     NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 },
+    { ngx_string("sha512sum"),     NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 }
+#else
     { ngx_string("md5sum"),        NGX_HTTP_VAR_OP_MD5SUM,        0, 1, 1 },
     { ngx_string("sha1sum"),       NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 }
+#endif
 };
 
 
@@ -248,6 +263,15 @@ static ngx_int_t ngx_http_var_operate_md5sum(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_sha1sum(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+
+#if (NGX_HTTP_SSL)
+static ngx_int_t ngx_http_var_operate_sha256sum(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_sha384sum(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_sha512sum(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+#endif
 
 static ngx_command_t ngx_http_var_commands[] = {
 
@@ -894,6 +918,20 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
     case NGX_HTTP_VAR_OP_SHA1SUM:
         rc = ngx_http_var_operate_sha1sum(r, v, var);
         break;
+
+#if (NGX_HTTP_SSL)
+    case NGX_HTTP_VAR_OP_SHA256SUM:
+        rc = ngx_http_var_operate_sha256sum(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_SHA384SUM:
+        rc = ngx_http_var_operate_sha384sum(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_SHA512SUM:
+        rc = ngx_http_var_operate_sha512sum(r, v, var);
+        break;
+#endif
 
     default:
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -3279,3 +3317,202 @@ ngx_http_var_operate_sha1sum(ngx_http_request_t *r,
 
     return NGX_OK;
 }
+
+#if (NGX_HTTP_SSL)
+static ngx_int_t
+ngx_http_var_operate_sha256sum(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                 src_str;
+    ngx_http_complex_value_t *args;
+    u_char                   *hash_data;
+    EVP_MD_CTX               *md;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "sha256sum operator");
+        return NGX_ERROR;
+    }
+
+    hash_data = ngx_pnalloc(r->pool, 64);
+    if (hash_data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for sha256sum");
+        return NGX_ERROR;
+    }
+
+    md = EVP_MD_CTX_create();
+    if (md == NULL) {
+        return NGX_ERROR;
+    }
+
+    if (EVP_DigestInit_ex(md, VP_sha256(), NULL) == 0) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "EVP_DigestInit_ex() failed");
+        return NGX_ERROR;
+    }
+
+    if (EVP_DigestUpdate(md, src_str.data, src_str.len) == 0) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "EVP_DigestUpdate() failed");
+        return NGX_ERROR;
+    }
+
+    if (EVP_DigestFinal_ex(md, hash_data, NULL) == 0) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "EVP_DigestFinal_ex() failed");
+        return NGX_ERROR;
+    }
+
+    EVP_MD_CTX_destroy(md);
+
+    /* Convert the SHA256 hash to a hexadecimal string */
+    v->data = ngx_pnalloc(r->pool, 64);
+    if (v->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_hex_dump(v->data, hash_data, 32);
+    v->len = 64;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_sha384sum(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                 src_str;
+    ngx_http_complex_value_t *args;
+    u_char                   *hash_data;
+    EVP_MD_CTX               *md;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "sha256sum operator");
+        return NGX_ERROR;
+    }
+
+    hash_data = ngx_pnalloc(r->pool, 96);
+    if (hash_data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for sha384sum");
+        return NGX_ERROR;
+    }
+
+    md = EVP_MD_CTX_create();
+    if (md == NULL) {
+        return NGX_ERROR;
+    }
+
+    if (EVP_DigestInit_ex(md, VP_sha384(), NULL) == 0) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "EVP_DigestInit_ex() failed");
+        return NGX_ERROR;
+    }
+
+    if (EVP_DigestUpdate(md, src_str.data, src_str.len) == 0) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "EVP_DigestUpdate() failed");
+        return NGX_ERROR;
+    }
+
+    if (EVP_DigestFinal_ex(md, hash_data, NULL) == 0) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "EVP_DigestFinal_ex() failed");
+        return NGX_ERROR;
+    }
+
+    EVP_MD_CTX_destroy(md);
+
+    /* Convert the SHA384 hash to a hexadecimal string */
+    v->data = ngx_pnalloc(r->pool, 96);
+    if (v->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_hex_dump(v->data, hash_data, 48);
+    v->len = 96;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_sha512sum(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                 src_str;
+    ngx_http_complex_value_t *args;
+    u_char                   *hash_data;
+    EVP_MD_CTX               *md;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "sha512sum operator");
+        return NGX_ERROR;
+    }
+
+    hash_data = ngx_pnalloc(r->pool, 128);
+    if (hash_data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for sha512sum");
+        return NGX_ERROR;
+    }
+
+    md = EVP_MD_CTX_create();
+    if (md == NULL) {
+        return NGX_ERROR;
+    }
+
+    if (EVP_DigestInit_ex(md, VP_sha512(), NULL) == 0) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "EVP_DigestInit_ex() failed");
+        return NGX_ERROR;
+    }
+
+    if (EVP_DigestUpdate(md, src_str.data, src_str.len) == 0) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "EVP_DigestUpdate() failed");
+        return NGX_ERROR;
+    }
+
+    if (EVP_DigestFinal_ex(md, hash_data, NULL) == 0) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "EVP_DigestFinal_ex() failed");
+        return NGX_ERROR;
+    }
+
+    EVP_MD_CTX_destroy(md);
+
+    /* Convert the SHA384 hash to a hexadecimal string */
+    v->data = ngx_pnalloc(r->pool, 128);
+    if (v->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_hex_dump(v->data, hash_data, 64);
+    v->len = 128;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+#endif
