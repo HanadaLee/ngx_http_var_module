@@ -1866,12 +1866,15 @@ static ngx_int_t
 ngx_http_var_operate_escape_uri(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                  src_str, escaped_str;
-    ngx_http_complex_value_t  *args;
-    size_t                     escaped_len;
+    ngx_str_t                 src_str, escaped_str;
+    ngx_http_complex_value_t *args;
+    size_t                    len;
+    uintptr_t                 escape;
+    u_char                   *src, *dst;
 
     args = var->args->elts;
 
+    /* Compute the source string */
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute argument "
@@ -1879,20 +1882,41 @@ ngx_http_var_operate_escape_uri(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    escaped_len = ngx_escape_uri(NULL, src_str.data, src_str.len,
-                                 NGX_ESCAPE_URI);
+    /* Handle empty source string */
+    if (src_str.len == 0) {
+        v->len = 0;
+        v->data = (u_char *)"";
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+        return NGX_OK;
+    }
 
-    escaped_str.len = escaped_len;
-    escaped_str.data = ngx_pnalloc(r->pool, escaped_str.len);
-    if (escaped_str.data == NULL) {
+    src = src_str.data;
+
+    /* Calculate the escaped length */
+    escape = ngx_escape_uri(NULL, src, src_str.len, NGX_ESCAPE_URI);
+    len = src_str.len + escape;
+
+    dst = ngx_pnalloc(r->pool, len);
+    if (dst == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: memory allocation failed for escape_uri");
         return NGX_ERROR;
     }
 
-    ngx_escape_uri(escaped_str.data, src_str.data, src_str.len,
-                   NGX_ESCAPE_URI);
+    /* Perform the escaping */
+    if (escape == 0) {
+        ngx_memcpy(dst, src, src_str.len);
+    } else {
+        ngx_escape_uri(dst, src, src_str.len, NGX_ESCAPE_URI);
+    }
 
+    /* Set the escaped string */
+    escaped_str.data = dst;
+    escaped_str.len = len;
+
+    /* Set the variable value */
     v->len = escaped_str.len;
     v->data = escaped_str.data;
     v->valid = 1;
