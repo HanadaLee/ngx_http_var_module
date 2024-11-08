@@ -54,6 +54,9 @@ typedef enum {
     NGX_HTTP_VAR_OP_BASE64_DECODE,
     NGX_HTTP_VAR_OP_BASE64URL_DECODE,
 
+    NGX_HTTP_VAR_OP_MD5SUM,
+    NGX_HTTP_VAR_OP_SHA1SUM,
+
     NGX_HTTP_VAR_OP_UNKNOWN
 } ngx_http_var_operator_e;
 
@@ -134,7 +137,9 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
                                 NGX_HTTP_VAR_OP_BASE64URL_ENCODE, 0, 1, 1 },
     { ngx_string("base64_decode"), NGX_HTTP_VAR_OP_BASE64_DECODE, 0, 1, 1 },
     { ngx_string("base64url_decode"),
-                                NGX_HTTP_VAR_OP_BASE64URL_DECODE, 0, 1, 1 }
+                                NGX_HTTP_VAR_OP_BASE64URL_DECODE, 0, 1, 1 },
+    { ngx_string("md5sum"),        NGX_HTTP_VAR_OP_MD5SUM,        0, 1, 1 },
+    { ngx_string("sha1sum"),       NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 }
 };
 
 
@@ -236,6 +241,10 @@ static ngx_int_t ngx_http_var_operate_base64url_encode(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_operate_base64_decode(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_base64url_decode(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_md5sum(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_sha1sum(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 static ngx_command_t ngx_http_var_commands[] = {
@@ -874,6 +883,14 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
 
     case NGX_HTTP_VAR_OP_BASE64URL_DECODE:
         rc = ngx_http_var_operate_base64url_decode(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_MD5SUM:
+        rc = ngx_http_var_operate_md5sum(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_SHA1SUM:
+        rc = ngx_http_var_operate_sha1sum(r, v, var);
         break;
 
     default:
@@ -3164,6 +3181,96 @@ ngx_http_var_operate_base64url_decode(ngx_http_request_t *r,
     /* Set variable value */
     v->len = decoded_str.len;
     v->data = decoded_str.data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_md5sum(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  src_str;
+    ngx_http_complex_value_t  *args;
+    u_char                    *hash_data;
+    ngx_md5_t                  md5;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "md5sum operator");
+        return NGX_ERROR;
+    }
+
+    hash_data = ngx_pnalloc(r->pool, 32);
+    if (hash_data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for md5sum");
+        return NGX_ERROR;
+    }
+
+    ngx_md5_init(&md5);
+    ngx_md5_update(&md5, src_str.data, src_str.len);
+    ngx_md5_final(hash_data, &md5);
+
+    /* Convert the MD5 hash to a hexadecimal string */
+    v->data = ngx_pnalloc(r->pool, 32);
+    if (v->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_hex_dump(v->data, hash_data, 16);
+    v->len = 32;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_sha1sum(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  src_str;
+    ngx_http_complex_value_t  *args;
+    u_char                    *hash_data;
+    ngx_sha1_t                 sha1;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "sha1sum operator");
+        return NGX_ERROR;
+    }
+
+    hash_data = ngx_pnalloc(r->pool, 40);
+    if (hash_data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for sha1sum");
+        return NGX_ERROR;
+    }
+
+    ngx_sha1_init(&sha1);
+    ngx_sha1_update(&sha1, src_str.data, src_str.len);
+    ngx_sha1_final(hash_data, &sha1);
+
+    /* Convert the SHA1 hash to a hexadecimal string */
+    v->data = ngx_pnalloc(r->pool, 40);
+    if (v->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_hex_dump(v->data, hash_data, 20);
+    v->len = 40;
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
