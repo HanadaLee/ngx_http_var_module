@@ -3565,7 +3565,6 @@ ngx_http_var_operate_hmac_sha1(ngx_http_request_t *r,
          src_str.data, src_str.len, md, &md_len);
 
     if (md_len == 0 || md_len > EVP_MAX_MD_SIZE) {
-        res->len = 0;
         return NGX_ERROR;
     }
 
@@ -3615,7 +3614,6 @@ ngx_http_var_operate_hmac_sha256(ngx_http_request_t *r,
          src_str.data, src_str.len, md, &md_len);
 
     if (md_len == 0 || md_len > EVP_MAX_MD_SIZE) {
-        res->len = 0;
         return NGX_ERROR;
     }
 
