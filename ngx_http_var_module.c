@@ -9,8 +9,11 @@
 #include <ngx_http.h>
 #include <ngx_md5.h>
 #include <ngx_sha1.h>
-#include <openssl/evp.h>
 
+#if (NGX_HTTP_SSL)
+#include <openssl/evp.h>
+#include <openssl/hmac.h>
+#endif
 
 typedef enum {
     NGX_HTTP_VAR_OP_COPY,
@@ -64,6 +67,8 @@ typedef enum {
     NGX_HTTP_VAR_OP_SHA256SUM,
     NGX_HTTP_VAR_OP_SHA384SUM,
     NGX_HTTP_VAR_OP_SHA512SUM,
+    NGX_HTTP_VAR_OP_HMAC_SHA1,
+    NGX_HTTP_VAR_OP_HMAC_SHA256,
 #endif
 
     NGX_HTTP_VAR_OP_UNKNOWN
@@ -152,7 +157,9 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("sha1sum"),       NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 },
     { ngx_string("sha256sum"),     NGX_HTTP_VAR_OP_SHA256SUM,     0, 1, 1 },
     { ngx_string("sha384sum"),     NGX_HTTP_VAR_OP_SHA384SUM,     0, 1, 1 },
-    { ngx_string("sha512sum"),     NGX_HTTP_VAR_OP_SHA512SUM,     0, 1, 1 }
+    { ngx_string("sha512sum"),     NGX_HTTP_VAR_OP_SHA512SUM,     0, 1, 1 },
+    { ngx_string("hmac_sha1"),     NGX_HTTP_VAR_OP_HMAC_SHA1,     0, 2, 2 },
+    { ngx_string("hmac_sha256"),   NGX_HTTP_VAR_OP_HMAC_SHA256,   0, 2, 2 },
 #else
     { ngx_string("md5sum"),        NGX_HTTP_VAR_OP_MD5SUM,        0, 1, 1 },
     { ngx_string("sha1sum"),       NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 }
@@ -270,6 +277,10 @@ static ngx_int_t ngx_http_var_operate_sha256sum(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_operate_sha384sum(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_sha512sum(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_hmac_sha1(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_hmac_sha256(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 #endif
 
@@ -930,6 +941,14 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
 
     case NGX_HTTP_VAR_OP_SHA512SUM:
         rc = ngx_http_var_operate_sha512sum(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_HMAC_SHA1:
+        rc = ngx_http_var_operate_hmac_sha1(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_HMAC_SHA256:
+        rc = ngx_http_var_operate_hmac_sha256(r, v, var);
         break;
 #endif
 
@@ -3509,6 +3528,106 @@ ngx_http_var_operate_sha512sum(ngx_http_request_t *r,
 
     ngx_hex_dump(v->data, hash_data, 64);
     v->len = 128;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_hmac_sha1(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, secret_str;
+    unsigned int               md_len = 0;
+    unsigned char              md[EVP_MAX_MD_SIZE];
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "HMAC_SHA1 src_string");
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_complex_value(r, &args[2], &secret_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "HMAC_SHA1 secret");
+        return NGX_ERROR;
+    }
+
+    HMAC(EVP_sha1(), secret_str.data, secret_str.len,
+         src_str.data, src_str.len, md, &md_len);
+
+    if (md_len == 0 || md_len > EVP_MAX_MD_SIZE) {
+        res->len = 0;
+        return NGX_ERROR;
+    }
+
+    v->data = ngx_pnalloc(r->pool, md_len);
+    if (v->data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for HMAC_SHA1");
+        return NGX_ERROR;
+    }
+
+    ngx_memcpy(v->data, &md, md_len);
+    v->len = md_len;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_hmac_sha256(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, secret_str;
+    unsigned int               md_len = 0;
+    unsigned char              md[EVP_MAX_MD_SIZE];
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "HMAC_SHA256 src_string");
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_complex_value(r, &args[2], &secret_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "HMAC_SHA256 secret");
+        return NGX_ERROR;
+    }
+
+    HMAC(EVP_sha256(), secret_str.data, secret_str.len,
+         src_str.data, src_str.len, md, &md_len);
+
+    if (md_len == 0 || md_len > EVP_MAX_MD_SIZE) {
+        res->len = 0;
+        return NGX_ERROR;
+    }
+
+    v->data = ngx_pnalloc(r->pool, md_len);
+    if (v->data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for HMAC_SHA256");
+        return NGX_ERROR;
+    }
+
+    ngx_memcpy(v->data, &md, md_len);
+    v->len = md_len;
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
