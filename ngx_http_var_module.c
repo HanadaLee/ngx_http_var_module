@@ -2217,11 +2217,23 @@ ngx_http_var_operate_round(ngx_http_request_t *r,
     num_data = num_str.data;
     num_len = num_str.len;
 
-    /* Find the decimal point */
+    /* Check if it is a number and find the decimal point */
     for (i = 0; i < (ngx_int_t)num_len; i++) {
+        if (i == 0 && num_data[i] == '-') {
+            continue;
+        }
         if (num_data[i] == '.') {
+            if (decimal_point != -1) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: illegal decimal point found");
+                return NGX_ERROR;
+            }
             decimal_point = i;
-            break;
+        }
+        if (num_data[i] < '0' || num_data[i] > '9') {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: input for round operator must be a number");
+            return NGX_ERROR;
         }
     }
 
@@ -2239,6 +2251,12 @@ ngx_http_var_operate_round(ngx_http_request_t *r,
             num_data[i] = '0';
         }
         num_data[num_len] = '\0';
+        v->data = num_data;
+        v->len = num_len;
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+        return NGX_OK;
     }
 
     len = decimal_point + precision + 1;
@@ -2327,11 +2345,23 @@ ngx_http_var_operate_floor(ngx_http_request_t *r,
     num_data = num_str.data;
     num_len = num_str.len;
 
-    /* Find the decimal point */
+    /* Check if it is a number and find the decimal point */
     for (i = 0; i < (ngx_int_t)num_len; i++) {
+        if (i == 0 && num_data[i] == '-') {
+            continue;
+        }
         if (num_data[i] == '.') {
+            if (decimal_point != -1) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: illegal decimal point found");
+                return NGX_ERROR;
+            }
             decimal_point = i;
-            break;
+        }
+        if (num_data[i] < '0' || num_data[i] > '9') {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: input for floor operator must be a number");
+            return NGX_ERROR;
         }
     }
 
@@ -2424,11 +2454,23 @@ ngx_http_var_operate_ceil(ngx_http_request_t *r,
     num_data = num_str.data;
     num_len = num_str.len;
 
-    /* Find the decimal point */
+    /* Check if it is a number and find the decimal point */
     for (i = 0; i < (ngx_int_t)num_len; i++) {
+        if (i == 0 && num_data[i] == '-') {
+            continue;
+        }
         if (num_data[i] == '.') {
+            if (decimal_point != -1) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: illegal decimal point found");
+                return NGX_ERROR;
+            }
             decimal_point = i;
-            break;
+        }
+        if (num_data[i] < '0' || num_data[i] > '9') {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: input for round operator must be a number");
+            return NGX_ERROR;
         }
     }
 
