@@ -990,6 +990,8 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
     default:
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: unknown operator");
+        v->len = 0;
+        v->not_found = 1;
         return NGX_ERROR;
     }
 
