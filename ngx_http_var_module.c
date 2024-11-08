@@ -42,7 +42,7 @@ typedef enum {
     NGX_HTTP_VAR_OP_BASE64_ENCODE,
     NGX_HTTP_VAR_OP_BASE64URL_ENCODE,
     NGX_HTTP_VAR_OP_BASE64_DECODE,
-    NGX_HTTP_VAR_OP_BASE64URL_ENCODE,
+    NGX_HTTP_VAR_OP_BASE64URL_DECODE,
 
     NGX_HTTP_VAR_OP_UNKNOWN
 } ngx_http_var_operator_e;
@@ -107,12 +107,12 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("escape_uri"),    NGX_HTTP_VAR_OP_ESCAPE_URI,    0, 1, 1 },
     { ngx_string("escape_args"),   NGX_HTTP_VAR_OP_ESCAPE_ARGS,   0, 1, 1 },
     { ngx_string("escape_uri_component"),
-                           NGX_HTTP_VAR_OP_ESCAPE_URI_COMPONENT,  0, 1, 1 },
+                            NGX_HTTP_VAR_OP_ESCAPE_URI_COMPONENT, 0, 1, 1 },
     { ngx_string("unescape_uri"),  NGX_HTTP_VAR_OP_UNESCAPE_URI,  0, 1, 1 },
     { ngx_string("unescape_uri"),  NGX_HTTP_VAR_OP_UNESCAPE_URI,  0, 1, 1 },
     { ngx_string("base64_encode"), NGX_HTTP_VAR_OP_BASE64_ENCODE, 0, 1, 1 },
     { ngx_string("base64url_encode"),
-                               NGX_HTTP_VAR_OP_BASE64URL_ENCODE,  0, 1, 1 },
+                                NGX_HTTP_VAR_OP_BASE64URL_ENCODE, 0, 1, 1 },
     { ngx_string("base64_decode"), NGX_HTTP_VAR_OP_BASE64_DECODE, 0, 1, 1 },
     { ngx_string("base64url_decode"),
                                 NGX_HTTP_VAR_OP_BASE64URL_DECODE, 0, 1, 1 }
