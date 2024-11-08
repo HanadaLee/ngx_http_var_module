@@ -1928,7 +1928,7 @@ ngx_http_var_operate_escape_uri(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_operate_escape_uri(ngx_http_request_t *r,
+ngx_http_var_operate_escape_args(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_str_t                 src_str, escaped_str;
@@ -1943,7 +1943,7 @@ ngx_http_var_operate_escape_uri(ngx_http_request_t *r,
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute argument "
-                      "for escape_uri operator");
+                      "for escape_args operator");
         return NGX_ERROR;
     }
 
@@ -1966,7 +1966,7 @@ ngx_http_var_operate_escape_uri(ngx_http_request_t *r,
     dst = ngx_pnalloc(r->pool, len);
     if (dst == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for escape_uri");
+                      "http_var: memory allocation failed for escape_args");
         return NGX_ERROR;
     }
 
