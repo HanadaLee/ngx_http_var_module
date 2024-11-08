@@ -3575,7 +3575,7 @@ ngx_http_var_operate_hmac_sha1(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    ngx_memcpy(v->data, &md, md_len);
+    ngx_memcpy(v->data, md, md_len);
     v->len = md_len;
     v->valid = 1;
     v->no_cacheable = 0;
@@ -3624,7 +3624,7 @@ ngx_http_var_operate_hmac_sha256(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    ngx_memcpy(v->data, &md, md_len);
+    ngx_memcpy(v->data, md, md_len);
     v->len = md_len;
     v->valid = 1;
     v->no_cacheable = 0;
