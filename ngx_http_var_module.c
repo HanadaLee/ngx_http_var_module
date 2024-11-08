@@ -31,6 +31,11 @@ typedef enum {
 
     NGX_HTTP_VAR_OP_MAX,
     NGX_HTTP_VAR_OP_MIN,
+    NGX_HTTP_VAR_OP_ADD,
+    NGX_HTTP_VAR_OP_SUB,
+    NGX_HTTP_VAR_OP_MUL,
+    NGX_HTTP_VAR_OP_DIV,
+    NGX_HTTP_VAR_OP_MOD,
     NGX_HTTP_VAR_OP_RAND,
     NGX_HTTP_VAR_OP_RAND_RANGE,
 
@@ -101,6 +106,11 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
 
     { ngx_string("max"),           NGX_HTTP_VAR_OP_MAX,           0, 2, 2 },
     { ngx_string("min"),           NGX_HTTP_VAR_OP_MIN,           0, 2, 2 },
+    { ngx_string("add"),           NGX_HTTP_VAR_OP_ADD,           0, 2, 2 },
+    { ngx_string("sub"),           NGX_HTTP_VAR_OP_SUB,           0, 2, 2 },
+    { ngx_string("mul"),           NGX_HTTP_VAR_OP_MUL,           0, 2, 2 },
+    { ngx_string("div"),           NGX_HTTP_VAR_OP_DIV,           0, 2, 2 },
+    { ngx_string("mod"),           NGX_HTTP_VAR_OP_MOD,           0, 2, 2 },
     { ngx_string("rand"),          NGX_HTTP_VAR_OP_RAND,          0, 0, 0 },
     { ngx_string("rand_range"),    NGX_HTTP_VAR_OP_RAND_RANGE,    0, 2, 2 },
 
@@ -175,6 +185,16 @@ static ngx_int_t ngx_http_var_operate_re_gsub(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_operate_max(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_min(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_add(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_sub(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_mul(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_div(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_mod(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_rand(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -755,6 +775,26 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
 
     case NGX_HTTP_VAR_OP_MIN:
         rc = ngx_http_var_operate_min(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_ADD:
+        rc = ngx_http_var_operate_add(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_SUB:
+        rc = ngx_http_var_operate_sub(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_MUL:
+        rc = ngx_http_var_operate_mul(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_DIV:
+        rc = ngx_http_var_operate_div(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_MOD:
+        rc = ngx_http_var_operate_mod(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_RAND:
@@ -1777,6 +1817,248 @@ ngx_http_var_operate_min(ngx_http_request_t *r,
 
     v->len = ngx_sprintf(p, "%i", min) - p;
     v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_add(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  int1_str, int2_str;
+    ngx_http_complex_value_t  *args;
+    ngx_int_t                  int1, int2, result;
+    u_char                    *p;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &int1_str) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &int2_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute arguments for "
+                      "add operator");
+        return NGX_ERROR;
+    }
+
+    int1 = ngx_atoi(int1_str.data, int1_str.len);
+    int2 = ngx_atoi(int2_str.data, int2_str.len);
+
+    if ((int1 == NGX_ERROR && int1_str.len > 1)
+        || (int2 == NGX_ERROR && int2_str.len > 1)) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: invalid integer value for add operator");
+        return NGX_ERROR;
+    }
+
+    result = int1 + int2;
+
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for add result");
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%i", result) - p;
+    v->data = p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_sub(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  int1_str, int2_str;
+    ngx_http_complex_value_t  *args;
+    ngx_int_t                  int1, int2, result;
+    u_char                    *p;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &int1_str) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &int2_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute arguments for sub "
+                      "operator");
+        return NGX_ERROR;
+    }
+
+    int1 = ngx_atoi(int1_str.data, int1_str.len);
+    int2 = ngx_atoi(int2_str.data, int2_str.len);
+
+    if ((int1 == NGX_ERROR && int1_str.len > 1)
+        || (int2 == NGX_ERROR && int2_str.len > 1)) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: invalid integer value for sub operator");
+        return NGX_ERROR;
+    }
+
+    result = int1 - int2;
+
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for sub result");
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%i", result) - p;
+    v->data = p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_mul(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  int1_str, int2_str;
+    ngx_http_complex_value_t  *args;
+    ngx_int_t                  int1, int2, result;
+    u_char                    *p;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &int1_str) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &int2_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute arguments for "
+                      "mul operator");
+        return NGX_ERROR;
+    }
+
+    int1 = ngx_atoi(int1_str.data, int1_str.len);
+    int2 = ngx_atoi(int2_str.data, int2_str.len);
+
+    if ((int1 == NGX_ERROR && int1_str.len > 1)
+        || (int2 == NGX_ERROR && int2_str.len > 1)) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: invalid integer value for mul operator");
+        return NGX_ERROR;
+    }
+
+    result = int1 * int2;
+
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for mul result");
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%i", result) - p;
+    v->data = p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_div(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  int1_str, int2_str;
+    ngx_http_complex_value_t  *args;
+    ngx_int_t                  int1, int2, result;
+    u_char                    *p;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &int1_str) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &int2_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute arguments for "
+                      "div operator");
+        return NGX_ERROR;
+    }
+
+    int1 = ngx_atoi(int1_str.data, int1_str.len);
+    int2 = ngx_atoi(int2_str.data, int2_str.len);
+
+    if ((int1 == NGX_ERROR && int1_str.len > 1)
+        || (int2 == NGX_ERROR && int2_str.len > 1) || int2 == 0) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: invalid integer value or division "
+                      "by zero for div operator");
+        return NGX_ERROR;
+    }
+
+    result = int1 / int2;
+
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for div result");
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%i", result) - p;
+    v->data = p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_mod(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  int1_str, int2_str;
+    ngx_http_complex_value_t  *args;
+    ngx_int_t                  int1, int2, result;
+    u_char                    *p;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &int1_str) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &int2_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute arguments for "
+                      "mod operator");
+        return NGX_ERROR;
+    }
+
+    int1 = ngx_atoi(int1_str.data, int1_str.len);
+    int2 = ngx_atoi(int2_str.data, int2_str.len);
+
+    if ((int1 == NGX_ERROR && int1_str.len > 1)
+        || (int2 == NGX_ERROR && int2_str.len > 1) || int2 == 0) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: invalid integer value or division "
+                      "by zero for mod operator");
+        return NGX_ERROR;
+    }
+
+    result = int1 % int2;
+
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for mod result");
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%i", result) - p;
+    v->data = p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
 
     return NGX_OK;
 }
