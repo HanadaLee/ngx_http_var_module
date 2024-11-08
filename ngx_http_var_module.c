@@ -103,7 +103,6 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("re_gsub_i"),     NGX_HTTP_VAR_OP_RE_GSUB,       1, 3, 3 },
 #endif
 
-
     { ngx_string("max"),           NGX_HTTP_VAR_OP_MAX,           0, 2, 2 },
     { ngx_string("min"),           NGX_HTTP_VAR_OP_MIN,           0, 2, 2 },
     { ngx_string("add"),           NGX_HTTP_VAR_OP_ADD,           0, 2, 2 },
@@ -1844,8 +1843,7 @@ ngx_http_var_operate_add(ngx_http_request_t *r,
     int1 = ngx_atoi(int1_str.data, int1_str.len);
     int2 = ngx_atoi(int2_str.data, int2_str.len);
 
-    if ((int1 == NGX_ERROR && int1_str.len > 1)
-        || (int2 == NGX_ERROR && int2_str.len > 1)) {
+    if (int1 == NGX_ERROR || int2 == NGX_ERROR) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: invalid integer value for add operator");
         return NGX_ERROR;
@@ -1892,8 +1890,7 @@ ngx_http_var_operate_sub(ngx_http_request_t *r,
     int1 = ngx_atoi(int1_str.data, int1_str.len);
     int2 = ngx_atoi(int2_str.data, int2_str.len);
 
-    if ((int1 == NGX_ERROR && int1_str.len > 1)
-        || (int2 == NGX_ERROR && int2_str.len > 1)) {
+    if (int1 == NGX_ERROR || int2 == NGX_ERROR) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: invalid integer value for sub operator");
         return NGX_ERROR;
@@ -1940,8 +1937,7 @@ ngx_http_var_operate_mul(ngx_http_request_t *r,
     int1 = ngx_atoi(int1_str.data, int1_str.len);
     int2 = ngx_atoi(int2_str.data, int2_str.len);
 
-    if ((int1 == NGX_ERROR && int1_str.len > 1)
-        || (int2 == NGX_ERROR && int2_str.len > 1)) {
+    if (int1 == NGX_ERROR || int2 == NGX_ERROR) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: invalid integer value for mul operator");
         return NGX_ERROR;
@@ -1988,8 +1984,7 @@ ngx_http_var_operate_div(ngx_http_request_t *r,
     int1 = ngx_atoi(int1_str.data, int1_str.len);
     int2 = ngx_atoi(int2_str.data, int2_str.len);
 
-    if ((int1 == NGX_ERROR && int1_str.len > 1)
-        || (int2 == NGX_ERROR && int2_str.len > 1) || int2 == 0) {
+    if (int1 == NGX_ERROR || int2 == NGX_ERROR || int2 == 0) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: invalid integer value or division "
                       "by zero for div operator");
@@ -2026,22 +2021,19 @@ ngx_http_var_operate_mod(ngx_http_request_t *r,
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &int1_str) != NGX_OK
-        || ngx_http_complex_value(r, &args[1], &int2_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &int1_str) != NGX_OK ||
+        ngx_http_complex_value(r, &args[1], &int2_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: failed to compute arguments for "
-                      "mod operator");
+                      "http_var: failed to compute arguments for mod operator");
         return NGX_ERROR;
     }
 
     int1 = ngx_atoi(int1_str.data, int1_str.len);
     int2 = ngx_atoi(int2_str.data, int2_str.len);
 
-    if ((int1 == NGX_ERROR && int1_str.len > 1)
-        || (int2 == NGX_ERROR && int2_str.len > 1) || int2 == 0) {
+    if (int1 == NGX_ERROR || int2 == NGX_ERROR || int2 == 0) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid integer value or division "
-                      "by zero for mod operator");
+                      "http_var: invalid integer value or division by zero for mod operator");
         return NGX_ERROR;
     }
 
