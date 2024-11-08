@@ -2217,6 +2217,13 @@ ngx_http_var_operate_round(ngx_http_request_t *r,
     num_data = num_str.data;
     num_len = num_str.len;
 
+    if (num_data[0] == '.') {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: decimal point cannot "
+                      "appear at the beginning");
+        return NGX_ERROR;
+    }
+
     /* Check if it is a number and find the decimal point */
     for (i = 0; i < (ngx_int_t)num_len; i++) {
         if (i == 0 && num_data[i] == '-') {
@@ -2346,6 +2353,13 @@ ngx_http_var_operate_floor(ngx_http_request_t *r,
     num_data = num_str.data;
     num_len = num_str.len;
 
+    if (num_data[0] == '.') {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: decimal point cannot "
+                      "appear at the beginning");
+        return NGX_ERROR;
+    }
+
     /* Check if it is a number and find the decimal point */
     for (i = 0; i < (ngx_int_t)num_len; i++) {
         if (i == 0 && num_data[i] == '-') {
@@ -2455,6 +2469,13 @@ ngx_http_var_operate_ceil(ngx_http_request_t *r,
 
     num_data = num_str.data;
     num_len = num_str.len;
+
+    if (num_data[0] == '.') {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: decimal point cannot "
+                      "appear at the beginning");
+        return NGX_ERROR;
+    }
 
     /* Check if it is a number and find the decimal point */
     for (i = 0; i < (ngx_int_t)num_len; i++) {
