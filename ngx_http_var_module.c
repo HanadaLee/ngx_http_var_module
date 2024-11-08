@@ -1840,8 +1840,17 @@ ngx_http_var_operate_add(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    int1 = ngx_atoi(int1_str.data, int1_str.len);
-    int2 = ngx_atoi(int2_str.data, int2_str.len);
+    if (int1_str.len > 0 && int1_str.data[0] == '-') {
+        int1 = -ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+    } else {
+        int1 = ngx_atoi(int1_str.data, int1_str.len);
+    }
+
+    if (int2_str.len > 0 && int2_str.data[0] == '-') {
+        int2 = -ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+    } else {
+        int2 = ngx_atoi(int2_str.data, int2_str.len);
+    }
 
     if (int1 == NGX_ERROR || int2 == NGX_ERROR) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -1887,8 +1896,17 @@ ngx_http_var_operate_sub(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    int1 = ngx_atoi(int1_str.data, int1_str.len);
-    int2 = ngx_atoi(int2_str.data, int2_str.len);
+    if (int1_str.len > 0 && int1_str.data[0] == '-') {
+        int1 = -ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+    } else {
+        int1 = ngx_atoi(int1_str.data, int1_str.len);
+    }
+
+    if (int2_str.len > 0 && int2_str.data[0] == '-') {
+        int2 = -ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+    } else {
+        int2 = ngx_atoi(int2_str.data, int2_str.len);
+    }
 
     if (int1 == NGX_ERROR || int2 == NGX_ERROR) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -1934,8 +1952,17 @@ ngx_http_var_operate_mul(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    int1 = ngx_atoi(int1_str.data, int1_str.len);
-    int2 = ngx_atoi(int2_str.data, int2_str.len);
+    if (int1_str.len > 0 && int1_str.data[0] == '-') {
+        int1 = -ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+    } else {
+        int1 = ngx_atoi(int1_str.data, int1_str.len);
+    }
+
+    if (int2_str.len > 0 && int2_str.data[0] == '-') {
+        int2 = -ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+    } else {
+        int2 = ngx_atoi(int2_str.data, int2_str.len);
+    }
 
     if (int1 == NGX_ERROR || int2 == NGX_ERROR) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -1981,8 +2008,17 @@ ngx_http_var_operate_div(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    int1 = ngx_atoi(int1_str.data, int1_str.len);
-    int2 = ngx_atoi(int2_str.data, int2_str.len);
+    if (int1_str.len > 0 && int1_str.data[0] == '-') {
+        int1 = -ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+    } else {
+        int1 = ngx_atoi(int1_str.data, int1_str.len);
+    }
+
+    if (int2_str.len > 0 && int2_str.data[0] == '-') {
+        int2 = -ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+    } else {
+        int2 = ngx_atoi(int2_str.data, int2_str.len);
+    }
 
     if (int1 == NGX_ERROR || int2 == NGX_ERROR || int2 == 0) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -2028,8 +2064,17 @@ ngx_http_var_operate_mod(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    int1 = ngx_atoi(int1_str.data, int1_str.len);
-    int2 = ngx_atoi(int2_str.data, int2_str.len);
+    if (int1_str.len > 0 && int1_str.data[0] == '-') {
+        int1 = -ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+    } else {
+        int1 = ngx_atoi(int1_str.data, int1_str.len);
+    }
+
+    if (int2_str.len > 0 && int2_str.data[0] == '-') {
+        int2 = -ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+    } else {
+        int2 = ngx_atoi(int2_str.data, int2_str.len);
+    }
 
     if (int1 == NGX_ERROR || int2 == NGX_ERROR || int2 == 0) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
