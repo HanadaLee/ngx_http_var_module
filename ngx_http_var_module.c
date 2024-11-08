@@ -2222,6 +2222,7 @@ ngx_http_var_operate_round(ngx_http_request_t *r,
         if (i == 0 && num_data[i] == '-') {
             continue;
         }
+
         if (num_data[i] == '.') {
             if (decimal_point != -1) {
                 ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -2229,8 +2230,8 @@ ngx_http_var_operate_round(ngx_http_request_t *r,
                 return NGX_ERROR;
             }
             decimal_point = i;
-        }
-        if (num_data[i] < '0' || num_data[i] > '9') {
+
+        } else if (num_data[i] < '0' || num_data[i] > '9') {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: input for round operator must be a number");
             return NGX_ERROR;
@@ -2350,6 +2351,7 @@ ngx_http_var_operate_floor(ngx_http_request_t *r,
         if (i == 0 && num_data[i] == '-') {
             continue;
         }
+
         if (num_data[i] == '.') {
             if (decimal_point != -1) {
                 ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -2357,10 +2359,10 @@ ngx_http_var_operate_floor(ngx_http_request_t *r,
                 return NGX_ERROR;
             }
             decimal_point = i;
-        }
-        if (num_data[i] < '0' || num_data[i] > '9') {
+
+        } else if (num_data[i] < '0' || num_data[i] > '9') {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: input for floor operator must be a number");
+                      "http_var: input for round operator must be a number");
             return NGX_ERROR;
         }
     }
@@ -2459,6 +2461,7 @@ ngx_http_var_operate_ceil(ngx_http_request_t *r,
         if (i == 0 && num_data[i] == '-') {
             continue;
         }
+
         if (num_data[i] == '.') {
             if (decimal_point != -1) {
                 ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -2466,8 +2469,8 @@ ngx_http_var_operate_ceil(ngx_http_request_t *r,
                 return NGX_ERROR;
             }
             decimal_point = i;
-        }
-        if (num_data[i] < '0' || num_data[i] > '9') {
+
+        } else if (num_data[i] < '0' || num_data[i] > '9') {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: input for round operator must be a number");
             return NGX_ERROR;
