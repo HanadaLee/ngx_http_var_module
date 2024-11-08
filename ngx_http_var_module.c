@@ -166,8 +166,8 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("hmac_sha256"),   NGX_HTTP_VAR_OP_HMAC_SHA256,   0, 2, 2 },
 #endif
 
-    { ngx_string("gmt_time"),      NGX_HTTP_VAR_OP_GMT_TIME,      0, 1, 1 },
-    { ngx_string("local_time"),    NGX_HTTP_VAR_OP_LOCAL_TIME,    0, 1, 1 }
+    { ngx_string("gmt_time"),      NGX_HTTP_VAR_OP_GMT_TIME,      0, 1, 2 },
+    { ngx_string("local_time"),    NGX_HTTP_VAR_OP_LOCAL_TIME,    0, 1, 2 }
 };
 
 
@@ -3657,22 +3657,48 @@ ngx_http_var_operate_gmt_time(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  date_format;
-    time_t                     now;
+    ngx_str_t                  ts_str, date_format;
+    time_t                     ts;
     u_char                    *p;
     struct tm                  tm;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &date_format) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: failed to compute argument for "
-                      "gmt_time date_format");
-        return NGX_ERROR;
+    if (var->args->nelts == 2) {
+        /* Two arguments: timestamp and date format */
+        if (ngx_http_complex_value(r, &args[0], &ts_str) != NGX_OK) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: failed to compute argument for "
+                          "gmt_time timestamp");
+            return NGX_ERROR;
+        }
+
+        ts = ngx_atoi(ts_str.data, ts_str.len);
+        if (ts == NGX_ERROR) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: invalid timestamp value "
+                          "for gmt_time");
+            return NGX_ERROR;
+        }
+
+        if (ngx_http_complex_value(r, &args[1], &date_format) != NGX_OK) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: failed to compute argument for "
+                          "gmt_time date_format");
+            return NGX_ERROR;
+        }
+    } else {
+        /* One argument: date format, use current time */
+        if (ngx_http_complex_value(r, &args[0], &date_format) != NGX_OK) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: failed to compute argument for gmt_time date_format");
+            return NGX_ERROR;
+        }
+
+        ts = ngx_time();
     }
 
-    now = ngx_time();
-    ngx_libc_gmtime(now, &tm);
+    ngx_libc_gmtime(ts, &tm);
 
     /* Allocate extra space for formatting */
     p = ngx_palloc(r->pool, 256);
@@ -3704,22 +3730,48 @@ ngx_http_var_operate_local_time(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  date_format;
-    time_t                     now;
+    ngx_str_t                  ts_str, date_format;
+    time_t                     ts;
     u_char                    *p;
     struct tm                  tm;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &date_format) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: failed to compute argument for "
-                      "local_time date_format");
-        return NGX_ERROR;
+    if (var->args->nelts == 2) {
+        /* Two arguments: timestamp and date format */
+        if (ngx_http_complex_value(r, &args[0], &ts_str) != NGX_OK) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: failed to compute argument for "
+                          "gmt_time timestamp");
+            return NGX_ERROR;
+        }
+
+        ts = ngx_atoi(ts_str.data, ts_str.len);
+        if (ts == NGX_ERROR) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: invalid timestamp value "
+                          "for gmt_time");
+            return NGX_ERROR;
+        }
+
+        if (ngx_http_complex_value(r, &args[1], &date_format) != NGX_OK) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: failed to compute argument for "
+                          "gmt_time date_format");
+            return NGX_ERROR;
+        }
+    } else {
+        /* One argument: date format, use current time */
+        if (ngx_http_complex_value(r, &args[0], &date_format) != NGX_OK) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: failed to compute argument for gmt_time date_format");
+            return NGX_ERROR;
+        }
+
+        ts = ngx_time();
     }
 
-    now = ngx_time();
-    ngx_libc_localtime(now, &tm);
+    ngx_libc_localtime(ts, &tm);
 
     /* Allocate extra space for formatting */
     p = ngx_palloc(r->pool, 256);
