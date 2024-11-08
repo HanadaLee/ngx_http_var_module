@@ -150,9 +150,9 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
 #if (NGX_HTTP_SSL)
     { ngx_string("md5sum"),        NGX_HTTP_VAR_OP_MD5SUM,        0, 1, 1 },
     { ngx_string("sha1sum"),       NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 },
-    { ngx_string("sha256sum"),     NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 },
-    { ngx_string("sha384sum"),     NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 },
-    { ngx_string("sha512sum"),     NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 }
+    { ngx_string("sha256sum"),     NGX_HTTP_VAR_OP_SHA256SUM,     0, 1, 1 },
+    { ngx_string("sha384sum"),     NGX_HTTP_VAR_OP_SHA384SUM,     0, 1, 1 },
+    { ngx_string("sha512sum"),     NGX_HTTP_VAR_OP_SHA512SUM,     0, 1, 1 }
 #else
     { ngx_string("md5sum"),        NGX_HTTP_VAR_OP_MD5SUM,        0, 1, 1 },
     { ngx_string("sha1sum"),       NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 }
