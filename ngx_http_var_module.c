@@ -71,6 +71,9 @@ typedef enum {
     NGX_HTTP_VAR_OP_HMAC_SHA256,
 #endif
 
+    NGX_HTTP_VAR_OP_GMT_TIME,
+    NGX_HTTP_VAR_OP_LOCAL_TIME,
+
     NGX_HTTP_VAR_OP_UNKNOWN
 } ngx_http_var_operator_e;
 
@@ -152,18 +155,19 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("base64_decode"), NGX_HTTP_VAR_OP_BASE64_DECODE, 0, 1, 1 },
     { ngx_string("base64url_decode"),
                                 NGX_HTTP_VAR_OP_BASE64URL_DECODE, 0, 1, 1 },
-#if (NGX_HTTP_SSL)
     { ngx_string("md5sum"),        NGX_HTTP_VAR_OP_MD5SUM,        0, 1, 1 },
     { ngx_string("sha1sum"),       NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 },
+
+#if (NGX_HTTP_SSL)
     { ngx_string("sha256sum"),     NGX_HTTP_VAR_OP_SHA256SUM,     0, 1, 1 },
     { ngx_string("sha384sum"),     NGX_HTTP_VAR_OP_SHA384SUM,     0, 1, 1 },
     { ngx_string("sha512sum"),     NGX_HTTP_VAR_OP_SHA512SUM,     0, 1, 1 },
     { ngx_string("hmac_sha1"),     NGX_HTTP_VAR_OP_HMAC_SHA1,     0, 2, 2 },
     { ngx_string("hmac_sha256"),   NGX_HTTP_VAR_OP_HMAC_SHA256,   0, 2, 2 },
-#else
-    { ngx_string("md5sum"),        NGX_HTTP_VAR_OP_MD5SUM,        0, 1, 1 },
-    { ngx_string("sha1sum"),       NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 }
 #endif
+
+    { ngx_string("gmt_time"),      NGX_HTTP_VAR_OP_MD5SUM,        0, 1, 1 },
+    { ngx_string("local_time"),    NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 }
 };
 
 
@@ -283,6 +287,11 @@ static ngx_int_t ngx_http_var_operate_hmac_sha1(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_operate_hmac_sha256(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 #endif
+
+static ngx_int_t ngx_http_var_operate_gmt_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_local_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 static ngx_command_t ngx_http_var_commands[] = {
 
@@ -951,6 +960,14 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
         rc = ngx_http_var_operate_hmac_sha256(r, v, var);
         break;
 #endif
+
+    case NGX_HTTP_VAR_OP_GMT_TIME:
+        rc = ngx_http_var_operate_gmt_time(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_LOCAL_TIME:
+        rc = ngx_http_var_operate_local_time(r, v, var);
+        break;
 
     default:
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -3633,3 +3650,97 @@ ngx_http_var_operate_hmac_sha256(ngx_http_request_t *r,
     return NGX_OK;
 }
 #endif
+
+
+static ngx_int_t
+ngx_http_var_operate_gmt_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  date_format;
+    time_t                     now;
+    u_char                    *p;
+    struct tm                  tm;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &date_format) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "gmt_time date_format");
+        return NGX_ERROR;
+    }
+
+    now = ngx_time();
+    ngx_libc_gmtime(now, &tm);
+
+    /* Allocate extra space for formatting */
+    p = ngx_palloc(r->pool, 256);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for gmt_time");
+        return NGX_ERROR;
+    }
+
+    v->len = strftime((char *) p, 256,
+                      (char *) date_format.data, &tm);
+    if (v->len == 0) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: strftime failed for gmt_time");
+        return NGX_ERROR;
+    }
+
+    v->data = p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_local_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  date_format;
+    time_t                     now;
+    u_char                    *p;
+    struct tm                  tm;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &date_format) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "local_time date_format");
+        return NGX_ERROR;
+    }
+
+    now = ngx_time();
+    ngx_libc_localtime(now, &tm);
+
+    /* Allocate extra space for formatting */
+    p = ngx_palloc(r->pool, 256);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for local_time");
+        return NGX_ERROR;
+    }
+
+    v->len = strftime((char *) p, 256,
+                      (char *) date_format.data, &tm);
+    if (v->len == 0) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: strftime failed for local_time");
+        return NGX_ERROR;
+    }
+
+    v->data = p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
