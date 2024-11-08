@@ -73,6 +73,7 @@ typedef enum {
 
     NGX_HTTP_VAR_OP_GMT_TIME,
     NGX_HTTP_VAR_OP_LOCAL_TIME,
+    NGX_HTTP_VAR_OP_TIMESTAMP,
 
     NGX_HTTP_VAR_OP_UNKNOWN
 } ngx_http_var_operator_e;
@@ -167,7 +168,8 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
 #endif
 
     { ngx_string("gmt_time"),      NGX_HTTP_VAR_OP_GMT_TIME,      0, 1, 2 },
-    { ngx_string("local_time"),    NGX_HTTP_VAR_OP_LOCAL_TIME,    0, 1, 2 }
+    { ngx_string("local_time"),    NGX_HTTP_VAR_OP_LOCAL_TIME,    0, 1, 2 },
+    { ngx_string("timestamp"),     NGX_HTTP_VAR_OP_TIMESTAMP,     0, 0, 3 },
 };
 
 
@@ -291,6 +293,8 @@ static ngx_int_t ngx_http_var_operate_hmac_sha256(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_operate_gmt_time(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_local_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_timestamp(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 static ngx_command_t ngx_http_var_commands[] = {
@@ -967,6 +971,10 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
 
     case NGX_HTTP_VAR_OP_LOCAL_TIME:
         rc = ngx_http_var_operate_local_time(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_TIMESTAMP:
+        rc = ngx_http_var_operate_timestamp(r, v, var);
         break;
 
     default:
@@ -3789,6 +3797,102 @@ ngx_http_var_operate_local_time(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    v->data = p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_timestamp(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  date_str, date_format, tz_str;
+    ngx_tm_t                   tm;
+    time_t                     timestamp;
+    ngx_int_t                  gmt = 1;
+    int                        tz_offset = 0;
+
+    args = var->args->elts;
+
+    if (var->args->nelts == 3) {
+        /* Three arguments: date string, date format, and timezone */
+        if (ngx_http_complex_value(r, &args[0], &date_str) != NGX_OK) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: failed to compute argument for "
+                          "timestamp date_string");
+            return NGX_ERROR;
+        }
+
+        if (ngx_http_complex_value(r, &args[1], &date_format) != NGX_OK) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: failed to compute argument for "
+                          "timestamp date_format");
+            return NGX_ERROR;
+        }
+
+        if (ngx_http_complex_value(r, &args[2], &tz_str) != NGX_OK) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: failed to compute argument for "
+                          "timestamp timezone");
+            return NGX_ERROR;
+        }
+
+        if (ngx_strncmp(tz_str.data, "gmt", tz_str.len) != 0) {
+            if (tz_str.len != 5 || (tz_str.data[0] != '+'
+                && tz_str.data[0] != '-')) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                              "http_var: invalid timezone format for "
+                              "timestamp");
+                return NGX_ERROR;
+            }
+
+            /* Parse timezone offset, e.g., +0900 or -0430 */
+            tz_offset = ((tz_str.data[1] - '0') * 10
+                + (tz_str.data[2] - '0')) * 3600;
+            tz_offset += ((tz_str.data[3] - '0') * 10
+                + (tz_str.data[4] - '0')) * 60;
+
+            if (tz_str.data[0] == '-') {
+                tz_offset = -tz_offset;
+            }
+        }
+
+        /* Parse the date string */
+        ngx_memzero(&tm, sizeof(ngx_tm_t));
+        if (strptime((char *) date_str.data,
+            (char *) date_format.data, &tm) == NULL) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: failed to parse date string for "
+                          "timestamp");
+            return NGX_ERROR;
+        }
+
+        /* Convert to timestamp */
+        timestamp = timegm(&tm) - tz_offset;
+    } else if (var->args->nelts == 0) {
+        /* No arguments: use current time */
+        timestamp = ngx_time();
+    } else {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: illegal number of parameters for timestamp");
+        return NGX_ERROR;
+    }
+
+    /* Convert timestamp to string */
+    u_char *p;
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for timestamp");
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%T", timestamp) - p;
     v->data = p;
     v->valid = 1;
     v->no_cacheable = 0;
