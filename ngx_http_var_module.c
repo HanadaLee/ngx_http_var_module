@@ -1764,20 +1764,20 @@ ngx_http_var_operate_max(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t *cvp;
-    ngx_str_t                 int_str1, int_str2;
+    ngx_str_t                 int1_str, int2_str;
     ngx_int_t                 int1, int2, max;
 
     cvp = var->args->elts;
 
     /* Evaluate first argument */
-    if (ngx_http_complex_value(r, &cvp[0], &int_str1) != NGX_OK) {
+    if (ngx_http_complex_value(r, &cvp[0], &int1_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute first argument");
         return NGX_ERROR;
     }
 
     /* Evaluate second argument */
-    if (ngx_http_complex_value(r, &cvp[1], &int_str2) != NGX_OK) {
+    if (ngx_http_complex_value(r, &cvp[1], &int2_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute second argument");
         return NGX_ERROR;
@@ -1826,20 +1826,20 @@ ngx_http_var_operate_min(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t *cvp;
-    ngx_str_t                 int_str1, int_str2;
+    ngx_str_t                 int1_str, int2_str;
     ngx_int_t                 int1, int2, min;
 
     cvp = var->args->elts;
 
     /* Evaluate first argument */
-    if (ngx_http_complex_value(r, &cvp[0], &int_str1) != NGX_OK) {
+    if (ngx_http_complex_value(r, &cvp[0], &int1_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute first argument");
         return NGX_ERROR;
     }
 
     /* Evaluate second argument */
-    if (ngx_http_complex_value(r, &cvp[1], &int_str2) != NGX_OK) {
+    if (ngx_http_complex_value(r, &cvp[1], &int2_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute second argument");
         return NGX_ERROR;
