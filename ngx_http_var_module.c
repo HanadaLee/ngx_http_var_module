@@ -32,6 +32,7 @@ typedef enum {
     NGX_HTTP_VAR_OP_MAX,
     NGX_HTTP_VAR_OP_MIN,
     NGX_HTTP_VAR_OP_RAND,
+    NGX_HTTP_VAR_OP_RAND_RANGE,
 
     NGX_HTTP_VAR_OP_HEX_ENCODE,
     NGX_HTTP_VAR_OP_HEX_DECODE,
@@ -101,6 +102,7 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("max"),           NGX_HTTP_VAR_OP_MAX,           0, 2, 2 },
     { ngx_string("min"),           NGX_HTTP_VAR_OP_MIN,           0, 2, 2 },
     { ngx_string("rand"),          NGX_HTTP_VAR_OP_RAND,          0, 0, 0 },
+    { ngx_string("rand_range"),    NGX_HTTP_VAR_OP_RAND_RANGE,    0, 2, 2 },
 
     { ngx_string("hex_encode"),    NGX_HTTP_VAR_OP_HEX_ENCODE,    0, 1, 1 },
     { ngx_string("hex_decode"),    NGX_HTTP_VAR_OP_HEX_DECODE,    0, 1, 1 },
@@ -175,6 +177,8 @@ static ngx_int_t ngx_http_var_operate_max(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_operate_min(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_rand(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_rand_range(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 static ngx_int_t ngx_http_var_operate_hex_encode(ngx_http_request_t *r,
@@ -755,6 +759,10 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
 
     case NGX_HTTP_VAR_OP_RAND:
         rc = ngx_http_var_operate_rand(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_RAND_RANGE:
+        rc = ngx_http_var_operate_rand_range(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_HEX_ENCODE:
@@ -1792,6 +1800,57 @@ ngx_http_var_operate_rand(ngx_http_request_t *r,
 
     v->len = ngx_sprintf(p, "%ui", rand_num) - p;
     v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_rand_range(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  start_str, end_str;
+    ngx_http_complex_value_t  *args;
+    ngx_int_t                  start, end, result;
+    u_char                    *p;
+
+    args = var->args->elts;
+
+    /* Compute the start and end values */
+    if (ngx_http_complex_value(r, &args[0], &start_str) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &end_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute arguments for "
+                      "rand_range operator");
+        return NGX_ERROR;
+    }
+
+    start = ngx_atoi(start_str.data, start_str.len);
+    end = ngx_atoi(end_str.data, end_str.len);
+
+    if (start == NGX_ERROR || end == NGX_ERROR || start > end) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: invalid start or end value for rand_range");
+        return NGX_ERROR;
+    }
+
+    /* Generate a random number between start and end (inclusive) */
+    result = start + (ngx_random() % (end - start + 1));
+
+    /* Allocate memory for the result string */
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for "
+                      "rand_range result");
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%i", result) - p;
+    v->data = p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
 
     return NGX_OK;
 }
