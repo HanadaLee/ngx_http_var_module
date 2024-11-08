@@ -338,8 +338,8 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     operators_count = sizeof(ngx_http_var_operators) / 
                   sizeof(ngx_http_var_operator_mapping_t);
     for (i = 0; i < operators_count; i++) {
-        if (operator_str.len == ngx_http_var_operators[i].name.len &&
-            ngx_strncmp(operator_str.data,
+        if (operator_str.len == ngx_http_var_operators[i].name.len
+            && ngx_strncmp(operator_str.data,
                 ngx_http_var_operators[i].name.data, operator_str.len) == 0)
         {
             op = ngx_http_var_operators[i].op;
@@ -562,8 +562,8 @@ ngx_http_var_find_variable(ngx_http_request_t *r, ngx_str_t *var_name,
                        "http_var: checking variable \"%V\" in %s conf",
                        &vars[i].name, conf_level);
 
-        if (vars[i].name.len == var_name->len &&
-            ngx_strncmp(vars[i].name.data, var_name->data, var_name->len) == 0)
+        if (vars[i].name.len == var_name->len
+            && ngx_strncmp(vars[i].name.data, var_name->data, var_name->len) == 0)
         {
             /* Found the variable */
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
@@ -1042,12 +1042,12 @@ ngx_http_var_operate_trim(ngx_http_request_t *r,
     end = src_str.data + src_str.len - 1;
 
     /* Trim left */
-    while (start <= end && ngx_isspace(*start)) {
+    while (start <= end && isspace((unsigned char)*start)) {
         start++;
     }
 
     /* Trim right */
-    while (end >= start && ngx_isspace(*end)) {
+    while (end >= start && isspace((unsigned char)*end)) {
         end--;
     }
 
@@ -1086,7 +1086,7 @@ ngx_http_var_operate_ltrim(ngx_http_request_t *r,
     end = src_str.data + src_str.len - 1;
 
     /* Trim left */
-    while (start <= end && ngx_isspace(*start)) {
+    while (start <= end && isspace((unsigned char)*start)) {
         start++;
     }
 
@@ -1125,7 +1125,7 @@ ngx_http_var_operate_rtrim(ngx_http_request_t *r,
     end = src_str.data + src_str.len - 1;
 
     /* Trim right */
-    while (end >= start && ngx_isspace(*end)) {
+    while (end >= start && isspace((unsigned char)*end)) {
         end--;
     }
 
@@ -1195,8 +1195,8 @@ ngx_http_var_operate_position(ngx_http_request_t *r,
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK ||
-        ngx_http_complex_value(r, &args[1], &sub_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &sub_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute arguments "
                       "for position operator");
@@ -1235,7 +1235,7 @@ static ngx_int_t
 ngx_http_var_operate_repeat(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 src_str;
+    ngx_str_t                 src_str, repeat_times_str;
     ngx_http_complex_value_t *args;
     ngx_int_t                 times;
     size_t                    total_len;
@@ -1244,27 +1244,45 @@ ngx_http_var_operate_repeat(ngx_http_request_t *r,
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK ||
-        ngx_http_complex_value(r, &args[1], &v[1]) != NGX_OK) {
+    /* Compute arguments */
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &repeat_times_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute arguments "
                       "for repeat operator");
         return NGX_ERROR;
     }
 
-    times = ngx_atoi(v[1].data, v[1].len);
+    /* Parse repeat times */
+    times = ngx_atoi(repeat_times_str.data, repeat_times_str.len);
     if (times == NGX_ERROR || times < 0) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: invalid repeat times");
         return NGX_ERROR;
     }
 
+    /* If times is zero, return an empty string */
+    if (times == 0 || src_str.len == 0) {
+        v->len = 0;
+        v->data = (u_char *)"";
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+        return NGX_OK;
+    }
+
+    /* Calculate total length */
     total_len = src_str.len * times;
+
+    /* Allocate memory */
     p = ngx_pnalloc(r->pool, total_len);
     if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for repeat result");
         return NGX_ERROR;
     }
 
+    /* Fill the result with repeated strings */
     for (i = 0; i < (ngx_uint_t)times; i++) {
         ngx_memcpy(p + i * src_str.len, src_str.data, src_str.len);
     }
@@ -1284,24 +1302,26 @@ static ngx_int_t
 ngx_http_var_operate_substr(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 src_str;
+    ngx_str_t                 src_str, start_str, len_str;
     ngx_http_complex_value_t *args;
     ngx_int_t                 start, len;
     ngx_uint_t                src_len;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK ||
-        ngx_http_complex_value(r, &args[1], &v[1]) != NGX_OK ||
-        ngx_http_complex_value(r, &args[2], &v[2]) != NGX_OK) {
+    /* Compute arguments */
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &start_str) != NGX_OK
+        || ngx_http_complex_value(r, &args[2], &len_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute arguments "
                       "for substr operator");
         return NGX_ERROR;
     }
 
-    start = ngx_atoi(v[1].data, v[1].len);
-    len = ngx_atoi(v[2].data, v[2].len);
+    /* Parse start and length values */
+    start = ngx_atoi(start_str.data, start_str.len);
+    len = ngx_atoi(len_str.data, len_str.len);
 
     if (start == NGX_ERROR || len == NGX_ERROR || start < 0 || len < 0) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -1311,18 +1331,29 @@ ngx_http_var_operate_substr(ngx_http_request_t *r,
 
     src_len = src_str.len;
 
+    /* Handle the case where start is beyond the string length */
     if ((ngx_uint_t)start >= src_len) {
-        /* Start is beyond the string length */
         v->len = 0;
         v->data = (u_char *)"";
     } else {
+        /* Adjust len if it exceeds the string length */
         if ((ngx_uint_t)(start + len) > src_len) {
             len = src_len - start;
         }
+
+        /* Allocate memory for the substring */
         v->len = len;
-        v->data = src_str.data + start;
+        v->data = ngx_pnalloc(r->pool, v->len);
+        if (v->data == NULL) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: memory allocation failed "
+                          "for substr result");
+            return NGX_ERROR;
+        }
+        ngx_memcpy(v->data, src_str.data + start, v->len);
     }
 
+    /* Set variable value */
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
@@ -1343,9 +1374,9 @@ ngx_http_var_operate_replace(ngx_http_request_t *r,
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK ||
-        ngx_http_complex_value(r, &args[1], &search_str) != NGX_OK ||
-        ngx_http_complex_value(r, &args[2], &replace_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &search_str) != NGX_OK
+        || ngx_http_complex_value(r, &args[2], &replace_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute arguments "
                       "for replace operator");
@@ -1400,8 +1431,8 @@ ngx_http_var_operate_replace(ngx_http_request_t *r,
     i = 0;
 
     while (i < src_str.len) {
-        if (i <= src_str.len - search_str.len &&
-            ngx_strncmp(p + i, search_str.data, search_str.len) == 0) {
+        if (i <= src_str.len - search_str.len
+            && ngx_strncmp(p + i, search_str.data, search_str.len) == 0) {
             ngx_memcpy(q, replace_str.data, replace_str.len);
             q += replace_str.len;
             i += search_str.len;
@@ -1465,11 +1496,13 @@ ngx_http_var_operate_hex_decode(ngx_http_request_t *r,
 {
     ngx_str_t                  hex_str, bin_str;
     ngx_http_complex_value_t  *args;
-    u_char                     c1, c2, *p;
+    u_char                    *p;
+    ngx_int_t                  n;
     size_t                     i;
 
     args = var->args->elts;
 
+    /* Compute argument */
     if (ngx_http_complex_value(r, &args[0], &hex_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute argument "
@@ -1477,12 +1510,14 @@ ngx_http_var_operate_hex_decode(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    /* Check if the input string is of even length */
     if (hex_str.len % 2 != 0) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: hex_decode requires even-length string");
         return NGX_ERROR;
     }
 
+    /* Allocate memory for the output binary string */
     bin_str.len = hex_str.len >> 1;
     bin_str.data = ngx_pnalloc(r->pool, bin_str.len);
     if (bin_str.data == NULL) {
@@ -1491,12 +1526,15 @@ ngx_http_var_operate_hex_decode(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    /* Convert hex string to binary */
     p = hex_str.data;
     for (i = 0; i < bin_str.len; i++) {
         n = ngx_hextoi(p, 2);
         if (n == NGX_ERROR || n > 255) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: invalid hex character in hex_decode");
+                          "http_var: invalid hex character "
+                          "in hex_decode at position %d",
+                          (int)(p - hex_str.data));
             return NGX_ERROR;
         }
 
@@ -1504,6 +1542,7 @@ ngx_http_var_operate_hex_decode(ngx_http_request_t *r,
         bin_str.data[i] = (u_char) n;
     }
 
+    /* Set variable value */
     v->len = bin_str.len;
     v->data = bin_str.data;
     v->valid = 1;
@@ -1642,13 +1681,14 @@ static ngx_int_t
 ngx_http_var_operate_unescape_uri(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                  src_str, unescaped_str;
-    ngx_http_complex_value_t  *args;
-    size_t                     unescaped_len;
-    u_char                     *p;
+    ngx_str_t                 src_str, unescaped_str;
+    ngx_http_complex_value_t *args;
+    size_t                    len;
+    u_char                   *p, *src, *dst;
 
     args = var->args->elts;
 
+    /* Compute the source string */
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute argument for "
@@ -1656,28 +1696,40 @@ ngx_http_var_operate_unescape_uri(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    unescaped_len = ngx_unescape_uri(NULL, src_str.data, src_str.len, 0);
-
-    if (unescaped_len == NGX_ERROR) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid URI encoding in unescape_uri");
-        return NGX_ERROR;
+    /* Handle empty source string */
+    if (src_str.len == 0) {
+        v->len = 0;
+        v->data = (u_char *)"";
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+        return NGX_OK;
     }
 
-    unescaped_str.len = unescaped_len;
-    unescaped_str.data = ngx_pnalloc(r->pool, unescaped_str.len);
-    if (unescaped_str.data == NULL) {
+    /* Allocate memory for the unescaped string */
+    len = src_str.len;
+    p = ngx_pnalloc(r->pool, len);
+    if (p == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: memory allocation failed for unescape_uri");
         return NGX_ERROR;
     }
 
-    p = ngx_unescape_uri(unescaped_str.data, src_str.data, src_str.len, 0);
-    if (p == NULL) {
+    /* Perform the unescaping */
+    src = src_str.data;
+    dst = p;
+    ngx_unescape_uri(&dst, &src, src_str.len, 0);
+
+    if (src != src_str.data + src_str.len) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid URI encoding in unescape_uri");
+                      "http_var: input data not consumed completely "
+                      "in unescape_uri");
         return NGX_ERROR;
     }
+
+    /* Set variable value */
+    unescaped_str.data = p;
+    unescaped_str.len = dst - p;
 
     v->len = unescaped_str.len;
     v->data = unescaped_str.data;
