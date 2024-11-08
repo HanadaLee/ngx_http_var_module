@@ -3814,7 +3814,6 @@ ngx_http_var_operate_timestamp(ngx_http_request_t *r,
     ngx_str_t                  date_str, date_format, tz_str;
     ngx_tm_t                   tm;
     time_t                     timestamp;
-    ngx_int_t                  gmt = 1;
     int                        tz_offset = 0;
 
     args = var->args->elts;
