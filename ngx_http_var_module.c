@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) Hanada
+ * Copyright (C) Hanada
  */
 
 
@@ -11,11 +11,9 @@
 
 typedef enum {
     NGX_HTTP_VAR_OP_COPY,
+    NGX_HTTP_VAR_OP_LEN,
     NGX_HTTP_VAR_OP_UPPER,
     NGX_HTTP_VAR_OP_LOWER,
-    NGX_HTTP_VAR_OP_MAX,
-    NGX_HTTP_VAR_OP_MIN,
-    NGX_HTTP_VAR_OP_LEN,
     NGX_HTTP_VAR_OP_TRIM,
     NGX_HTTP_VAR_OP_LTRIM,
     NGX_HTTP_VAR_OP_RTRIM,
@@ -24,12 +22,6 @@ typedef enum {
     NGX_HTTP_VAR_OP_REPEAT,
     NGX_HTTP_VAR_OP_SUBSTR,
     NGX_HTTP_VAR_OP_REPLACE,
-    NGX_HTTP_VAR_OP_HEX_ENCODE,
-    NGX_HTTP_VAR_OP_HEX_DECODE,
-    NGX_HTTP_VAR_OP_ESCAPE_URI,
-    NGX_HTTP_VAR_OP_ESCAPE_ARGS,
-    NGX_HTTP_VAR_OP_ESCAPE_URI_COMPONENT,
-    NGX_HTTP_VAR_OP_UNESCAPE_URI,
 
 #if (NGX_PCRE)
     NGX_HTTP_VAR_OP_RE_MATCH,
@@ -37,7 +29,16 @@ typedef enum {
     NGX_HTTP_VAR_OP_RE_GSUB,
 #endif
 
+    NGX_HTTP_VAR_OP_MAX,
+    NGX_HTTP_VAR_OP_MIN,
     NGX_HTTP_VAR_OP_RAND,
+
+    NGX_HTTP_VAR_OP_HEX_ENCODE,
+    NGX_HTTP_VAR_OP_HEX_DECODE,
+    NGX_HTTP_VAR_OP_ESCAPE_URI,
+    NGX_HTTP_VAR_OP_ESCAPE_ARGS,
+    NGX_HTTP_VAR_OP_ESCAPE_URI_COMPONENT,
+    NGX_HTTP_VAR_OP_UNESCAPE_URI,
 
     NGX_HTTP_VAR_OP_UNKNOWN
 } ngx_http_var_operator_e;
@@ -71,11 +72,9 @@ typedef struct {
 
 static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("copy"),         NGX_HTTP_VAR_OP_COPY,         0, 1, 1 },
+    { ngx_string("len"),          NGX_HTTP_VAR_OP_LEN,          0, 1, 1 },
     { ngx_string("upper"),        NGX_HTTP_VAR_OP_UPPER,        0, 1, 1 },
     { ngx_string("lower"),        NGX_HTTP_VAR_OP_LOWER,        0, 1, 1 },
-    { ngx_string("max"),          NGX_HTTP_VAR_OP_MAX,          0, 2, 2 },
-    { ngx_string("min"),          NGX_HTTP_VAR_OP_MIN,          0, 2, 2 },
-    { ngx_string("len"),          NGX_HTTP_VAR_OP_LEN,          0, 1, 1 },
     { ngx_string("trim"),         NGX_HTTP_VAR_OP_TRIM,         0, 1, 1 },
     { ngx_string("ltrim"),        NGX_HTTP_VAR_OP_LTRIM,        0, 1, 1 },
     { ngx_string("rtrim"),        NGX_HTTP_VAR_OP_RTRIM,        0, 1, 1 },
@@ -84,13 +83,6 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("repeat"),       NGX_HTTP_VAR_OP_REPEAT,       0, 2, 2 },
     { ngx_string("substr"),       NGX_HTTP_VAR_OP_SUBSTR,       0, 3, 3 },
     { ngx_string("replace"),       NGX_HTTP_VAR_OP_REPLACE,     0, 3, 3 },
-    { ngx_string("hex_encode"),   NGX_HTTP_VAR_OP_HEX_ENCODE,   0, 1, 1 },
-    { ngx_string("hex_decode"),   NGX_HTTP_VAR_OP_HEX_DECODE,   0, 1, 1 },
-    { ngx_string("escape_uri"),   NGX_HTTP_VAR_OP_ESCAPE_URI,   0, 1, 1 },
-    { ngx_string("escape_args"),  NGX_HTTP_VAR_OP_ESCAPE_ARGS,  0, 1, 1 },
-    { ngx_string("escape_uri_component"),
-                          NGX_HTTP_VAR_OP_ESCAPE_URI_COMPONENT, 0, 1, 1 },
-    { ngx_string("unescape_uri"), NGX_HTTP_VAR_OP_UNESCAPE_URI, 0, 1, 1 },
 
 #if (NGX_PCRE)
     { ngx_string("re_match"),     NGX_HTTP_VAR_OP_RE_MATCH,     0, 3, 3 },
@@ -101,7 +93,18 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("re_gsub_i"),    NGX_HTTP_VAR_OP_RE_GSUB,      1, 3, 3 },
 #endif
 
-    { ngx_string("rand"),         NGX_HTTP_VAR_OP_RAND,       0, 0, 0 }
+
+    { ngx_string("max"),          NGX_HTTP_VAR_OP_MAX,          0, 2, 2 },
+    { ngx_string("min"),          NGX_HTTP_VAR_OP_MIN,          0, 2, 2 },
+    { ngx_string("rand"),         NGX_HTTP_VAR_OP_RAND,         0, 0, 0 },
+
+    { ngx_string("hex_encode"),   NGX_HTTP_VAR_OP_HEX_ENCODE,   0, 1, 1 },
+    { ngx_string("hex_decode"),   NGX_HTTP_VAR_OP_HEX_DECODE,   0, 1, 1 },
+    { ngx_string("escape_uri"),   NGX_HTTP_VAR_OP_ESCAPE_URI,   0, 1, 1 },
+    { ngx_string("escape_args"),  NGX_HTTP_VAR_OP_ESCAPE_ARGS,  0, 1, 1 },
+    { ngx_string("escape_uri_component"),
+                          NGX_HTTP_VAR_OP_ESCAPE_URI_COMPONENT, 0, 1, 1 },
+    { ngx_string("unescape_uri"), NGX_HTTP_VAR_OP_UNESCAPE_URI, 0, 1, 1 }
 };
 
 
@@ -124,15 +127,11 @@ static ngx_int_t ngx_http_var_variable_expr(ngx_http_request_t *r,
 
 static ngx_int_t ngx_http_var_operate_copy(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_len(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_upper(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_lower(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_operate_max(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_operate_min(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_operate_len(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_trim(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -150,6 +149,23 @@ static ngx_int_t ngx_http_var_operate_substr(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_replace(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+
+#if (NGX_PCRE)
+static ngx_int_t ngx_http_var_operate_re_match(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_re_sub(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_re_gsub(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+#endif
+
+static ngx_int_t ngx_http_var_operate_max(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_min(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_rand(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+
 static ngx_int_t ngx_http_var_operate_hex_encode(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_hex_decode(ngx_http_request_t *r,
@@ -162,18 +178,6 @@ static ngx_int_t ngx_http_var_operate_escape_uri_component(
     ngx_http_request_t *r, ngx_http_variable_value_t *v,
     ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_unescape_uri(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-
-#if (NGX_PCRE)
-static ngx_int_t ngx_http_var_operate_re_match(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_operate_re_sub(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_operate_re_gsub(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-#endif
-
-static ngx_int_t ngx_http_var_operate_rand(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 
@@ -665,24 +669,16 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
         rc = ngx_http_var_operate_copy(r, v, var);
         break;
 
+    case NGX_HTTP_VAR_OP_LEN:
+        rc = ngx_http_var_operate_len(r, v, var);
+        break;
+
     case NGX_HTTP_VAR_OP_UPPER:
         rc = ngx_http_var_operate_upper(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_LOWER:
         rc = ngx_http_var_operate_lower(r, v, var);
-        break;
-
-    case NGX_HTTP_VAR_OP_MAX:
-        rc = ngx_http_var_operate_max(r, v, var);
-        break;
-
-    case NGX_HTTP_VAR_OP_MIN:
-        rc = ngx_http_var_operate_min(r, v, var);
-        break;
-
-    case NGX_HTTP_VAR_OP_LEN:
-        rc = ngx_http_var_operate_len(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_TRIM:
@@ -717,6 +713,32 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
         rc = ngx_http_var_operate_replace(r, v, var);
         break;
 
+#if (NGX_PCRE)
+    case NGX_HTTP_VAR_OP_RE_MATCH:
+        rc = ngx_http_var_operate_re_match(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_RE_SUB:
+        rc = ngx_http_var_operate_re_sub(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_RE_GSUB:
+        rc = ngx_http_var_operate_re_gsub(r, v, var);
+        break;
+#endif
+
+    case NGX_HTTP_VAR_OP_MAX:
+        rc = ngx_http_var_operate_max(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_MIN:
+        rc = ngx_http_var_operate_min(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_RAND:
+        rc = ngx_http_var_operate_rand(r, v, var);
+        break;
+
     case NGX_HTTP_VAR_OP_HEX_ENCODE:
         rc = ngx_http_var_operate_hex_encode(r, v, var);
         break;
@@ -739,24 +761,6 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
     
     case NGX_HTTP_VAR_OP_UNESCAPE_URI:
         rc = ngx_http_var_operate_unescape_uri(r, v, var);
-        break;
-
-#if (NGX_PCRE)
-    case NGX_HTTP_VAR_OP_RE_MATCH:
-        rc = ngx_http_var_operate_re_match(r, v, var);
-        break;
-
-    case NGX_HTTP_VAR_OP_RE_SUB:
-        rc = ngx_http_var_operate_re_sub(r, v, var);
-        break;
-
-    case NGX_HTTP_VAR_OP_RE_GSUB:
-        rc = ngx_http_var_operate_re_gsub(r, v, var);
-        break;
-#endif
-
-    case NGX_HTTP_VAR_OP_RAND:
-        rc = ngx_http_var_operate_rand(r, v, var);
         break;
 
     default:
@@ -793,6 +797,41 @@ ngx_http_var_operate_copy(ngx_http_request_t *r,
     }
 
     ngx_memcpy(v->data, value_str.data, v->len);
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_len(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  src_str;
+    ngx_http_complex_value_t  *args;
+    u_char                    *p;
+    size_t                     len;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument "
+                      "for len operator");
+        return NGX_ERROR;
+    }
+
+    /* Convert length to string */
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    len = src_str.len;
+    v->len = ngx_sprintf(p, "%uz", len) - p;
+    v->data = p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
 
     return NGX_OK;
 }
@@ -865,157 +904,6 @@ ngx_http_var_operate_lower(ngx_http_request_t *r,
     for (i = 0; i < v->len; i++) {
         v->data[i] = ngx_tolower(v->data[i]);
     }
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_http_var_operate_max(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
-{
-    ngx_http_complex_value_t *cvp;
-    ngx_str_t                 arg_str1, arg_str2;
-    ngx_int_t                 num1, num2, max;
-
-    cvp = var->args->elts;
-
-    /* Evaluate first argument */
-    if (ngx_http_complex_value(r, &cvp[0], &arg_str1) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: failed to compute first argument");
-        return NGX_ERROR;
-    }
-
-    /* Evaluate second argument */
-    if (ngx_http_complex_value(r, &cvp[1], &arg_str2) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: failed to compute second argument");
-        return NGX_ERROR;
-    }
-
-    /* Convert arguments to integers */
-    num1 = ngx_atoi(arg_str1.data, arg_str1.len);
-    if (num1 == NGX_ERROR) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid number \"%V\"", &arg_str1);
-        return NGX_ERROR;
-    }
-
-    num2 = ngx_atoi(arg_str2.data, arg_str2.len);
-    if (num2 == NGX_ERROR) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid number \"%V\"", &arg_str2);
-        return NGX_ERROR;
-    }
-
-    /* Compute max */
-    max = (num1 > num2) ? num1 : num2;
-
-    /* Convert result to string */
-    u_char *p;
-    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
-    if (p == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed");
-        return NGX_ERROR;
-    }
-
-    v->len = ngx_sprintf(p, "%i", max) - p;
-    v->data = p;
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_http_var_operate_min(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
-{
-    ngx_http_complex_value_t *cvp;
-    ngx_str_t                 arg_str1, arg_str2;
-    ngx_int_t                 num1, num2, min;
-
-    cvp = var->args->elts;
-
-    /* Evaluate first argument */
-    if (ngx_http_complex_value(r, &cvp[0], &arg_str1) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: failed to compute first argument");
-        return NGX_ERROR;
-    }
-
-    /* Evaluate second argument */
-    if (ngx_http_complex_value(r, &cvp[1], &arg_str2) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: failed to compute second argument");
-        return NGX_ERROR;
-    }
-
-    /* Convert arguments to integers */
-    num1 = ngx_atoi(arg_str1.data, arg_str1.len);
-    if (num1 == NGX_ERROR) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid number \"%V\"", &arg_str1);
-        return NGX_ERROR;
-    }
-
-    num2 = ngx_atoi(arg_str2.data, arg_str2.len);
-    if (num2 == NGX_ERROR) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid number \"%V\"", &arg_str2);
-        return NGX_ERROR;
-    }
-
-    /* Compute min */
-    min = (num1 < num2) ? num1 : num2;
-
-    /* Convert result to string */
-    u_char *p;
-    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
-    if (p == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed");
-        return NGX_ERROR;
-    }
-
-    v->len = ngx_sprintf(p, "%i", min) - p;
-    v->data = p;
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_http_var_operate_len(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
-{
-    ngx_str_t                  src_str;
-    ngx_http_complex_value_t  *args;
-    u_char                    *p;
-    size_t                     len;
-
-    args = var->args->elts;
-
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: failed to compute argument "
-                      "for len operator");
-        return NGX_ERROR;
-    }
-
-    /* Convert length to string */
-    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
-    if (p == NULL) {
-        return NGX_ERROR;
-    }
-
-    len = src_str.len;
-    v->len = ngx_sprintf(p, "%uz", len) - p;
-    v->data = p;
-    v->valid = 1;
-    v->no_cacheable = 0;
-    v->not_found = 0;
 
     return NGX_OK;
 }
@@ -1454,293 +1342,6 @@ ngx_http_var_operate_replace(ngx_http_request_t *r,
 }
 
 
-static ngx_int_t
-ngx_http_var_operate_hex_encode(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
-{
-    ngx_str_t                  src_str, hex_str;
-    ngx_http_complex_value_t  *args;
-
-    args = var->args->elts;
-
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: failed to compute argument "
-                      "for hex_encode operator");
-        return NGX_ERROR;
-    }
-
-    hex_str.len = src_str.len << 1;
-    hex_str.data = ngx_pnalloc(r->pool, hex_str.len);
-    if (hex_str.data == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for hex_encode");
-        return NGX_ERROR;
-    }
-
-    ngx_hex_dump(hex_str.data, src_str.data, src_str.len);
-
-    v->len = hex_str.len;
-    v->data = hex_str.data;
-    v->valid = 1;
-    v->no_cacheable = 0;
-    v->not_found = 0;
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_http_var_operate_hex_decode(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
-{
-    ngx_str_t                  hex_str, bin_str;
-    ngx_http_complex_value_t  *args;
-    u_char                    *p;
-    ngx_int_t                  n;
-    size_t                     i;
-
-    args = var->args->elts;
-
-    /* Compute argument */
-    if (ngx_http_complex_value(r, &args[0], &hex_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: failed to compute argument "
-                      "for hex_decode operator");
-        return NGX_ERROR;
-    }
-
-    /* Check if the input string is of even length */
-    if (hex_str.len % 2 != 0) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: hex_decode requires even-length string");
-        return NGX_ERROR;
-    }
-
-    /* Allocate memory for the output binary string */
-    bin_str.len = hex_str.len >> 1;
-    bin_str.data = ngx_pnalloc(r->pool, bin_str.len);
-    if (bin_str.data == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for hex_decode");
-        return NGX_ERROR;
-    }
-
-    /* Convert hex string to binary */
-    p = hex_str.data;
-    for (i = 0; i < bin_str.len; i++) {
-        n = ngx_hextoi(p, 2);
-        if (n == NGX_ERROR || n > 255) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: invalid hex character "
-                          "in hex_decode at position %d",
-                          (int)(p - hex_str.data));
-            return NGX_ERROR;
-        }
-
-        p += 2;
-        bin_str.data[i] = (u_char) n;
-    }
-
-    /* Set variable value */
-    v->len = bin_str.len;
-    v->data = bin_str.data;
-    v->valid = 1;
-    v->no_cacheable = 0;
-    v->not_found = 0;
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_http_var_operate_escape_uri(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
-{
-    ngx_str_t                  src_str, escaped_str;
-    ngx_http_complex_value_t  *args;
-    size_t                     escaped_len;
-
-    args = var->args->elts;
-
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: failed to compute argument "
-                      "for escape_uri operator");
-        return NGX_ERROR;
-    }
-
-    escaped_len = ngx_escape_uri(NULL, src_str.data, src_str.len,
-                                 NGX_ESCAPE_URI);
-
-    escaped_str.len = escaped_len;
-    escaped_str.data = ngx_pnalloc(r->pool, escaped_str.len);
-    if (escaped_str.data == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for escape_uri");
-        return NGX_ERROR;
-    }
-
-    ngx_escape_uri(escaped_str.data, src_str.data, src_str.len,
-                   NGX_ESCAPE_URI);
-
-    v->len = escaped_str.len;
-    v->data = escaped_str.data;
-    v->valid = 1;
-    v->no_cacheable = 0;
-    v->not_found = 0;
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_http_var_operate_escape_args(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
-{
-    ngx_str_t                  src_str, escaped_str;
-    ngx_http_complex_value_t  *args;
-    size_t                     escaped_len;
-
-    args = var->args->elts;
-
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: failed to compute argument for "
-                      "escape_args operator");
-        return NGX_ERROR;
-    }
-
-    escaped_len = ngx_escape_uri(NULL, src_str.data, src_str.len,
-                                 NGX_ESCAPE_ARGS);
-
-    escaped_str.len = escaped_len;
-    escaped_str.data = ngx_pnalloc(r->pool, escaped_str.len);
-    if (escaped_str.data == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for escape_args");
-        return NGX_ERROR;
-    }
-
-    ngx_escape_uri(escaped_str.data, src_str.data, src_str.len,
-                   NGX_ESCAPE_ARGS);
-
-    v->len = escaped_str.len;
-    v->data = escaped_str.data;
-    v->valid = 1;
-    v->no_cacheable = 0;
-    v->not_found = 0;
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_http_var_operate_escape_uri_component(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
-{
-    ngx_str_t                  src_str, escaped_str;
-    ngx_http_complex_value_t  *args;
-    size_t                     escaped_len;
-
-    args = var->args->elts;
-
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: failed to compute argument for "
-                      "escape_uri_component operator");
-        return NGX_ERROR;
-    }
-
-    escaped_len = ngx_escape_uri(NULL, src_str.data, src_str.len,
-                                 NGX_ESCAPE_URI_COMPONENT);
-
-    escaped_str.len = escaped_len;
-    escaped_str.data = ngx_pnalloc(r->pool, escaped_str.len);
-    if (escaped_str.data == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for "
-                      "escape_uri_component");
-        return NGX_ERROR;
-    }
-
-    ngx_escape_uri(escaped_str.data, src_str.data, src_str.len,
-                   NGX_ESCAPE_URI_COMPONENT);
-
-    v->len = escaped_str.len;
-    v->data = escaped_str.data;
-    v->valid = 1;
-    v->no_cacheable = 0;
-    v->not_found = 0;
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_http_var_operate_unescape_uri(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
-{
-    ngx_str_t                 src_str, unescaped_str;
-    ngx_http_complex_value_t *args;
-    size_t                    len;
-    u_char                   *p, *src, *dst;
-
-    args = var->args->elts;
-
-    /* Compute the source string */
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: failed to compute argument for "
-                      "unescape_uri operator");
-        return NGX_ERROR;
-    }
-
-    /* Handle empty source string */
-    if (src_str.len == 0) {
-        v->len = 0;
-        v->data = (u_char *)"";
-        v->valid = 1;
-        v->no_cacheable = 0;
-        v->not_found = 0;
-        return NGX_OK;
-    }
-
-    /* Allocate memory for the unescaped string */
-    len = src_str.len;
-    p = ngx_pnalloc(r->pool, len);
-    if (p == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for unescape_uri");
-        return NGX_ERROR;
-    }
-
-    /* Perform the unescaping */
-    src = src_str.data;
-    dst = p;
-    ngx_unescape_uri(&dst, &src, src_str.len, 0);
-
-    if (src != src_str.data + src_str.len) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: input data not consumed completely "
-                      "in unescape_uri");
-        return NGX_ERROR;
-    }
-
-    /* Set variable value */
-    unescaped_str.data = p;
-    unescaped_str.len = dst - p;
-
-    v->len = unescaped_str.len;
-    v->data = unescaped_str.data;
-    v->valid = 1;
-    v->no_cacheable = 0;
-    v->not_found = 0;
-
-    return NGX_OK;
-}
-
-
 #if (NGX_PCRE)
 static ngx_int_t
 ngx_http_var_operate_re_match(ngx_http_request_t *r,
@@ -2024,6 +1625,122 @@ ngx_http_var_operate_re_gsub(ngx_http_request_t *r,
 
 
 static ngx_int_t
+ngx_http_var_operate_max(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t *cvp;
+    ngx_str_t                 arg_str1, arg_str2;
+    ngx_int_t                 num1, num2, max;
+
+    cvp = var->args->elts;
+
+    /* Evaluate first argument */
+    if (ngx_http_complex_value(r, &cvp[0], &arg_str1) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute first argument");
+        return NGX_ERROR;
+    }
+
+    /* Evaluate second argument */
+    if (ngx_http_complex_value(r, &cvp[1], &arg_str2) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute second argument");
+        return NGX_ERROR;
+    }
+
+    /* Convert arguments to integers */
+    num1 = ngx_atoi(arg_str1.data, arg_str1.len);
+    if (num1 == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: invalid number \"%V\"", &arg_str1);
+        return NGX_ERROR;
+    }
+
+    num2 = ngx_atoi(arg_str2.data, arg_str2.len);
+    if (num2 == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: invalid number \"%V\"", &arg_str2);
+        return NGX_ERROR;
+    }
+
+    /* Compute max */
+    max = (num1 > num2) ? num1 : num2;
+
+    /* Convert result to string */
+    u_char *p;
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed");
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%i", max) - p;
+    v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_min(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t *cvp;
+    ngx_str_t                 arg_str1, arg_str2;
+    ngx_int_t                 num1, num2, min;
+
+    cvp = var->args->elts;
+
+    /* Evaluate first argument */
+    if (ngx_http_complex_value(r, &cvp[0], &arg_str1) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute first argument");
+        return NGX_ERROR;
+    }
+
+    /* Evaluate second argument */
+    if (ngx_http_complex_value(r, &cvp[1], &arg_str2) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute second argument");
+        return NGX_ERROR;
+    }
+
+    /* Convert arguments to integers */
+    num1 = ngx_atoi(arg_str1.data, arg_str1.len);
+    if (num1 == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: invalid number \"%V\"", &arg_str1);
+        return NGX_ERROR;
+    }
+
+    num2 = ngx_atoi(arg_str2.data, arg_str2.len);
+    if (num2 == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: invalid number \"%V\"", &arg_str2);
+        return NGX_ERROR;
+    }
+
+    /* Compute min */
+    min = (num1 < num2) ? num1 : num2;
+
+    /* Convert result to string */
+    u_char *p;
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed");
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%i", min) - p;
+    v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_http_var_operate_rand(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
@@ -2041,6 +1758,293 @@ ngx_http_var_operate_rand(ngx_http_request_t *r,
 
     v->len = ngx_sprintf(p, "%ui", rand_num) - p;
     v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_hex_encode(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  src_str, hex_str;
+    ngx_http_complex_value_t  *args;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument "
+                      "for hex_encode operator");
+        return NGX_ERROR;
+    }
+
+    hex_str.len = src_str.len << 1;
+    hex_str.data = ngx_pnalloc(r->pool, hex_str.len);
+    if (hex_str.data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for hex_encode");
+        return NGX_ERROR;
+    }
+
+    ngx_hex_dump(hex_str.data, src_str.data, src_str.len);
+
+    v->len = hex_str.len;
+    v->data = hex_str.data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_hex_decode(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  hex_str, bin_str;
+    ngx_http_complex_value_t  *args;
+    u_char                    *p;
+    ngx_int_t                  n;
+    size_t                     i;
+
+    args = var->args->elts;
+
+    /* Compute argument */
+    if (ngx_http_complex_value(r, &args[0], &hex_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument "
+                      "for hex_decode operator");
+        return NGX_ERROR;
+    }
+
+    /* Check if the input string is of even length */
+    if (hex_str.len % 2 != 0) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: hex_decode requires even-length string");
+        return NGX_ERROR;
+    }
+
+    /* Allocate memory for the output binary string */
+    bin_str.len = hex_str.len >> 1;
+    bin_str.data = ngx_pnalloc(r->pool, bin_str.len);
+    if (bin_str.data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for hex_decode");
+        return NGX_ERROR;
+    }
+
+    /* Convert hex string to binary */
+    p = hex_str.data;
+    for (i = 0; i < bin_str.len; i++) {
+        n = ngx_hextoi(p, 2);
+        if (n == NGX_ERROR || n > 255) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: invalid hex character "
+                          "in hex_decode at position %d",
+                          (int)(p - hex_str.data));
+            return NGX_ERROR;
+        }
+
+        p += 2;
+        bin_str.data[i] = (u_char) n;
+    }
+
+    /* Set variable value */
+    v->len = bin_str.len;
+    v->data = bin_str.data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_escape_uri(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  src_str, escaped_str;
+    ngx_http_complex_value_t  *args;
+    size_t                     escaped_len;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument "
+                      "for escape_uri operator");
+        return NGX_ERROR;
+    }
+
+    escaped_len = ngx_escape_uri(NULL, src_str.data, src_str.len,
+                                 NGX_ESCAPE_URI);
+
+    escaped_str.len = escaped_len;
+    escaped_str.data = ngx_pnalloc(r->pool, escaped_str.len);
+    if (escaped_str.data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for escape_uri");
+        return NGX_ERROR;
+    }
+
+    ngx_escape_uri(escaped_str.data, src_str.data, src_str.len,
+                   NGX_ESCAPE_URI);
+
+    v->len = escaped_str.len;
+    v->data = escaped_str.data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_escape_args(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  src_str, escaped_str;
+    ngx_http_complex_value_t  *args;
+    size_t                     escaped_len;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "escape_args operator");
+        return NGX_ERROR;
+    }
+
+    escaped_len = ngx_escape_uri(NULL, src_str.data, src_str.len,
+                                 NGX_ESCAPE_ARGS);
+
+    escaped_str.len = escaped_len;
+    escaped_str.data = ngx_pnalloc(r->pool, escaped_str.len);
+    if (escaped_str.data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for escape_args");
+        return NGX_ERROR;
+    }
+
+    ngx_escape_uri(escaped_str.data, src_str.data, src_str.len,
+                   NGX_ESCAPE_ARGS);
+
+    v->len = escaped_str.len;
+    v->data = escaped_str.data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_escape_uri_component(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  src_str, escaped_str;
+    ngx_http_complex_value_t  *args;
+    size_t                     escaped_len;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "escape_uri_component operator");
+        return NGX_ERROR;
+    }
+
+    escaped_len = ngx_escape_uri(NULL, src_str.data, src_str.len,
+                                 NGX_ESCAPE_URI_COMPONENT);
+
+    escaped_str.len = escaped_len;
+    escaped_str.data = ngx_pnalloc(r->pool, escaped_str.len);
+    if (escaped_str.data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for "
+                      "escape_uri_component");
+        return NGX_ERROR;
+    }
+
+    ngx_escape_uri(escaped_str.data, src_str.data, src_str.len,
+                   NGX_ESCAPE_URI_COMPONENT);
+
+    v->len = escaped_str.len;
+    v->data = escaped_str.data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_unescape_uri(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                 src_str, unescaped_str;
+    ngx_http_complex_value_t *args;
+    size_t                    len;
+    u_char                   *p, *src, *dst;
+
+    args = var->args->elts;
+
+    /* Compute the source string */
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "unescape_uri operator");
+        return NGX_ERROR;
+    }
+
+    /* Handle empty source string */
+    if (src_str.len == 0) {
+        v->len = 0;
+        v->data = (u_char *)"";
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+        return NGX_OK;
+    }
+
+    /* Allocate memory for the unescaped string */
+    len = src_str.len;
+    p = ngx_pnalloc(r->pool, len);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for unescape_uri");
+        return NGX_ERROR;
+    }
+
+    /* Perform the unescaping */
+    src = src_str.data;
+    dst = p;
+    ngx_unescape_uri(&dst, &src, src_str.len, 0);
+
+    if (src != src_str.data + src_str.len) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: input data not consumed completely "
+                      "in unescape_uri");
+        return NGX_ERROR;
+    }
+
+    /* Set variable value */
+    unescaped_str.data = p;
+    unescaped_str.len = dst - p;
+
+    v->len = unescaped_str.len;
+    v->data = unescaped_str.data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
 
     return NGX_OK;
 }
