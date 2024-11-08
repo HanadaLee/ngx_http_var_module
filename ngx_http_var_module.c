@@ -1895,7 +1895,7 @@ ngx_http_var_operate_escape_uri(ngx_http_request_t *r,
     src = src_str.data;
 
     /* Calculate the escaped length */
-    escape = ngx_escape_uri(NULL, src, src_str.len, NGX_ESCAPE_URI);
+    escape = 2 * ngx_escape_uri(NULL, src, src_str.len, NGX_ESCAPE_URI);
     len = src_str.len + escape;
 
     dst = ngx_pnalloc(r->pool, len);
