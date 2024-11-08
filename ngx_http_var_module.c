@@ -3841,24 +3841,26 @@ ngx_http_var_operate_timestamp(ngx_http_request_t *r,
             return NGX_ERROR;
         }
 
-        if (ngx_strncmp(tz_str.data, "gmt", tz_str.len) != 0) {
-            if (tz_str.len != 5 || (tz_str.data[0] != '+'
-                && tz_str.data[0] != '-')) {
+        if (ngx_strncmp(tz_str.data, "gmt", 3) == 0) {
+            if (tz_str.len == 3) {
+                tz_offset = 0;
+            } else if (tz_str.len == 5
+                       && (tz_str.data[3] == '+' || tz_str.data[3] == '-')) {
+                /* Parse timezone offset, e.g., gmt+08 or gmt-02 */
+                tz_offset = ((tz_str.data[4] - '0')) * 3600;
+                if (tz_str.data[3] == '-') {
+                    tz_offset = -tz_offset;
+                }
+            } else {
                 ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                               "http_var: invalid timezone format for "
                               "timestamp");
                 return NGX_ERROR;
             }
-
-            /* Parse timezone offset, e.g., +0900 or -0430 */
-            tz_offset = ((tz_str.data[1] - '0') * 10
-                + (tz_str.data[2] - '0')) * 3600;
-            tz_offset += ((tz_str.data[3] - '0') * 10
-                + (tz_str.data[4] - '0')) * 60;
-
-            if (tz_str.data[0] == '-') {
-                tz_offset = -tz_offset;
-            }
+        } else {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: invalid timezone format for timestamp");
+            return NGX_ERROR;
         }
 
         /* Parse the date string */
