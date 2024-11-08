@@ -2345,14 +2345,52 @@ ngx_http_var_operate_floor(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-    /* Truncate everything after the decimal point */
-    result = ngx_palloc(r->pool, decimal_point + 1);
-    if (result == NULL) {
-        return NGX_ERROR;
-    }
+    /* Handle negative numbers differently */
+    if (num_data[0] == '-') {
+        /* Truncate everything after the decimal point */
+        result = ngx_palloc(r->pool, decimal_point + 2);
+        if (result == NULL) {
+            return NGX_ERROR;
+        }
 
-    ngx_memcpy(result, num_data, decimal_point);
-    result[decimal_point] = '\0';
+        ngx_memcpy(result, num_data, decimal_point);
+        result[decimal_point] = '\0';
+
+        /* Check if we need to round down */
+        if (num_data[decimal_point + 1] > '0') {
+            for (i = decimal_point - 1; i >= 0; i--) {
+                if (result[i] == '-') {
+                    continue;
+                }
+
+                if (result[i] < '9') {
+                    result[i]++;
+                    break;
+                } else {
+                    result[i] = '0';
+                    if (i == 1) {
+                        result[0] = '-';
+                        result[1] = '1';
+                        v->data = result;
+                        v->len = decimal_point + 1;
+                        v->valid = 1;
+                        v->no_cacheable = 0;
+                        v->not_found = 0;
+                        return NGX_OK;
+                    }
+                }
+            }
+        }
+    } else {
+        /* Truncate everything after the decimal point for positive numbers */
+        result = ngx_palloc(r->pool, decimal_point + 1);
+        if (result == NULL) {
+            return NGX_ERROR;
+        }
+
+        ngx_memcpy(result, num_data, decimal_point);
+        result[decimal_point] = '\0';
+    }
 
     v->data = result;
     v->len = decimal_point;
@@ -2404,38 +2442,50 @@ ngx_http_var_operate_ceil(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-    /* Truncate everything after the decimal point and add 1 if necessary */
-    result = ngx_palloc(r->pool, decimal_point + 2);
-    if (result == NULL) {
-        return NGX_ERROR;
-    }
+    /* Handle negative numbers differently */
+    if (num_data[0] == '-') {
+        /* Truncate everything after the decimal point for negative numbers */
+        result = ngx_palloc(r->pool, decimal_point + 1);
+        if (result == NULL) {
+            return NGX_ERROR;
+        }
 
-    ngx_memcpy(result, num_data, decimal_point);
-    result[decimal_point] = '\0';
+        ngx_memcpy(result, num_data, decimal_point);
+        result[decimal_point] = '\0';
+    } else {
+        /* Truncate everything after the decimal point and add 1 if necessary for positive numbers */
+        result = ngx_palloc(r->pool, decimal_point + 2);
+        if (result == NULL) {
+            return NGX_ERROR;
+        }
 
-    /* Check if we need to round up */
-    if (num_data[decimal_point + 1] > '0') {
-        for (i = decimal_point - 1; i >= 0; i--) {
-            if (result[i] < '9') {
-                result[i]++;
-                break;
-            } else {
-                result[i] = '0';
-                if (i == 0) {
-                    u_char *new_result = ngx_palloc(r->pool,
-                        decimal_point + 2);
-                    if (new_result == NULL) {
-                        return NGX_ERROR;
+        ngx_memcpy(result, num_data, decimal_point);
+        result[decimal_point] = '\0';
+
+        /* Check if we need to round up */
+        if (num_data[decimal_point + 1] > '0') {
+            for (i = decimal_point - 1; i >= 0; i--) {
+                if (result[i] < '9') {
+                    result[i]++;
+                    break;
+                } else {
+                    result[i] = '0';
+                    if (i == 0) {
+                        u_char *new_result = ngx_palloc(r->pool,
+                            decimal_point + 2);
+                        if (new_result == NULL) {
+                            return NGX_ERROR;
+                        }
+                        new_result[0] = '1';
+                        ngx_memcpy(new_result + 1, result, decimal_point);
+                        new_result[decimal_point + 1] = '\0';
+                        v->data = new_result;
+                        v->len = decimal_point + 1;
+                        v->valid = 1;
+                        v->no_cacheable = 0;
+                        v->not_found = 0;
+                        return NGX_OK;
                     }
-                    new_result[0] = '1';
-                    ngx_memcpy(new_result + 1, result, decimal_point);
-                    new_result[decimal_point + 1] = '\0';
-                    v->data = new_result;
-                    v->len = decimal_point + 1;
-                    v->valid = 1;
-                    v->no_cacheable = 0;
-                    v->not_found = 0;
-                    return NGX_OK;
                 }
             }
         }
