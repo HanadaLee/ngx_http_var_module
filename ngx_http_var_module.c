@@ -201,6 +201,8 @@ static ngx_int_t ngx_http_var_operate_div(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_mod(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_round(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_rand(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_rand_range(ngx_http_request_t *r,
