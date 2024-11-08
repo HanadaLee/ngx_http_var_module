@@ -166,8 +166,8 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("hmac_sha256"),   NGX_HTTP_VAR_OP_HMAC_SHA256,   0, 2, 2 },
 #endif
 
-    { ngx_string("gmt_time"),      NGX_HTTP_VAR_OP_MD5SUM,        0, 1, 1 },
-    { ngx_string("local_time"),    NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 }
+    { ngx_string("gmt_time"),      NGX_HTTP_VAR_OP_GMT_TIME,      0, 1, 1 },
+    { ngx_string("local_time"),    NGX_HTTP_VAR_OP_LOCAL_TIME,    0, 1, 1 }
 };
 
 
