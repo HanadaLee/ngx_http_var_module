@@ -37,6 +37,7 @@ typedef enum {
     NGX_HTTP_VAR_OP_MUL,
     NGX_HTTP_VAR_OP_DIV,
     NGX_HTTP_VAR_OP_MOD,
+    NGX_HTTP_VAR_OP_ROUND,
     NGX_HTTP_VAR_OP_RAND,
     NGX_HTTP_VAR_OP_RAND_RANGE,
 
@@ -112,6 +113,7 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("mul"),           NGX_HTTP_VAR_OP_MUL,           0, 2, 2 },
     { ngx_string("div"),           NGX_HTTP_VAR_OP_DIV,           0, 2, 2 },
     { ngx_string("mod"),           NGX_HTTP_VAR_OP_MOD,           0, 2, 2 },
+    { ngx_string("round"),         NGX_HTTP_VAR_OP_ROUND,         0, 2, 2 },
     { ngx_string("rand"),          NGX_HTTP_VAR_OP_RAND,          0, 0, 0 },
     { ngx_string("rand_range"),    NGX_HTTP_VAR_OP_RAND_RANGE,    0, 2, 2 },
 
@@ -802,6 +804,10 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
 
     case NGX_HTTP_VAR_OP_MOD:
         rc = ngx_http_var_operate_mod(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_ROUND:
+        rc = ngx_http_var_operate_round(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_RAND:
@@ -2154,6 +2160,60 @@ ngx_http_var_operate_mod(ngx_http_request_t *r,
     }
 
     v->len = ngx_sprintf(p, "%i", result) - p;
+    v->data = p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_round(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                  num_str, precision_str;
+    ngx_http_complex_value_t  *args;
+    double                     num, rounded_value;
+    ngx_int_t                  precision;
+    u_char                    *p;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &num_str) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &precision_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute arguments for "
+                      "round operator");
+        return NGX_ERROR;
+    }
+
+    num = ngx_atofp(num_str.data, num_str.len, NGX_MAX_FLOAT_PRECISION);
+    if (num == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: invalid number value for round operator");
+        return NGX_ERROR;
+    }
+
+    precision = ngx_atoi(precision_str.data, precision_str.len);
+    if (precision == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: invalid precision value for round operator");
+        return NGX_ERROR;
+    }
+
+    double factor = pow(10, precision);
+    rounded_value = round(num * factor) / factor;
+
+    p = ngx_pnalloc(r->pool, NGX_DOUBLE_LEN);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for round result");
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%.f", rounded_value) - p;
     v->data = p;
     v->valid = 1;
     v->no_cacheable = 0;
