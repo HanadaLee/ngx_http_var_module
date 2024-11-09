@@ -2909,7 +2909,7 @@ ngx_http_var_operate_dec_to_hex(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN + 1);
     if (p == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: memory allocation failed for dec_to_hex");
@@ -2917,10 +2917,11 @@ ngx_http_var_operate_dec_to_hex(ngx_http_request_t *r,
     }
 
     if (negative) {
-        dec_value = -dec_value;
+        v->len = ngx_sprintf(p, "-%xi", dec_value) - p;
+    } else {
+        v->len = ngx_sprintf(p, "%xi", dec_value) - p;
     }
 
-    v->len = ngx_sprintf(p, "%xi", dec_value) - p;
     v->data = p;
     v->valid = 1;
     v->no_cacheable = 0;
@@ -2965,14 +2966,19 @@ ngx_http_var_operate_hex_to_dec(ngx_http_request_t *r,
         dec_value = -dec_value;
     }
 
-    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN + 1);
     if (p == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: memory allocation failed for hex_to_dec");
         return NGX_ERROR;
     }
 
-    v->len = ngx_sprintf(p, "%i", dec_value) - p;
+    if (negative) {
+        v->len = ngx_sprintf(p, "-%i", dec_value) - p;
+    } else {
+        v->len = ngx_sprintf(p, "%i", dec_value) - p;
+    }
+
     v->data = p;
     v->valid = 1;
     v->no_cacheable = 0;
