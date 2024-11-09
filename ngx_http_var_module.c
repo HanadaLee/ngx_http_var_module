@@ -60,7 +60,8 @@ typedef enum {
     NGX_HTTP_VAR_OP_BASE64_DECODE,
     NGX_HTTP_VAR_OP_BASE64URL_DECODE,
 
-    NGX_HTTP_VAR_OP_CRC32,
+    NGX_HTTP_VAR_OP_CRC32_SHORT,
+    NGX_HTTP_VAR_OP_CRC32_LONG,
     NGX_HTTP_VAR_OP_MD5SUM,
     NGX_HTTP_VAR_OP_SHA1SUM,
 
@@ -158,7 +159,8 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("base64url_decode"),
                                 NGX_HTTP_VAR_OP_BASE64URL_DECODE, 0, 1, 1 },
 
-    { ngx_string("crc32"),         NGX_HTTP_VAR_OP_CRC32,         0, 1, 1 },
+    { ngx_string("crc32_short"),   NGX_HTTP_VAR_OP_CRC32_SHORT,   0, 1, 1 },
+    { ngx_string("crc32_log"),     NGX_HTTP_VAR_OP_CRC32_LONG,    0, 1, 1 },
     { ngx_string("md5sum"),        NGX_HTTP_VAR_OP_MD5SUM,        0, 1, 1 },
     { ngx_string("sha1sum"),       NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 },
 
@@ -276,7 +278,9 @@ static ngx_int_t ngx_http_var_operate_base64_decode(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_operate_base64url_decode(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
-static ngx_int_t ngx_http_var_operate_crc32(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_operate_crc32_short(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_crc32_long(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_md5sum(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -941,8 +945,12 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
         rc = ngx_http_var_operate_base64url_decode(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_CRC32:
-        rc = ngx_http_var_operate_crc32(r, v, var);
+    case NGX_HTTP_VAR_OP_CRC32_SHORT:
+        rc = ngx_http_var_operate_crc32_short(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_CRC32_LONG:
+        rc = ngx_http_var_operate_crc32_long(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_MD5SUM:
@@ -3286,7 +3294,7 @@ ngx_http_var_operate_base64url_decode(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_operate_crc32(ngx_http_request_t *r,
+ngx_http_var_operate_crc32_short(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -3299,23 +3307,66 @@ ngx_http_var_operate_crc32(ngx_http_request_t *r,
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute argument for "
-                      "crc32 source string");
+                      "crc32_short source string");
+        return NGX_ERROR;
+    }
+
+    /* Compute CRC32 */
+    crc = ngx_crc32_short(src_str.data, src_str.len);
+
+    /* Allocate buffer for CRC32 result */
+    u_char *p;
+    p = ngx_pnalloc(r->pool, 9);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for crc32_short");
+        return NGX_ERROR;
+    }
+
+    /* Convert CRC32 result to string */
+    v->len = ngx_sprintf(p, "%08x", crc) - p;  // Use lowercase %08x for CRC32 result
+    v->data = p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+
+static ngx_int_t
+ngx_http_var_operate_crc32_long(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str;
+    ngx_uint_t                 crc;
+
+    args = var->args->elts;
+
+    /* Evaluate source string */
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "crc32_long source string");
         return NGX_ERROR;
     }
 
     /* Compute CRC32 */
     crc = ngx_crc32_long(src_str.data, src_str.len);
 
-    /* Convert CRC32 result to string */
+    /* Allocate buffer for CRC32 result */
     u_char *p;
-    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    p = ngx_pnalloc(r->pool, 9);
     if (p == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for crc32");
+                      "http_var: memory allocation failed for crc32_long");
         return NGX_ERROR;
     }
 
-    v->len = ngx_sprintf(p, "%08X", crc) - p;
+    /* Convert CRC32 result to string */
+    v->len = ngx_sprintf(p, "%08x", crc) - p;
     v->data = p;
     v->valid = 1;
     v->no_cacheable = 0;
