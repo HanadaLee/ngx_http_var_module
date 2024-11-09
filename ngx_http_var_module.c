@@ -30,7 +30,7 @@ typedef enum {
     NGX_HTTP_VAR_OP_REPLACE,
 
 #if (NGX_PCRE)
-    NGX_HTTP_VAR_OP_RE_MATCH,
+    NGX_HTTP_VAR_OP_RE_CAPTURE,
     NGX_HTTP_VAR_OP_RE_SUB,
     NGX_HTTP_VAR_OP_RE_GSUB,
 #endif
@@ -51,6 +51,8 @@ typedef enum {
 
     NGX_HTTP_VAR_OP_HEX_ENCODE,
     NGX_HTTP_VAR_OP_HEX_DECODE,
+    NGX_HTTP_VAR_OP_DEC_TO_HEX,
+    NGX_HTTP_VAR_OP_HEX_TO_DEC,
     NGX_HTTP_VAR_OP_ESCAPE_URI,
     NGX_HTTP_VAR_OP_ESCAPE_ARGS,
     NGX_HTTP_VAR_OP_ESCAPE_URI_COMPONENT,
@@ -122,8 +124,8 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("replace"),       NGX_HTTP_VAR_OP_REPLACE,       0, 3, 3 },
 
 #if (NGX_PCRE)
-    { ngx_string("re_match"),      NGX_HTTP_VAR_OP_RE_MATCH,      0, 3, 3 },
-    { ngx_string("re_match_i"),    NGX_HTTP_VAR_OP_RE_MATCH,      1, 3, 3 },
+    { ngx_string("re_capture"),    NGX_HTTP_VAR_OP_RE_CAPTURE,    0, 3, 3 },
+    { ngx_string("re_capture_i"),  NGX_HTTP_VAR_OP_RE_CAPTURE,    1, 3, 3 },
     { ngx_string("re_sub"),        NGX_HTTP_VAR_OP_RE_SUB,        0, 3, 3 },
     { ngx_string("re_sub_i"),      NGX_HTTP_VAR_OP_RE_SUB,        1, 3, 3 },
     { ngx_string("re_gsub"),       NGX_HTTP_VAR_OP_RE_GSUB,       0, 3, 3 },
@@ -146,6 +148,8 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
 
     { ngx_string("hex_encode"),    NGX_HTTP_VAR_OP_HEX_ENCODE,    0, 1, 1 },
     { ngx_string("hex_decode"),    NGX_HTTP_VAR_OP_HEX_DECODE,    0, 1, 1 },
+    { ngx_string("dec_to_hex"),    NGX_HTTP_VAR_OP_DEC_TO_HEX,    0, 1, 1 },
+    { ngx_string("hex_to_dec"),    NGX_HTTP_VAR_OP_HEX_TO_DEC,    0, 1, 1 },
     { ngx_string("escape_uri"),    NGX_HTTP_VAR_OP_ESCAPE_URI,    0, 1, 1 },
     { ngx_string("escape_args"),   NGX_HTTP_VAR_OP_ESCAPE_ARGS,   0, 1, 1 },
     { ngx_string("escape_uri_component"),
@@ -221,7 +225,7 @@ static ngx_int_t ngx_http_var_operate_replace(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 #if (NGX_PCRE)
-static ngx_int_t ngx_http_var_operate_re_match(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_operate_re_capture(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_re_sub(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -259,6 +263,10 @@ static ngx_int_t ngx_http_var_operate_rand_range(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_operate_hex_encode(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_hex_decode(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_dec_to_hex(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_operate_hex_to_dec(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_escape_uri(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -519,14 +527,14 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     var->operator = op;
 
 #if (NGX_PCRE)
-    if (op == NGX_HTTP_VAR_OP_RE_MATCH
+    if (op == NGX_HTTP_VAR_OP_RE_CAPTURE
         || op == NGX_HTTP_VAR_OP_RE_SUB
         || op == NGX_HTTP_VAR_OP_RE_GSUB)
     {
         /* Regex operators requires 3 parameters：src_string, regex_pattern, assign_value */
         if (args_count != 3) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "re_match operator requires 3 arguments");
+                               "regex operators requires 3 arguments");
             return NGX_CONF_ERROR;
         }
 
@@ -767,8 +775,8 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
         break;
 
 #if (NGX_PCRE)
-    case NGX_HTTP_VAR_OP_RE_MATCH:
-        rc = ngx_http_var_operate_re_match(r, v, var);
+    case NGX_HTTP_VAR_OP_RE_CAPTURE:
+        rc = ngx_http_var_operate_re_capture(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_RE_SUB:
@@ -836,6 +844,14 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
         rc = ngx_http_var_operate_hex_encode(r, v, var);
         break;
     
+    case NGX_HTTP_VAR_OP_DEC_TO_HEX:
+        rc = ngx_http_var_operate_dec_to_hex(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_HEX_TO_DEC:
+        rc = ngx_http_var_operate_hex_to_dec(r, v, var);
+        break;
+
     case NGX_HTTP_VAR_OP_HEX_DECODE:
         rc = ngx_http_var_operate_hex_decode(r, v, var);
         break;
@@ -1579,7 +1595,7 @@ ngx_http_var_operate_replace(ngx_http_request_t *r,
 
 #if (NGX_PCRE)
 static ngx_int_t
-ngx_http_var_operate_re_match(ngx_http_request_t *r,
+ngx_http_var_operate_re_capture(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_str_t                    subject, assign_value;
@@ -2854,6 +2870,110 @@ ngx_http_var_operate_hex_decode(ngx_http_request_t *r,
     /* Set variable value */
     v->len = bin_str.len;
     v->data = bin_str.data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_dec_to_hex(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  dec_str;
+    ngx_int_t                  dec_value;
+    u_char                    *p;
+    ngx_flag_t                 negative = 0;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &dec_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for dec_to_hex");
+        return NGX_ERROR;
+    }
+
+    /* Validate if the input is a number */
+    if (dec_str.data[0] == '-') {
+        negative = 1;
+    }
+
+    dec_value = ngx_atoi(dec_str.data + (negative ? 1 : 0),
+                           dec_str.len - (negative ? 1 : 0));
+    if (dec_value == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: invalid decimal value for dec_to_hex");
+        return NGX_ERROR;
+    }
+
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for dec_to_hex");
+        return NGX_ERROR;
+    }
+
+    if (negative) {
+        dec_value = -dec_value;
+    }
+
+    v->len = ngx_sprintf(p, "%xi", dec_value) - p;
+    v->data = p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_operate_hex_to_dec(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  hex_str;
+    ngx_int_t                  dec_value = 0;
+    u_char                    *p;
+    ngx_flag_t                 negative = 0;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &hex_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument for hex_to_dec");
+        return NGX_ERROR;
+    }
+
+    /* Check if the input is negative */
+    if (hex_str.data[0] == '-') {
+        negative = 1;
+    }
+
+    dec_value = ngx_hextoi(hex_str.data + (negative ? 1 : 0),
+                           hex_str.len - (negative ? 1 : 0));
+    if (dec_value == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: invalid hexadecimal value for hex_to_dec");
+        return NGX_ERROR;
+    }
+
+    if (negative) {
+        dec_value = -dec_value;
+    }
+
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for hex_to_dec");
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%i", dec_value) - p;
+    v->data = p;
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
