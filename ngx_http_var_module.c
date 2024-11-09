@@ -452,6 +452,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_uint_t                   ignore_case = 0, min_args = 0, max_args = 0;
     ngx_uint_t                   args_count;
     size_t                       operators_count;
+    ngx_http_complex_value_t    *filter;
 
     ngx_http_compile_complex_value_t   ccv;
 
@@ -517,7 +518,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             return NGX_CONF_ERROR;
         }
 
-        var->filter = ccv.complex_value;
+        filter = ccv.complex_value;
         args_count = cf->args->nelts - 4;
 
     } else {
@@ -553,6 +554,10 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     var->operator = op;
+
+    if (filter) {
+        var->filter = filter;
+    }
 
 #if (NGX_PCRE)
     if (op == NGX_HTTP_VAR_OP_RE_CAPTURE
