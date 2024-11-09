@@ -2962,10 +2962,6 @@ ngx_http_var_operate_hex_to_dec(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (negative) {
-        dec_value = -dec_value;
-    }
-
     p = ngx_pnalloc(r->pool, NGX_INT_T_LEN + 1);
     if (p == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
