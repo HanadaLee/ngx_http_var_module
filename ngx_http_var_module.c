@@ -188,12 +188,12 @@ static char *ngx_http_var_create_variable(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
 static ngx_int_t ngx_http_var_find_variable(ngx_http_request_t *r,
     ngx_str_t *var_name, ngx_http_var_conf_t *vconf,
-    ngx_log_t *log, const char *conf_level,
-    ngx_http_var_variable_t **found_var);
-static ngx_int_t ngx_http_var_variable_handler(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data);
+    const char *conf_level, ngx_http_var_variable_t **found_var);
+
 static ngx_int_t ngx_http_var_variable_expr(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_variable_handler(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
 
 static ngx_int_t ngx_http_var_operate_copy(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -668,9 +668,9 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 /* Helper function to find variable */
 static ngx_int_t
-ngx_http_var_find_variable(ngx_http_request_t *r, ngx_str_t *var_name,
-    ngx_http_var_conf_t *vconf, ngx_log_t *log, const char *conf_level,
-    ngx_http_var_variable_t **found_var)
+ngx_http_var_find_variable(ngx_http_request_t *r,
+    ngx_str_t *var_name, ngx_http_var_conf_t *vconf,
+    const char *conf_level, ngx_http_var_variable_t **found_var)
 {
     ngx_http_var_variable_t      *vars;
     ngx_uint_t                    n;
@@ -680,7 +680,7 @@ ngx_http_var_find_variable(ngx_http_request_t *r, ngx_str_t *var_name,
         return NGX_DECLINED;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http_var: searching in %s conf", conf_level);
 
     vars = vconf->vars->elts;
@@ -696,7 +696,7 @@ ngx_http_var_find_variable(ngx_http_request_t *r, ngx_str_t *var_name,
             && ngx_strncmp(vars[i].name.data, var_name->data, var_name->len) == 0)
         {
             /* Found the variable */
-            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
+            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                            "http_var: variable found in %s conf", conf_level);
 
             /* Return the found variable */
@@ -707,79 +707,6 @@ ngx_http_var_find_variable(ngx_http_request_t *r, ngx_str_t *var_name,
     }
 
     return NGX_DECLINED;
-}
-
-
-/* Variable handler */
-static ngx_int_t
-ngx_http_var_variable_handler(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data)
-{
-    ngx_http_var_conf_t          *vconf;
-    ngx_str_t                     var_name;
-    ngx_log_t                    *log = r->connection->log;
-    ngx_str_t                    *var_name_ptr;
-    ngx_int_t                     rc;
-    ngx_http_var_variable_t      *found_var = NULL;
-
-    /* Get variable name from data */
-    var_name_ptr = (ngx_str_t *) data;
-    var_name.len = var_name_ptr->len;
-    var_name.data = var_name_ptr->data;
-
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
-                   "http_var: handling variable \"$%V\"", &var_name);
-
-    /* Search in location conf */
-    vconf = ngx_http_get_module_loc_conf(r, ngx_http_var_module);
-    rc = ngx_http_var_find_variable(r, &var_name, vconf, log,
-        "location", &found_var);
-    if (rc == NGX_OK) {
-        goto found;
-    } else if (rc == NGX_ERROR) {
-        return NGX_ERROR;
-    }
-
-    /* Search in server conf */
-    vconf = ngx_http_get_module_srv_conf(r, ngx_http_var_module);
-    rc = ngx_http_var_find_variable(r, &var_name, vconf, log,
-        "server", &found_var);
-    if (rc == NGX_OK) {
-        goto found;
-    } else if (rc == NGX_ERROR) {
-        return NGX_ERROR;
-    }
-
-    /* Search in main conf */
-    vconf = ngx_http_get_module_main_conf(r, ngx_http_var_module);
-    rc = ngx_http_var_find_variable(r, &var_name, vconf, log,
-        "main", &found_var);
-    if (rc == NGX_OK) {
-        goto found;
-    } else if (rc == NGX_ERROR) {
-        return NGX_ERROR;
-    }
-
-    /* Variable not found */
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
-                   "http_var: variable \"$%V\" not found", &var_name);
-
-    v->not_found = 1;
-    return NGX_OK;
-
-found:
-
-    v->valid = 1;
-    v->no_cacheable = 1;
-    v->not_found = 0;
-
-    /* Evaluate the variable expression */
-    rc = ngx_http_var_variable_expr(r, v, found_var);
-    if (rc != NGX_OK) {
-        return NGX_ERROR;
-    }
-
-    return NGX_OK;
 }
 
 
@@ -946,7 +873,7 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
         break;
 
     case NGX_HTTP_VAR_OP_CRC32_SHORT:
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0,
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http_var: use operator crc32_short");
         rc = ngx_http_var_operate_crc32_short(r, v, var);
         break;
@@ -1006,6 +933,78 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
     }
 
     return rc;
+}
+
+
+/* Variable handler */
+static ngx_int_t
+ngx_http_var_variable_handler(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    ngx_http_var_conf_t          *vconf;
+    ngx_str_t                     var_name;
+    ngx_str_t                    *var_name_ptr;
+    ngx_int_t                     rc;
+    ngx_http_var_variable_t      *found_var = NULL;
+
+    /* Get variable name from data */
+    var_name_ptr = (ngx_str_t *) data;
+    var_name.len = var_name_ptr->len;
+    var_name.data = var_name_ptr->data;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "http_var: handling variable \"$%V\"", &var_name);
+
+    /* Search in location conf */
+    vconf = ngx_http_get_module_loc_conf(r, ngx_http_var_module);
+    rc = ngx_http_var_find_variable(r, &var_name, vconf,
+        "location", &found_var);
+    if (rc == NGX_OK) {
+        goto found;
+    } else if (rc == NGX_ERROR) {
+        return NGX_ERROR;
+    }
+
+    /* Search in server conf */
+    vconf = ngx_http_get_module_srv_conf(r, ngx_http_var_module);
+    rc = ngx_http_var_find_variable(r, &var_name, vconf,
+        "server", &found_var);
+    if (rc == NGX_OK) {
+        goto found;
+    } else if (rc == NGX_ERROR) {
+        return NGX_ERROR;
+    }
+
+    /* Search in main conf */
+    vconf = ngx_http_get_module_main_conf(r, ngx_http_var_module);
+    rc = ngx_http_var_find_variable(r, &var_name, vconf,
+        "main", &found_var);
+    if (rc == NGX_OK) {
+        goto found;
+    } else if (rc == NGX_ERROR) {
+        return NGX_ERROR;
+    }
+
+    /* Variable not found */
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "http_var: variable \"$%V\" not found", &var_name);
+
+    v->not_found = 1;
+    return NGX_OK;
+
+found:
+
+    v->valid = 1;
+    v->no_cacheable = 1;
+    v->not_found = 0;
+
+    /* Evaluate the variable expression */
+    rc = ngx_http_var_variable_expr(r, v, found_var);
+    if (rc != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
 }
 
 
