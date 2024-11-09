@@ -3302,6 +3302,9 @@ ngx_http_var_operate_crc32_short(ngx_http_request_t *r,
     ngx_str_t                  src_str;
     ngx_uint_t                 crc;
 
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "http_var: starting crc32 calculation");
+
     args = var->args->elts;
 
     /* Evaluate source string */
@@ -3311,6 +3314,10 @@ ngx_http_var_operate_crc32_short(ngx_http_request_t *r,
                       "crc32_short source string");
         return NGX_ERROR;
     }
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "http_var: computed source string: data='%V', length=%uz",
+                   &src_str, src_str.len);
 
     /* Compute CRC32 */
     crc = ngx_crc32_short(src_str.data, src_str.len);
@@ -3326,14 +3333,21 @@ ngx_http_var_operate_crc32_short(ngx_http_request_t *r,
 
     /* Convert CRC32 result to string */
     v->len = ngx_sprintf(p, "%08x", crc) - p;  // Use lowercase %08x for CRC32 result
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "http_var: formatted crc32 string: data='%s', length=%uz",
+                   p, v->len);
+
     v->data = p;
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
 
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "http_var: crc32 calculation completed successfully");
+
     return NGX_OK;
 }
-
 
 
 static ngx_int_t
