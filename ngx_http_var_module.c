@@ -948,6 +948,12 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    if (rc == NGX_ERROR) {
+        v->len = 0;
+        v->not_found = 1;
+        return NGX_ERROR;
+    }
+
     return rc;
 }
 
