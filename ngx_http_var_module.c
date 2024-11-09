@@ -3332,7 +3332,7 @@ ngx_http_var_operate_crc32_short(ngx_http_request_t *r,
     }
 
     /* Convert CRC32 result to string */
-    v->len = ngx_sprintf(p, "%08x", crc) - p;  // Use lowercase %08x for CRC32 result
+    v->len = ngx_sprintf(p, "%08xD", crc) - p;  // Use lowercase %08x for CRC32 result
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http_var: formatted crc32 string: data='%s', length=%uz",
@@ -3381,7 +3381,7 @@ ngx_http_var_operate_crc32_long(ngx_http_request_t *r,
     }
 
     /* Convert CRC32 result to string */
-    v->len = ngx_sprintf(p, "%08x", crc) - p;
+    v->len = ngx_sprintf(p, "%08xD", crc) - p;
     v->data = p;
     v->valid = 1;
     v->no_cacheable = 0;
