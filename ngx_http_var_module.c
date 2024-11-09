@@ -92,6 +92,7 @@ typedef struct {
     ngx_str_t                   name;        /* variable name */
     ngx_http_var_operator_e     operator;    /* operator type */
     ngx_array_t                *args;        /* array of ngx_http_complex_value_t */
+    ngx_http_complex_value_t   *filter;
 
 #if (NGX_PCRE)
     ngx_http_regex_t           *regex;       /* compiled regex */
@@ -441,6 +442,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_http_var_conf_t         *vconf = conf;
     ngx_str_t                   *value;
+    ngx_uint_t                   last;
     ngx_str_t                    var_name, operator_str, regex_pattern;
     ngx_http_variable_t         *v;
     ngx_http_var_variable_t     *var;
@@ -452,6 +454,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     size_t                       operators_count;
 
     value = cf->args->elts;
+    last = cf->args->nelts - 1;
 
     if (cf->args->nelts < 3) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -494,7 +497,30 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    args_count = cf->args->nelts - 3;
+    if (ngx_strncmp(value[last].data, "if=", 3) == 0) {
+        s.len = value[last].len - 3;
+        s.data = value[last].data + 3;
+
+        ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+
+        ccv.cf = cf;
+        ccv.value = &s;
+        ccv.complex_value = ngx_palloc(cf->pool,
+                                    sizeof(ngx_http_complex_value_t));
+        if (ccv.complex_value == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+            return NGX_CONF_ERROR;
+        }
+
+        var->filter = ccv.complex_value;
+        args_count = cf->args->nelts - 4;
+
+    } else {
+        args_count = cf->args->nelts - 3;
+    }
 
     if (args_count < min_args || args_count > max_args) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -703,6 +729,17 @@ ngx_http_var_find_variable(ngx_http_request_t *r,
         if (vars[i].name.len == var_name->len
             && ngx_strncmp(vars[i].name.data, var_name->data, var_name->len) == 0)
         {
+            if (vars[i].filter) {
+                ngx_str_t  val;
+                if (ngx_http_complex_value(r, vars[i].filter, &val) != NGX_OK) {
+                    return NGX_ERROR;
+                }
+
+                if (val.len == 0 || (val.len == 1 && val.data[0] == '0')) {
+                    continue;
+                }
+            }
+
             /* Found the variable */
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                            "http_var: variable found in %s conf", conf_level);
@@ -889,8 +926,6 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
         break;
 
     case NGX_HTTP_VAR_OP_CRC32_SHORT:
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http_var: use operator crc32_short");
         rc = ngx_http_var_operate_crc32_short(r, v, var);
         break;
 
