@@ -452,7 +452,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_uint_t                   ignore_case = 0, min_args = 0, max_args = 0;
     ngx_uint_t                   args_count;
     size_t                       operators_count;
-    ngx_http_complex_value_t    *filter;
+    ngx_http_complex_value_t    *filter = NULL;
 
     ngx_http_compile_complex_value_t   ccv;
 
