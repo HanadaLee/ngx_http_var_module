@@ -4051,10 +4051,10 @@ ngx_http_var_operate_unix_time(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-set_unix_time:
-
     /* Convert to unix_time */
     unix_time = timegm(&tm) - tz_offset;
+
+set_unix_time:
 
     /* Convert unix_time to string */
     p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
