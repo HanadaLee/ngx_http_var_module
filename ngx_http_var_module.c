@@ -688,7 +688,7 @@ ngx_http_var_find_variable(ngx_http_request_t *r,
 
     /* Linear search */
     for (i = 0; i < (ngx_int_t) n; i++) {
-        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, log, 0,
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                        "http_var: checking variable \"%V\" in %s conf",
                        &vars[i].name, conf_level);
 
@@ -873,7 +873,7 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
         break;
 
     case NGX_HTTP_VAR_OP_CRC32_SHORT:
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http_var: use operator crc32_short");
         rc = ngx_http_var_operate_crc32_short(r, v, var);
         break;
