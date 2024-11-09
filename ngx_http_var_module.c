@@ -443,7 +443,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_http_var_conf_t         *vconf = conf;
     ngx_str_t                   *value;
     ngx_uint_t                   last;
-    ngx_str_t                    var_name, operator_str, regex_pattern;
+    ngx_str_t                    var_name, operator_str, regex_pattern, s;
     ngx_http_variable_t         *v;
     ngx_http_var_variable_t     *var;
     ngx_uint_t                   flags;
@@ -452,6 +452,8 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_uint_t                   ignore_case = 0, min_args = 0, max_args = 0;
     ngx_uint_t                   args_count;
     size_t                       operators_count;
+
+    ngx_http_compile_complex_value_t   ccv;
 
     value = cf->args->elts;
     last = cf->args->nelts - 1;
@@ -572,7 +574,6 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
 
         ngx_http_complex_value_t *cv_src;
-        ngx_http_compile_complex_value_t ccv;
 
         cv_src = ngx_array_push(var->args);
         if (cv_src == NULL) {
@@ -640,7 +641,6 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         /* Compile all arguments */
         for (n = 0; n < args_count; n++) {
             ngx_http_complex_value_t   *cv;
-            ngx_http_compile_complex_value_t   ccv;
 
             cv = ngx_array_push(var->args);
             if (cv == NULL) {
