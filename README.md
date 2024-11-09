@@ -127,10 +127,15 @@ Variables defined with the var directive can be overwritten by directives such a
 
 The if parameter enables conditional var. var will not be assign a value if the condition evaluates to “0” or an empty string. And it will continue to look for subsequent definitions of this variable.
 
-```
-var $new_var copy have-header-a if=$http_a; # When request header A is present, the value of the variable is 'have-header-a'
-var $new_var copy have-header-b if=$http_b; # When request header A is not present but request header B is present, the value of the variable is 'have-header-b'
-var $new_var copy not-have-a-or-b; # When both request header A and B are not present, the value of the variable is 'not-have-a-or-b'
+```nginx
+# When request header A is present, the value of the variable is 'have-header-a'
+var $new_var copy have-header-a if=$http_a;
+
+# When request header A is not present but request header B is present, the value of the variable is 'have-header-b'
+var $new_var copy have-header-b if=$http_b;
+
+# When both request header A and B are not present, the value of the variable is 'not-have-a-or-b'
+var $new_var copy not-have-a-or-b;
 add_header Test-Var $new_var;
 ```
 
