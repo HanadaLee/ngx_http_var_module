@@ -66,12 +66,12 @@ var $new_var substr src_string start len; # Extract a substring
 var $new_var replace src_string src dst; # Replace a keyword in the string
 
 # Regular Expressions
-var $new_var re_match src_string capture_regex assign_value; # Regex match and capture
-var $new_var re_match_i src_string capture_regex assign_value; # Regex match and capture (case-insensitive)
-var $new_var re_sub src_string capture_regex assign_value; # Regex substitution
-var $new_var re_sub_i src_string capture_regex assign_value; # Regex substitution (case-insensitive)
-var $new_var re_gsub src_string capture_regex assign_value; # Global regex substitution
-var $new_var re_gsub_i src_string capture_regex assign_value; # Global regex substitution (case-insensitive)
+var $new_var re_capture src_string regex assign_value; # Regex match and capture
+var $new_var re_capture_i src_string regex assign_value; # Regex match and capture (case-insensitive)
+var $new_var re_sub src_string regex assign_value; # Regex substitution
+var $new_var re_sub_i src_string regex assign_value; # Regex substitution (case-insensitive)
+var $new_var re_gsub src_string regex assign_value; # Global regex substitution
+var $new_var re_gsub_i src_string regex assign_value; # Global regex substitution (case-insensitive)
 
 # Mathematical Calculations
 var $new_var abs int; # Absolute value of an integer
@@ -91,6 +91,8 @@ var $new_var rand_range start_int end_int; # Generate a random positive integer 
 # Encoding and Decoding
 var $new_var hex_encode src_string; # Convert binary to hexadecimal
 var $new_var hex_decode src_string; # Convert hexadecimal to binary
+var $new_var dec_to_hex dec; # Convert decimal to hexadecimal
+var $new_var hex_to_dec hex; # Convert hexadecimal to decimal
 var $new_var escape_uri src_string; # Encode as complete URI
 var $new_var escape_args src_string; # Encode URI parameters
 var $new_var escape_uri_component src_string; # Encode URI component
@@ -101,7 +103,8 @@ var $new_var base64_decode src_string; # Base64 decoding
 var $new_var base64url_decode src_string; # Base64url decoding
 
 # Hashing Calculations
-var $new_var crc32 src_string; # CRC32 encoding
+var $new_var crc32_short src_string; # CRC32 encoding, better on relatively short str inputs (i.e., less than 30 ~ 60 bytes)
+var $new_var crc32_long src_string; # CRC32 encoding, better on relatively long str inputs (i.e., longer than 30 ~ 60 bytes)
 var $new_var md5sum src_string; # MD5 encoding
 var $new_var sha1sum src_string; # SHA1 encoding
 var $new_var sha256sum src_string; # SHA256 encoding
@@ -111,9 +114,13 @@ var $new_var hmac_sha1 src_string secret; # HMAC-SHA1 encryption
 var $new_var hmac_sha256 src_string secret; # HMAC-SHA256 encryption
 
 # Time Formatting
-var $new_var gmt_time [src_ts] date_format; # Convert timestamp to specified GMT format (use current time if timestamp is omitted)
-var $new_var local_time [src_ts] date_format; # Convert timestamp to specified local time format (use current time if timestamp is omitted)
-var $new_var timestamp [src_date] [date_format] [timezone]; # Convert specified date to timestamp (return current timestamp if all are omitted)
+var $new_var gmt_time [src_ts] date_format; # Convert timestamp to GMT time in specified format (current time if timestamp is omitted)
+var $new_var gmt_time [src_ts] http_time; # Convert timestamp to http time (current time if timestamp is omitted)
+var $new_var gmt_time [src_ts] cookie_time; # Convert timestamp to cookie time (current time if timestamp is omitted)
+var $new_var local_time [src_ts] date_format; # Convert timestamp to local time in specified format (current time if timestamp is omitted)
+var $new_var unixtime; # Return current timestamp
+var $new_var unixtime src_http_time http_time; # Convert http time to timestamp
+var $new_var unixtime src_time date_format timezone; # Convert specified date to timestamp (current timestamp is returned if all are omitted)
 ```
 
 Variables defined with the var directive can be overwritten by directives such as `set` and `auth_request_set`.
