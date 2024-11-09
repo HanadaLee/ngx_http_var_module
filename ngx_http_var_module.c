@@ -75,7 +75,7 @@ typedef enum {
 
     NGX_HTTP_VAR_OP_GMT_TIME,
     NGX_HTTP_VAR_OP_LOCAL_TIME,
-    NGX_HTTP_VAR_OP_TIMESTAMP,
+    NGX_HTTP_VAR_OP_UNIXTIME,
 
     NGX_HTTP_VAR_OP_UNKNOWN
 } ngx_http_var_operator_e;
@@ -174,7 +174,7 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
 
     { ngx_string("gmt_time"),      NGX_HTTP_VAR_OP_GMT_TIME,      0, 1, 2 },
     { ngx_string("local_time"),    NGX_HTTP_VAR_OP_LOCAL_TIME,    0, 1, 2 },
-    { ngx_string("timestamp"),     NGX_HTTP_VAR_OP_TIMESTAMP,     0, 0, 3 },
+    { ngx_string("unixtime"),      NGX_HTTP_VAR_OP_UNIXTIME,      0, 0, 3 },
 };
 
 
@@ -304,7 +304,7 @@ static ngx_int_t ngx_http_var_operate_gmt_time(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_local_time(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_operate_timestamp(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_operate_unixtime(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 static ngx_command_t ngx_http_var_commands[] = {
@@ -920,8 +920,8 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
         rc = ngx_http_var_operate_local_time(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_TIMESTAMP:
-        rc = ngx_http_var_operate_timestamp(r, v, var);
+    case NGX_HTTP_VAR_OP_UNIXTIME:
+        rc = ngx_http_var_operate_unixtime(r, v, var);
         break;
 
     default:
@@ -3302,9 +3302,6 @@ ngx_http_var_operate_crc32_short(ngx_http_request_t *r,
     ngx_str_t                  src_str;
     ngx_uint_t                 crc;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http_var: starting crc32 calculation");
-
     args = var->args->elts;
 
     /* Evaluate source string */
@@ -3314,10 +3311,6 @@ ngx_http_var_operate_crc32_short(ngx_http_request_t *r,
                       "crc32_short source string");
         return NGX_ERROR;
     }
-
-    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http_var: computed source string: data='%V', length=%uz",
-                   &src_str, src_str.len);
 
     /* Compute CRC32 */
     crc = ngx_crc32_short(src_str.data, src_str.len);
@@ -3334,17 +3327,10 @@ ngx_http_var_operate_crc32_short(ngx_http_request_t *r,
     /* Convert CRC32 result to string */
     v->len = ngx_sprintf(p, "%08xD", crc) - p;  // Use lowercase %08x for CRC32 result
 
-    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http_var: formatted crc32 string: data='%s', length=%uz",
-                   p, v->len);
-
     v->data = p;
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
-
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http_var: crc32 calculation completed successfully");
 
     return NGX_OK;
 }
@@ -3791,19 +3777,18 @@ ngx_http_var_operate_gmt_time(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (var->args->nelts == 2) {
-        /* Two arguments: timestamp and date format */
+        /* Two arguments: unixtime and date format */
         if (ngx_http_complex_value(r, &args[0], &ts_str) != NGX_OK) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                           "http_var: failed to compute argument for "
-                          "gmt_time timestamp");
+                          "gmt_time unixtime");
             return NGX_ERROR;
         }
 
         ts = ngx_atoi(ts_str.data, ts_str.len);
         if (ts == NGX_ERROR) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: invalid timestamp value "
-                          "for gmt_time");
+                          "http_var: invalid unixtime value for gmt_time");
             return NGX_ERROR;
         }
 
@@ -3824,6 +3809,40 @@ ngx_http_var_operate_gmt_time(ngx_http_request_t *r,
         ts = ngx_time();
     }
 
+    if (ngx_strcmp(date_format.data, "http_time") == 0) {
+        p = ngx_pnalloc(r->pool, sizeof("Mon, 28 Sep 1970 06:00:00 GMT") - 1);
+        if (p == NULL) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: memory allocation failed for gmt_time");
+            return NGX_ERROR;
+        }
+
+        v->len = ngx_http_time(p, ts)- p;
+        v->data = p;
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+
+        return NGX_OK;
+    }
+  
+    if (ngx_strcmp(date_format.data, "cookie_time") == 0) {
+        p = ngx_pnalloc(r->pool, sizeof("Thu, 18-Nov-10 11:27:35 GMT") - 1);
+        if (p == NULL) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: memory allocation failed for gmt_time");
+            return NGX_ERROR;
+        }
+
+        v->len = ngx_http_cookie_time(p, ts) - p;
+        v->data = p;
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+
+        return NGX_OK;
+    }
+  
     ngx_libc_gmtime(ts, &tm);
 
     /* Allocate extra space for formatting */
@@ -3836,6 +3855,7 @@ ngx_http_var_operate_gmt_time(ngx_http_request_t *r,
 
     v->len = strftime((char *) p, 256,
                       (char *) date_format.data, &tm);
+
     if (v->len == 0) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: strftime failed for gmt_time");
@@ -3864,18 +3884,18 @@ ngx_http_var_operate_local_time(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (var->args->nelts == 2) {
-        /* Two arguments: timestamp and date format */
+        /* Two arguments: unixtime and date format */
         if (ngx_http_complex_value(r, &args[0], &ts_str) != NGX_OK) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                           "http_var: failed to compute argument for "
-                          "gmt_time timestamp");
+                          "gmt_time unixtime");
             return NGX_ERROR;
         }
 
         ts = ngx_atoi(ts_str.data, ts_str.len);
         if (ts == NGX_ERROR) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: invalid timestamp value "
+                          "http_var: invalid unixtime value "
                           "for gmt_time");
             return NGX_ERROR;
         }
@@ -3925,93 +3945,126 @@ ngx_http_var_operate_local_time(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_operate_timestamp(ngx_http_request_t *r,
+ngx_http_var_operate_unixtime(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  date_str, date_format, tz_str;
     ngx_tm_t                   tm;
-    time_t                     timestamp;
+    time_t                     unixtime;
     int                        tz_offset = 0;
+    u_char                    *p;
+    ngx_time_t                *tp;
 
     args = var->args->elts;
 
+    if (var->args->nelts == 0) {
+        p = ngx_pnalloc(r->pool, NGX_TIME_T_LEN);
+        if (p == NULL) {
+            return NGX_ERROR;
+        }
+
+        tp = ngx_timeofday();
+
+        v->len = ngx_sprintf(p, "%T", tp->sec) - p;
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+        v->data = p;
+
+        return NGX_OK;
+    }
+    
+    if (var->args->nelts == 1) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: illegal number of parameters for unixtime");
+        return NGX_ERROR;
+    }
+
+    /* Two arguments: http date string, http_time */
+    if (ngx_http_complex_value(r, &args[0], &date_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "http_var: failed to compute argument for "
+                    "unixtime date_string");
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_complex_value(r, &args[1], &date_format) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "http_var: failed to compute argument for "
+                    "unixtime date_format");
+        return NGX_ERROR;
+    }
+
+    if (ngx_strcmp(date_format.data, "http_time") == 0) {
+        unixtime = ngx_parse_http_time(date_str.data, date_str.len);
+        if (unixtime == NGX_ERROR) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: failed to parse http_time for unixtime");
+            return NGX_ERROR;
+        }
+        goto set_unixtime;
+    }
+
+    /* Third argument: timezone */
     if (var->args->nelts == 3) {
-        /* Three arguments: date string, date format, and timezone */
-        if (ngx_http_complex_value(r, &args[0], &date_str) != NGX_OK) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: failed to compute argument for "
-                          "timestamp date_string");
-            return NGX_ERROR;
-        }
-
-        if (ngx_http_complex_value(r, &args[1], &date_format) != NGX_OK) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: failed to compute argument for "
-                          "timestamp date_format");
-            return NGX_ERROR;
-        }
-
         if (ngx_http_complex_value(r, &args[2], &tz_str) != NGX_OK) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                           "http_var: failed to compute argument for "
-                          "timestamp timezone");
+                          "unixtime timezone");
             return NGX_ERROR;
         }
 
         if (ngx_strncmp(tz_str.data, "gmt", 3) == 0) {
             if (tz_str.len == 3) {
                 tz_offset = 0;
-            } else if (tz_str.len == 5
+            } else if ((tz_str.len == 8)
                        && (tz_str.data[3] == '+' || tz_str.data[3] == '-')) {
-                /* Parse timezone offset, e.g., gmt+08 or gmt-02 */
-                tz_offset = ((tz_str.data[4] - '0')) * 3600;
+                /* Parse timezone offset, e.g., +0800 or -0200 */
+                tz_offset = ((tz_str.data[4] - '0') * 10
+                              + (tz_str.data[5] - '0')) * 3600;
+                tz_offset += ((tz_str.data[6] - '0') * 10
+                               + (tz_str.data[7] - '0')) * 60;
                 if (tz_str.data[3] == '-') {
                     tz_offset = -tz_offset;
                 }
             } else {
                 ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                               "http_var: invalid timezone format for "
-                              "timestamp");
+                              "unixtime");
                 return NGX_ERROR;
             }
         } else {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: invalid timezone format for timestamp");
+                          "http_var: invalid timezone format for unixtime");
             return NGX_ERROR;
         }
+    }
 
-        /* Parse the date string */
-        ngx_memzero(&tm, sizeof(ngx_tm_t));
-        if (strptime((char *) date_str.data,
-            (char *) date_format.data, &tm) == NULL) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: failed to parse date string for "
-                          "timestamp");
-            return NGX_ERROR;
-        }
-
-        /* Convert to timestamp */
-        timestamp = timegm(&tm) - tz_offset;
-    } else if (var->args->nelts == 0) {
-        /* No arguments: use current time */
-        timestamp = ngx_time();
-    } else {
+    /* Parse the date string */
+    ngx_memzero(&tm, sizeof(ngx_tm_t));
+    if (strptime((char *) date_str.data,
+        (char *) date_format.data, &tm) == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: illegal number of parameters for timestamp");
+                        "http_var: failed to parse date string for "
+                        "unixtime");
         return NGX_ERROR;
     }
 
-    /* Convert timestamp to string */
-    u_char *p;
+set_unixtime:
+
+    /* Convert to unixtime */
+    unixtime = timegm(&tm) - tz_offset;
+
+    /* Convert unixtime to string */
     p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
     if (p == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for timestamp");
+                      "http_var: memory allocation failed for unixtime");
         return NGX_ERROR;
     }
 
-    v->len = ngx_sprintf(p, "%T", timestamp) - p;
+    v->len = ngx_sprintf(p, "%T", unixtime) - p;
     v->data = p;
     v->valid = 1;
     v->no_cacheable = 0;
