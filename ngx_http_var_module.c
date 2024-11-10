@@ -326,6 +326,13 @@ static ngx_command_t ngx_http_var_commands[] = {
       0,
       NULL },
 
+    { ngx_string("const"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_2MORE,
+      ngx_http_var_create_variable,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
+      NULL },
+
     ngx_null_command
 };
 
@@ -437,7 +444,7 @@ ngx_http_var_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 }
 
 
-/* "var" directive handler */
+/* "var" or "const" directive handler */
 static char *
 ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -447,7 +454,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_str_t                    var_name, operator_str, regex_pattern, s;
     ngx_http_variable_t         *v;
     ngx_http_var_variable_t     *var;
-    ngx_uint_t                   flags;
+    ngx_uint_t                   flags = 0;
     ngx_uint_t                   i, n;
     ngx_http_var_operator_e      op = NGX_HTTP_VAR_OP_UNKNOWN;
     ngx_uint_t                   ignore_case = 0, min_args = 0, max_args = 0;
@@ -463,7 +470,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (cf->args->nelts < 3) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "invalid number of arguments in \"var\" directive");
+                           "http_var: invalid number of arguments in \"var\" directive");
         return NGX_CONF_ERROR;
     }
 
@@ -472,7 +479,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (var_name.len == 0 || var_name.data[0] != '$') {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "invalid variable name \"%V\"", &var_name);
+                           "http_var: invalid variable name \"%V\"", &var_name);
         return NGX_CONF_ERROR;
     }
 
@@ -498,7 +505,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (op == NGX_HTTP_VAR_OP_UNKNOWN) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "unsupported operator \"%V\"", &operator_str);
+                           "http_var: unsupported operator \"%V\"", &operator_str);
         return NGX_CONF_ERROR;
     }
 
@@ -538,7 +545,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (args_count < min_args || args_count > max_args) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "invalid number of arguments for operator \"%V\"",
+                           "http_var: invalid number of arguments for operator \"%V\"",
                            &operator_str);
         return NGX_CONF_ERROR;
     }
@@ -579,7 +586,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         /* Regex operators requires 3 parameters：src_string, regex_pattern, assign_value */
         if (args_count != 3) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "regex operators requires 3 arguments");
+                               "http_var: regex operators requires 3 arguments");
             return NGX_CONF_ERROR;
         }
 
@@ -680,16 +687,16 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 #endif
 
     /* Add variable to Nginx */
-    flags = NGX_HTTP_VAR_CHANGEABLE | NGX_HTTP_VAR_NOCACHEABLE;
+    if (ngx_strcmp(value[0].data, "var") == 0) {
+        flags = NGX_HTTP_VAR_CHANGEABLE | NGX_HTTP_VAR_NOCACHEABLE;
+    }
 
     v = ngx_http_add_variable(cf, &var_name, flags);
     if (v == NULL) {
         return NGX_CONF_ERROR;
     }
 
-    if (v->get_handler == NULL
-        || v->get_handler == ngx_http_var_variable_handler)
-    {
+    if (v->get_handler == NULL) {
         v->get_handler = ngx_http_var_variable_handler;
 
         /* Store variable name */
@@ -707,9 +714,9 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
 
         v->data = (uintptr_t) var_name_copy;
-    } else {
+    } else if (v->get_handler != ngx_http_var_variable_handler) {
         ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
-                           "variable \"%V\" already has a handler",
+                           "http_var: variable \"%V\" already has another handler",
                            &var_name);
     }
 

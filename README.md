@@ -6,13 +6,15 @@
 
 # Table of Content
 
-- [Name](#name)
+- [ngx\_http\_var\_module](#ngx_http_var_module)
+  - [Name](#name)
+- [Table of Content](#table-of-content)
 - [Status](#status)
-- [Features](#features)
 - [Synopsis](#synopsis)
 - [Installation](#installation)
 - [Directives](#directives)
   - [var](#var)
+  - [const](#const)
 - [Author](#author)
 - [License](#license)
 
@@ -138,6 +140,18 @@ var $new_var copy have-header-b if=$http_b;
 var $new_var copy not-have-a-or-b;
 add_header Test-Var $new_var;
 ```
+
+## const
+
+**Syntax:** *const $new_variable operator args... \[if\=condition\]*
+
+**Default:** *-*
+
+**Context:** *http, server, location*
+
+Same as variables defined by the `var` directive, but variables are cacheable, and the value of the variable is only calculated the first time it is used. In addition, the value of the variable cannot be modified.
+
+Do not use both the const and var directives to define variables with the same name.
 
 # Author
 
