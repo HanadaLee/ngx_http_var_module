@@ -1015,7 +1015,7 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    ngx_log_debug3(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+    ngx_log_debug4(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http_var: evaluated variable \"%V\", "
                    "result length: %uz, value: \"%*s\"",
                    &var->name, v->len, v->len, v->data);
