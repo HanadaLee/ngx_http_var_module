@@ -24,7 +24,7 @@ typedef enum {
     NGX_HTTP_VAR_OP_LTRIM,
     NGX_HTTP_VAR_OP_RTRIM,
     NGX_HTTP_VAR_OP_REVERSE,
-    NGX_HTTP_VAR_OP_POSITION,
+    NGX_HTTP_VAR_OP_FIND,
     NGX_HTTP_VAR_OP_REPEAT,
     NGX_HTTP_VAR_OP_SUBSTR,
     NGX_HTTP_VAR_OP_REPLACE,
@@ -93,6 +93,7 @@ typedef struct {
     ngx_http_var_operator_e     operator;    /* operator type */
     ngx_array_t                *args;        /* array of ngx_http_complex_value_t */
     ngx_http_complex_value_t   *filter;
+    ngx_uint_t                  negative;
 
 #if (NGX_PCRE)
     ngx_http_regex_t           *regex;       /* compiled regex */
@@ -119,7 +120,7 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("ltrim"),         NGX_HTTP_VAR_OP_LTRIM,         0, 1, 1 },
     { ngx_string("rtrim"),         NGX_HTTP_VAR_OP_RTRIM,         0, 1, 1 },
     { ngx_string("reverse"),       NGX_HTTP_VAR_OP_REVERSE,       0, 1, 1 },
-    { ngx_string("position"),      NGX_HTTP_VAR_OP_POSITION,      0, 2, 2 },
+    { ngx_string("find"),          NGX_HTTP_VAR_OP_FIND,          0, 2, 2 },
     { ngx_string("repeat"),        NGX_HTTP_VAR_OP_REPEAT,        0, 2, 2 },
     { ngx_string("substr"),        NGX_HTTP_VAR_OP_SUBSTR,        0, 3, 3 },
     { ngx_string("replace"),       NGX_HTTP_VAR_OP_REPLACE,       0, 3, 3 },
@@ -216,7 +217,7 @@ static ngx_int_t ngx_http_var_operate_rtrim(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_reverse(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_operate_position(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_operate_find(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_operate_repeat(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -453,6 +454,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_uint_t                   args_count;
     size_t                       operators_count;
     ngx_http_complex_value_t    *filter = NULL;
+    ngx_uint_t                   negative = 0;
 
     ngx_http_compile_complex_value_t   ccv;
 
@@ -500,9 +502,18 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    if (ngx_strncmp(value[last].data, "if=", 3) == 0) {
-        s.len = value[last].len - 3;
-        s.data = value[last].data + 3;
+    if (ngx_strncmp(value[last].data, "if=", 3) == 0
+        || ngx_strncmp(value[last].data, "if!=", 4) == 0)
+    {
+        if (ngx_strncmp(value[last].data, "if=", 3) == 0) {
+            s.len = value[last].len - 3;
+            s.data = value[last].data + 3;
+            negative = 0;
+        } else {
+            s.len = value[last].len - 4;
+            s.data = value[last].data + 4;
+            negative = 1;
+        }
 
         ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
 
@@ -740,8 +751,16 @@ ngx_http_var_find_variable(ngx_http_request_t *r,
                     return NGX_ERROR;
                 }
 
-                if (val.len == 0 || (val.len == 1 && val.data[0] == '0')) {
-                    continue;
+                if ((val.len == 0 || (val.len == 1 && val.data[0] == '0'))) {
+                    if (!vars[i].negative) {
+                        /* Filter is false and negative is not set, skip this variable */
+                        continue;
+                    }
+                } else {
+                    if (vars[i].negative) {
+                        /* Filter is true but negative is set, skip this variable */
+                        continue;
+                    }
                 }
             }
 
@@ -800,8 +819,8 @@ ngx_http_var_variable_expr(ngx_http_request_t *r,
         rc = ngx_http_var_operate_reverse(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_POSITION:
-        rc = ngx_http_var_operate_position(r, v, var);
+    case NGX_HTTP_VAR_OP_FIND:
+        rc = ngx_http_var_operate_find(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_REPEAT:
@@ -1370,7 +1389,7 @@ ngx_http_var_operate_reverse(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_operate_position(ngx_http_request_t *r,
+ngx_http_var_operate_find(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_str_t                 src_str, sub_str;
@@ -1384,7 +1403,7 @@ ngx_http_var_operate_position(ngx_http_request_t *r,
         || ngx_http_complex_value(r, &args[1], &sub_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute arguments "
-                      "for position operator");
+                      "for find operator");
         return NGX_ERROR;
     }
 
@@ -1400,7 +1419,7 @@ ngx_http_var_operate_position(ngx_http_request_t *r,
         }
     }
 
-    /* Convert position to string */
+    /* Convert find to string */
     u_char *buf = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
     if (buf == NULL) {
         return NGX_ERROR;
