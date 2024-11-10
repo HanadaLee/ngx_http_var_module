@@ -736,7 +736,7 @@ ngx_http_var_find_variable(ngx_http_request_t *r,
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http_var: searching variable \"$%V\" in %s conf",
-                   &var_name, conf_level);
+                   var_name, conf_level);
 
     vars = vconf->vars->elts;
     n = vconf->vars->nelts;
@@ -768,7 +768,7 @@ ngx_http_var_find_variable(ngx_http_request_t *r,
             /* Found the variable */
             ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                            "http_var: variable \"$%V\" found in %s conf",
-                           &var_name, conf_level);
+                           var_name, conf_level);
 
             /* Return the found variable */
             *found_var = &vars[i];
