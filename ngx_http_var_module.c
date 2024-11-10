@@ -1134,6 +1134,8 @@ ngx_http_var_do_and(ngx_http_request_t *r,
     ngx_http_complex_value_t *args;
     ngx_str_t                 val;
 
+    args = var->args->elts;
+
     for (i = 0; i < var->args->nelts; i++) {
         if (ngx_http_complex_value(r, &args[i], &val) != NGX_OK) {
             return NGX_ERROR;
@@ -1197,16 +1199,11 @@ ngx_http_var_do_not(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t *args;
-    ngx_str_t val;
-
-    if (var->args->nelts != 1) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: \"not\" operator expects exactly 1 argument");
-        return NGX_ERROR;
-    }
+    ngx_str_t                 val;
 
     args = var->args->elts;
-    if (ngx_http_complex_value(r, args, &val) != NGX_OK) {
+
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
