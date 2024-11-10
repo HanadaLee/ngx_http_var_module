@@ -568,6 +568,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (filter) {
         var->filter = filter;
+        var->negative = negative;
     }
 
 #if (NGX_PCRE)
