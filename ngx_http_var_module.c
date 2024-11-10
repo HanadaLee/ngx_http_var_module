@@ -195,8 +195,6 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
 static void *ngx_http_var_create_main_conf(ngx_conf_t *cf);
 static void *ngx_http_var_create_srv_conf(ngx_conf_t *cf);
 static void *ngx_http_var_create_loc_conf(ngx_conf_t *cf);
-static char *ngx_http_var_merge_conf(ngx_conf_t *cf,
-    void *parent, void *child);
 
 static char *ngx_http_var_create_variable(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
@@ -352,10 +350,10 @@ static ngx_http_module_t ngx_http_var_module_ctx = {
     NULL,                                  /* init main configuration */
 
     ngx_http_var_create_srv_conf,          /* create server configuration */
-    ngx_http_var_merge_conf,               /* merge server configuration */
+    NULL,                                  /* merge server configuration */
 
     ngx_http_var_create_loc_conf,          /* create location configuration */
-    ngx_http_var_merge_conf                /* merge location configuration */
+    NULL                                   /* merge location configuration */
 };
 
 
@@ -423,48 +421,6 @@ ngx_http_var_create_loc_conf(ngx_conf_t *cf)
     conf->vars = NULL;
 
     return conf;
-}
-
-
-/* Merge configurations */
-static char *
-ngx_http_var_merge_conf(ngx_conf_t *cf, void *parent, void *child)
-{
-    ngx_http_var_conf_t *prev = parent;
-    ngx_http_var_conf_t *conf = child;
-    ngx_http_var_variable_t *src_var, *dst_var;
-    ngx_uint_t i;
-
-    if (prev->vars) {
-        if (conf->vars == NULL) {
-            conf->vars = ngx_array_create(cf->pool, prev->vars->nelts, sizeof(ngx_http_var_variable_t));
-            if (conf->vars == NULL) {
-                return NGX_CONF_ERROR;
-            }
-
-            for (i = 0; i < prev->vars->nelts; i++) {
-                src_var = &((ngx_http_var_variable_t *) prev->vars->elts)[i];
-                dst_var = ngx_array_push(conf->vars);
-                if (dst_var == NULL) {
-                    return NGX_CONF_ERROR;
-                }
-                *dst_var = *src_var;
-            }
-        } else {
-            dst_var = ngx_array_push_n(conf->vars, prev->vars->nelts);
-            if (dst_var == NULL) {
-                return NGX_CONF_ERROR;
-            }
-
-            for (i = 0; i < prev->vars->nelts; i++) {
-                src_var = &((ngx_http_var_variable_t *) prev->vars->elts)[i];
-                *dst_var = *src_var;
-                dst_var++;
-            }
-        }
-    }
-
-    return NGX_CONF_OK;
 }
 
 
