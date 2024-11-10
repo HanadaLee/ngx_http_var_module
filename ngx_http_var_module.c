@@ -16,6 +16,10 @@
 #endif
 
 typedef enum {
+    NGX_HTTP_VAR_OP_AND,
+    NGX_HTTP_VAR_OP_OR,
+    NGX_HTTP_VAR_OP_NOT,
+
     NGX_HTTP_VAR_OP_COPY,
     NGX_HTTP_VAR_OP_LEN,
     NGX_HTTP_VAR_OP_UPPER,
@@ -112,6 +116,10 @@ typedef struct {
 
 
 static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
+    { ngx_string("and"),           NGX_HTTP_VAR_OP_AND,           0, 1, 9 },
+    { ngx_string("or"),            NGX_HTTP_VAR_OP_OR,            0, 1, 9 },
+    { ngx_string("not"),           NGX_HTTP_VAR_OP_NOT,           0, 1, 1 },
+
     { ngx_string("copy"),          NGX_HTTP_VAR_OP_COPY,          0, 1, 1 },
     { ngx_string("len"),           NGX_HTTP_VAR_OP_LEN,           0, 1, 1 },
     { ngx_string("upper"),         NGX_HTTP_VAR_OP_UPPER,         0, 1, 1 },
@@ -201,6 +209,12 @@ static ngx_int_t ngx_http_var_evaluate_variable(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_variable_handler(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 
+static ngx_int_t ngx_http_var_do_and(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_do_or(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_do_not(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_do_copy(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_do_len(ngx_http_request_t *r,
@@ -789,6 +803,18 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
     ngx_int_t rc;
 
     switch (var->operator) {
+    case NGX_HTTP_VAR_OP_AND:
+        rc = ngx_http_var_do_and(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_OR:
+        rc = ngx_http_var_do_or(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_NOT:
+        rc = ngx_http_var_do_not(r, v, var);
+        break;
+
     case NGX_HTTP_VAR_OP_COPY:
         rc = ngx_http_var_do_copy(r, v, var);
         break;
@@ -1087,8 +1113,8 @@ found:
     v->not_found = 0;
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                "http_var: evaluating the expression of variable \"$%V\"",
-                &var_name);
+                   "http_var: evaluating the expression of variable \"$%V\"",
+                   &var_name);
 
     /* Evaluate the variable expression */
     rc = ngx_http_var_evaluate_variable(r, v, found_var);
@@ -1096,6 +1122,105 @@ found:
         return NGX_ERROR;
     }
 
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_do_and(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_uint_t i;
+    ngx_http_complex_value_t *cv;
+    ngx_str_t val;
+
+    for (i = 0; i < var->args->nelts; i++) {
+        cv = (ngx_http_complex_value_t *) var->args->elts + i;
+        if (ngx_http_complex_value(r, cv, &val) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        if (val.len == 0 || (val.len == 1 && val.data[0] == '0')) {
+            v->len = 1;
+            v->data = (u_char *) "0";
+            v->valid = 1;
+            v->no_cacheable = 0;
+            v->not_found = 0;
+            return NGX_OK;
+        }
+    }
+
+    v->len = 1;
+    v->data = (u_char *) "1";
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_do_or(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_uint_t i;
+    ngx_http_complex_value_t *cv;
+    ngx_str_t val;
+
+    for (i = 0; i < var->args->nelts; i++) {
+        cv = (ngx_http_complex_value_t *) var->args->elts + i;
+        if (ngx_http_complex_value(r, cv, &val) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        if (!(val.len == 0 || (val.len == 1 && val.data[0] == '0'))) {
+            v->len = 1;
+            v->data = (u_char *) "1";
+            v->valid = 1;
+            v->no_cacheable = 0;
+            v->not_found = 0;
+            return NGX_OK;
+        }
+    }
+
+    v->len = 1;
+    v->data = (u_char *) "0";
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_do_not(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t *cv;
+    ngx_str_t val;
+
+    if (var->args->nelts != 1) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: \"not\" operator expects exactly 1 argument");
+        return NGX_ERROR;
+    }
+
+    cv = (ngx_http_complex_value_t *) var->args->elts;
+    if (ngx_http_complex_value(r, cv, &val) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (val.len == 0 || (val.len == 1 && val.data[0] == '0')) {
+        v->len = 1;
+        v->data = (u_char *) "1";
+    } else {
+        v->len = 1;
+        v->data = (u_char *) "0";
+    }
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
     return NGX_OK;
 }
 
