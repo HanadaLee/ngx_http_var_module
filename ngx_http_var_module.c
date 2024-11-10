@@ -116,8 +116,8 @@ typedef struct {
 
 
 static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
-    { ngx_string("and"),           NGX_HTTP_VAR_OP_AND,           0, 1, 9 },
-    { ngx_string("or"),            NGX_HTTP_VAR_OP_OR,            0, 1, 9 },
+    { ngx_string("and"),           NGX_HTTP_VAR_OP_AND,           0, 2, 9 },
+    { ngx_string("or"),            NGX_HTTP_VAR_OP_OR,            0, 2, 9 },
     { ngx_string("not"),           NGX_HTTP_VAR_OP_NOT,           0, 1, 1 },
 
     { ngx_string("copy"),          NGX_HTTP_VAR_OP_COPY,          0, 1, 1 },
@@ -1130,13 +1130,12 @@ static ngx_int_t
 ngx_http_var_do_and(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_uint_t i;
-    ngx_http_complex_value_t *cv;
-    ngx_str_t val;
+    ngx_uint_t                i;
+    ngx_http_complex_value_t *args;
+    ngx_str_t                 val;
 
     for (i = 0; i < var->args->nelts; i++) {
-        cv = (ngx_http_complex_value_t *) var->args->elts + i;
-        if (ngx_http_complex_value(r, cv, &val) != NGX_OK) {
+        if (ngx_http_complex_value(r, &args[i], &val) != NGX_OK) {
             return NGX_ERROR;
         }
 
@@ -1163,13 +1162,14 @@ static ngx_int_t
 ngx_http_var_do_or(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_uint_t i;
-    ngx_http_complex_value_t *cv;
-    ngx_str_t val;
+    ngx_uint_t                i;
+    ngx_http_complex_value_t *args;
+    ngx_str_t                 val;
+
+    args = var->args->elts;
 
     for (i = 0; i < var->args->nelts; i++) {
-        cv = (ngx_http_complex_value_t *) var->args->elts + i;
-        if (ngx_http_complex_value(r, cv, &val) != NGX_OK) {
+        if (ngx_http_complex_value(r, &args[i], &val) != NGX_OK) {
             return NGX_ERROR;
         }
 
@@ -1196,7 +1196,7 @@ static ngx_int_t
 ngx_http_var_do_not(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t *cv;
+    ngx_http_complex_value_t *args;
     ngx_str_t val;
 
     if (var->args->nelts != 1) {
@@ -1205,8 +1205,8 @@ ngx_http_var_do_not(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    cv = (ngx_http_complex_value_t *) var->args->elts;
-    if (ngx_http_complex_value(r, cv, &val) != NGX_OK) {
+    args = var->args->elts;
+    if (ngx_http_complex_value(r, args, &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
@@ -1229,12 +1229,12 @@ static ngx_int_t
 ngx_http_var_do_copy(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t value_str;
-    ngx_http_complex_value_t *cv;
+    ngx_str_t                 value_str;
+    ngx_http_complex_value_t *args;
 
-    cv = (ngx_http_complex_value_t *) var->args->elts;
+    args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &cv[0], &value_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &value_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute variable value");
         return NGX_ERROR;
@@ -1249,6 +1249,10 @@ ngx_http_var_do_copy(ngx_http_request_t *r,
     }
 
     ngx_memcpy(v->data, value_str.data, v->len);
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
 
     return NGX_OK;
 }
@@ -1293,12 +1297,12 @@ static ngx_int_t
 ngx_http_var_do_upper(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t value_str;
-    ngx_http_complex_value_t *cv;
+    ngx_str_t                 value_str;
+    ngx_http_complex_value_t *args;
 
-    cv = (ngx_http_complex_value_t *) var->args->elts;
+    args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &cv[0], &value_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &value_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute argument "
                       "for upper operator");
@@ -1329,12 +1333,12 @@ static ngx_int_t
 ngx_http_var_do_lower(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t value_str;
-    ngx_http_complex_value_t *cv;
+    ngx_str_t                 value_str;
+    ngx_http_complex_value_t *args;
 
-    cv = (ngx_http_complex_value_t *) var->args->elts;
+    args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &cv[0], &value_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &value_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute argument "
                       "for lower operator");
@@ -2080,14 +2084,14 @@ static ngx_int_t
 ngx_http_var_do_abs(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t *cvp;
+    ngx_http_complex_value_t *args;
     ngx_str_t                 num_str;
     ngx_int_t                 num;
 
-    cvp = var->args->elts;
+    args = var->args->elts;
 
     /* Evaluate argument */
-    if (ngx_http_complex_value(r, &cvp[0], &num_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &num_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute first argument");
         return NGX_ERROR;
@@ -2126,21 +2130,21 @@ static ngx_int_t
 ngx_http_var_do_max(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t *cvp;
+    ngx_http_complex_value_t *args;
     ngx_str_t                 int1_str, int2_str;
     ngx_int_t                 int1, int2, max;
 
-    cvp = var->args->elts;
+    args = var->args->elts;
 
     /* Evaluate first argument */
-    if (ngx_http_complex_value(r, &cvp[0], &int1_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &int1_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute first argument");
         return NGX_ERROR;
     }
 
     /* Evaluate second argument */
-    if (ngx_http_complex_value(r, &cvp[1], &int2_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[1], &int2_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute second argument");
         return NGX_ERROR;
@@ -2188,21 +2192,21 @@ static ngx_int_t
 ngx_http_var_do_min(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t *cvp;
+    ngx_http_complex_value_t *args;
     ngx_str_t                 int1_str, int2_str;
     ngx_int_t                 int1, int2, min;
 
-    cvp = var->args->elts;
+    args = var->args->elts;
 
     /* Evaluate first argument */
-    if (ngx_http_complex_value(r, &cvp[0], &int1_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &int1_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute first argument");
         return NGX_ERROR;
     }
 
     /* Evaluate second argument */
-    if (ngx_http_complex_value(r, &cvp[1], &int2_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[1], &int2_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute second argument");
         return NGX_ERROR;
