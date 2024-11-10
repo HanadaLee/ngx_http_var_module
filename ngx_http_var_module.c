@@ -432,19 +432,36 @@ ngx_http_var_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 {
     ngx_http_var_conf_t *prev = parent;
     ngx_http_var_conf_t *conf = child;
+    ngx_http_var_variable_t *src_var, *dst_var;
+    ngx_uint_t i;
 
-    if (conf->vars == NULL) {
-        conf->vars = prev->vars;
-    } else if (prev->vars) {
-        ngx_http_var_variable_t *var;
+    if (prev->vars) {
+        if (conf->vars == NULL) {
+            conf->vars = ngx_array_create(cf->pool, prev->vars->nelts, sizeof(ngx_http_var_variable_t));
+            if (conf->vars == NULL) {
+                return NGX_CONF_ERROR;
+            }
 
-        var = ngx_array_push_n(conf->vars, prev->vars->nelts);
-        if (var == NULL) {
-            return NGX_CONF_ERROR;
+            for (i = 0; i < prev->vars->nelts; i++) {
+                src_var = &((ngx_http_var_variable_t *) prev->vars->elts)[i];
+                dst_var = ngx_array_push(conf->vars);
+                if (dst_var == NULL) {
+                    return NGX_CONF_ERROR;
+                }
+                *dst_var = *src_var;
+            }
+        } else {
+            dst_var = ngx_array_push_n(conf->vars, prev->vars->nelts);
+            if (dst_var == NULL) {
+                return NGX_CONF_ERROR;
+            }
+
+            for (i = 0; i < prev->vars->nelts; i++) {
+                src_var = &((ngx_http_var_variable_t *) prev->vars->elts)[i];
+                *dst_var = *src_var;
+                dst_var++;
+            }
         }
-
-        ngx_memcpy(var, prev->vars->elts,
-            prev->vars->nelts * sizeof(ngx_http_var_variable_t));
     }
 
     return NGX_CONF_OK;
