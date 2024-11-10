@@ -1132,11 +1132,11 @@ ngx_http_var_do_and(ngx_http_request_t *r,
 {
     ngx_uint_t                i;
     ngx_http_complex_value_t *args;
-    ngx_str_t                 val;
 
     args = var->args->elts;
 
     for (i = 0; i < var->args->nelts; i++) {
+        ngx_str_t val;
         if (ngx_http_complex_value(r, &args[i], &val) != NGX_OK) {
             return NGX_ERROR;
         }
