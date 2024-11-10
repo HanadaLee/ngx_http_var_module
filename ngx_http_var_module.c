@@ -689,8 +689,6 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     /* Add variable to Nginx */
     if (ngx_strcmp(value[0].data, "var") == 0) {
         flags = NGX_HTTP_VAR_CHANGEABLE | NGX_HTTP_VAR_NOCACHEABLE;
-    } else {
-        flags = NGX_HTTP_VAR_CHANGEABLE;
     }
 
     v = ngx_http_add_variable(cf, &var_name, flags);
