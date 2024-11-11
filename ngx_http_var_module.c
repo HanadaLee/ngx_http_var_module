@@ -1063,8 +1063,8 @@ ngx_http_var_variable_handler(ngx_http_request_t *r,
     }
 
     /* Search in server conf */
-    svr_conf = ngx_http_get_module_srv_conf(r, ngx_http_var_module);
-    rc = ngx_http_var_find_variable(r, &var_name, svr_conf,
+    srv_conf = ngx_http_get_module_srv_conf(r, ngx_http_var_module);
+    rc = ngx_http_var_find_variable(r, &var_name, srv_conf,
         "server", &found_var);
     if (rc == NGX_OK) {
         goto found;
