@@ -397,23 +397,13 @@ ngx_http_var_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_http_var_variable_t   *prev_var = prev->vars->elts;
     ngx_http_var_variable_t   *cur_vars = conf->vars->elts;
 
-    if (prev->vars != NULL) {
-        for (i = 0; i < prev->vars->nelts; i++) {
-            found = 0;
-            for (j = 0; j < conf->vars->nelts; j++) {
-                if (ngx_strcmp(prev_var[i].name.data, cur_vars[j].name.data) == 0) {
-                    found = 1;
-                    break;
-                }
-            }
-
-            if (!found) {
-                ngx_http_var_variable_t *cur_var = ngx_array_push(conf->vars);
-                if (cur_var == NULL) {
-                    return NGX_CONF_ERROR;
-                }
-
-                *cur_var = prev_var[i];
+    if (conf->vars == NULL) {
+        if (prev->vars != NULL) {
+            conf->vars = prev->vars;
+        } else {
+            conf->vars = ngx_array_create(cf->pool, 4, sizeof(ngx_http_var_variable_t));
+            if (conf->vars == NULL) {
+                return NGX_CONF_ERROR;
             }
         }
     }
