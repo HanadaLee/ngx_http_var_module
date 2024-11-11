@@ -581,11 +581,8 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     var->operator = op;
-
-    if (filter) {
-        var->filter = filter;
-        var->negative = negative;
-    }
+    var->filter = filter;
+    var->negative = negative;
 
 #if (NGX_PCRE)
     if (op == NGX_HTTP_VAR_OP_RE_CAPTURE
