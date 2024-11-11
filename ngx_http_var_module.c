@@ -165,7 +165,6 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("escape_uri_component"),
                             NGX_HTTP_VAR_OP_ESCAPE_URI_COMPONENT, 0, 1, 1 },
     { ngx_string("unescape_uri"),  NGX_HTTP_VAR_OP_UNESCAPE_URI,  0, 1, 1 },
-    { ngx_string("unescape_uri"),  NGX_HTTP_VAR_OP_UNESCAPE_URI,  0, 1, 1 },
     { ngx_string("base64_encode"), NGX_HTTP_VAR_OP_BASE64_ENCODE, 0, 1, 1 },
     { ngx_string("base64url_encode"),
                                 NGX_HTTP_VAR_OP_BASE64URL_ENCODE, 0, 1, 1 },
@@ -174,7 +173,7 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
                                 NGX_HTTP_VAR_OP_BASE64URL_DECODE, 0, 1, 1 },
 
     { ngx_string("crc32_short"),   NGX_HTTP_VAR_OP_CRC32_SHORT,   0, 1, 1 },
-    { ngx_string("crc32_log"),     NGX_HTTP_VAR_OP_CRC32_LONG,    0, 1, 1 },
+    { ngx_string("crc32_long"),    NGX_HTTP_VAR_OP_CRC32_LONG,    0, 1, 1 },
     { ngx_string("md5sum"),        NGX_HTTP_VAR_OP_MD5SUM,        0, 1, 1 },
     { ngx_string("sha1sum"),       NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 },
 
