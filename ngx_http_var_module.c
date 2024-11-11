@@ -384,7 +384,10 @@ ngx_http_var_create_main_conf(ngx_conf_t *cf)
         return NULL;
     }
 
-    conf->vars = NULL;
+    conf->vars = ngx_array_create(cf->pool, 4, sizeof(ngx_http_var_variable_t));
+    if (conf->vars == NULL) {
+        return NULL;
+    }
 
     return conf;
 }
@@ -401,7 +404,10 @@ ngx_http_var_create_srv_conf(ngx_conf_t *cf)
         return NULL;
     }
 
-    conf->vars = NULL;
+    conf->vars = ngx_array_create(cf->pool, 4, sizeof(ngx_http_var_variable_t));
+    if (conf->vars == NULL) {
+        return NULL;
+    }
 
     return conf;
 }
@@ -418,7 +424,10 @@ ngx_http_var_create_loc_conf(ngx_conf_t *cf)
         return NULL;
     }
 
-    conf->vars = NULL;
+    conf->vars = ngx_array_create(cf->pool, 4, sizeof(ngx_http_var_variable_t));
+    if (conf->vars == NULL) {
+        return NULL;
+    }
 
     return conf;
 }
@@ -535,11 +544,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     /* Initialize vars array if necessary */
     if (vconf->vars == NULL) {
-        vconf->vars = ngx_array_create(cf->pool, 4,
-                                       sizeof(ngx_http_var_variable_t));
-        if (vconf->vars == NULL) {
-            return NGX_CONF_ERROR;
-        }
+        return NGX_CONF_ERROR;
     }
 
     /* Add variable definition */
