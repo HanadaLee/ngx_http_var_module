@@ -546,6 +546,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "http_var: failed to push variable \"%V\" into vars array", &var_name);
         return NGX_CONF_ERROR;
     }
+
     var->name.len = var_name.len;
     var->name.data = ngx_pstrdup(cf->pool, &var_name);
     if (var->name.data == NULL) {
