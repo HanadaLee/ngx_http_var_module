@@ -165,6 +165,7 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("escape_uri_component"),
                             NGX_HTTP_VAR_OP_ESCAPE_URI_COMPONENT, 0, 1, 1 },
     { ngx_string("unescape_uri"),  NGX_HTTP_VAR_OP_UNESCAPE_URI,  0, 1, 1 },
+    { ngx_string("unescape_uri"),  NGX_HTTP_VAR_OP_UNESCAPE_URI,  0, 1, 1 },
     { ngx_string("base64_encode"), NGX_HTTP_VAR_OP_BASE64_ENCODE, 0, 1, 1 },
     { ngx_string("base64url_encode"),
                                 NGX_HTTP_VAR_OP_BASE64URL_ENCODE, 0, 1, 1 },
@@ -173,7 +174,7 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
                                 NGX_HTTP_VAR_OP_BASE64URL_DECODE, 0, 1, 1 },
 
     { ngx_string("crc32_short"),   NGX_HTTP_VAR_OP_CRC32_SHORT,   0, 1, 1 },
-    { ngx_string("crc32_long"),     NGX_HTTP_VAR_OP_CRC32_LONG,    0, 1, 1 },
+    { ngx_string("crc32_log"),     NGX_HTTP_VAR_OP_CRC32_LONG,    0, 1, 1 },
     { ngx_string("md5sum"),        NGX_HTTP_VAR_OP_MD5SUM,        0, 1, 1 },
     { ngx_string("sha1sum"),       NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 },
 
@@ -191,8 +192,10 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
 };
 
 
+static void *ngx_http_var_create_main_conf(ngx_conf_t *cf);
+static void *ngx_http_var_create_srv_conf(ngx_conf_t *cf);
 static void *ngx_http_var_create_loc_conf(ngx_conf_t *cf);
-static char *ngx_http_var_merge_loc_conf(ngx_conf_t *cf,
+static char *ngx_http_var_merge_conf(ngx_conf_t *cf,
     void *parent, void *child);
 
 static char *ngx_http_var_create_variable(ngx_conf_t *cf,
@@ -200,7 +203,7 @@ static char *ngx_http_var_create_variable(ngx_conf_t *cf,
 
 static ngx_int_t ngx_http_var_find_variable(ngx_http_request_t *r,
     ngx_str_t *var_name, ngx_http_var_conf_t *vconf,
-    ngx_http_var_variable_t **found_var);
+    const char *conf_level, ngx_http_var_variable_t **found_var);
 static ngx_int_t ngx_http_var_evaluate_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_variable_handler(ngx_http_request_t *r,
@@ -345,14 +348,14 @@ static ngx_http_module_t ngx_http_var_module_ctx = {
     NULL,                                  /* preconfiguration */
     NULL,                                  /* postconfiguration */
 
-    NULL,                                  /* create main configuration */
+    ngx_http_var_create_main_conf,         /* create main configuration */
     NULL,                                  /* init main configuration */
 
-    NULL,                                  /* create server configuration */
-    NULL,                                  /* merge server configuration */
+    ngx_http_var_create_srv_conf,          /* create server configuration */
+    ngx_http_var_merge_conf,               /* merge server configuration */
 
     ngx_http_var_create_loc_conf,          /* create location configuration */
-    ngx_http_var_merge_loc_conf            /* merge location configuration */
+    ngx_http_var_merge_conf                /* merge location configuration */
 };
 
 
@@ -372,7 +375,41 @@ ngx_module_t ngx_http_var_module = {
 };
 
 
-/* Create configuration */
+/* Create main configuration */
+static void *
+ngx_http_var_create_main_conf(ngx_conf_t *cf)
+{
+    ngx_http_var_conf_t  *conf;
+
+    conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_var_conf_t));
+    if (conf == NULL) {
+        return NULL;
+    }
+
+    conf->vars = NULL;
+
+    return conf;
+}
+
+
+/* Create server configuration */
+static void *
+ngx_http_var_create_srv_conf(ngx_conf_t *cf)
+{
+    ngx_http_var_conf_t  *conf;
+
+    conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_var_conf_t));
+    if (conf == NULL) {
+        return NULL;
+    }
+
+    conf->vars = NULL;
+
+    return conf;
+}
+
+
+/* Create location configuration */
 static void *
 ngx_http_var_create_loc_conf(ngx_conf_t *cf)
 {
@@ -383,25 +420,31 @@ ngx_http_var_create_loc_conf(ngx_conf_t *cf)
         return NULL;
     }
 
+    conf->vars = NULL;
+
     return conf;
 }
 
 
+/* Merge configurations */
 static char *
-ngx_http_var_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
+ngx_http_var_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 {
-    ngx_http_var_conf_t       *prev = parent;
-    ngx_http_var_conf_t       *conf = child;
+    ngx_http_var_conf_t *prev = parent;
+    ngx_http_var_conf_t *conf = child;
 
     if (conf->vars == NULL) {
-        if (prev->vars != NULL) {
-            conf->vars = prev->vars;
-        } else {
-            conf->vars = ngx_array_create(cf->pool, 4, sizeof(ngx_http_var_variable_t));
-            if (conf->vars == NULL) {
-                return NGX_CONF_ERROR;
-            }
+        conf->vars = prev->vars;
+    } else if (prev->vars) {
+        ngx_http_var_variable_t *var;
+
+        var = ngx_array_push_n(conf->vars, prev->vars->nelts);
+        if (var == NULL) {
+            return NGX_CONF_ERROR;
         }
+
+        ngx_memcpy(var, prev->vars->elts,
+            prev->vars->nelts * sizeof(ngx_http_var_variable_t));
     }
 
     return NGX_CONF_OK;
@@ -520,7 +563,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     /* Initialize vars array if necessary */
     if (vconf->vars == NULL) {
         vconf->vars = ngx_array_create(cf->pool, 4,
-                                        sizeof(ngx_http_var_variable_t));
+                                       sizeof(ngx_http_var_variable_t));
         if (vconf->vars == NULL) {
             return NGX_CONF_ERROR;
         }
@@ -529,7 +572,6 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     /* Add variable definition */
     var = ngx_array_push(vconf->vars);
     if (var == NULL) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "http_var: failed to push variable \"%V\" into vars array", &var_name);
         return NGX_CONF_ERROR;
     }
 
@@ -696,24 +738,25 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 static ngx_int_t
 ngx_http_var_find_variable(ngx_http_request_t *r,
     ngx_str_t *var_name, ngx_http_var_conf_t *vconf,
-    ngx_http_var_variable_t **found_var)
+    const char *conf_level, ngx_http_var_variable_t **found_var)
 {
     ngx_http_var_variable_t      *vars;
-    ngx_uint_t                    i;
+    ngx_uint_t                    n;
+    ngx_int_t                     i;
 
     if (vconf == NULL || vconf->vars == NULL || vconf->vars->nelts == 0) {
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "http_var: do not have any defiend vars");
         return NGX_DECLINED;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http_var: searching variable \"$%V\" in conf", var_name);
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "http_var: searching variable \"$%V\" in %s conf",
+                   var_name, conf_level);
 
     vars = vconf->vars->elts;
+    n = vconf->vars->nelts;
 
     /* Linear search */
-    for (i = 0; i < vconf->vars->nelts; i++) {
+    for (i = 0; i < (ngx_int_t) n; i++) {
         if (vars[i].name.len == var_name->len
             && ngx_strncmp(vars[i].name.data, var_name->data, var_name->len) == 0)
         {
@@ -737,9 +780,9 @@ ngx_http_var_find_variable(ngx_http_request_t *r,
             }
 
             /* Found the variable */
-            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                           "http_var: variable \"$%V\" found in conf",
-                           var_name);
+            ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                           "http_var: variable \"$%V\" found in %s conf",
+                           var_name, conf_level);
 
             /* Return the found variable */
             *found_var = &vars[i];
@@ -1012,7 +1055,7 @@ static ngx_int_t
 ngx_http_var_variable_handler(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data)
 {
-    ngx_http_var_conf_t          *conf;
+    ngx_http_var_conf_t          *vconf;
     ngx_str_t                     var_name;
     ngx_str_t                    *var_name_ptr;
     ngx_int_t                     rc;
@@ -1026,9 +1069,30 @@ ngx_http_var_variable_handler(ngx_http_request_t *r,
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http_var: handling variable \"$%V\"", &var_name);
 
-    /* Search in conf */
-    conf = ngx_http_get_module_loc_conf(r, ngx_http_var_module);
-    rc = ngx_http_var_find_variable(r, &var_name, conf, &found_var);
+    /* Search in location conf */
+    vconf = ngx_http_get_module_loc_conf(r, ngx_http_var_module);
+    rc = ngx_http_var_find_variable(r, &var_name, vconf,
+        "location", &found_var);
+    if (rc == NGX_OK) {
+        goto found;
+    } else if (rc == NGX_ERROR) {
+        return NGX_ERROR;
+    }
+
+    /* Search in server conf */
+    vconf = ngx_http_get_module_srv_conf(r, ngx_http_var_module);
+    rc = ngx_http_var_find_variable(r, &var_name, vconf,
+        "server", &found_var);
+    if (rc == NGX_OK) {
+        goto found;
+    } else if (rc == NGX_ERROR) {
+        return NGX_ERROR;
+    }
+
+    /* Search in main conf */
+    vconf = ngx_http_get_module_main_conf(r, ngx_http_var_module);
+    rc = ngx_http_var_find_variable(r, &var_name, vconf,
+        "main", &found_var);
     if (rc == NGX_OK) {
         goto found;
     } else if (rc == NGX_ERROR) {
@@ -1068,11 +1132,11 @@ ngx_http_var_do_and(ngx_http_request_t *r,
 {
     ngx_uint_t                i;
     ngx_http_complex_value_t *args;
+    ngx_str_t                 val;
 
     args = var->args->elts;
 
     for (i = 0; i < var->args->nelts; i++) {
-        ngx_str_t val;
         if (ngx_http_complex_value(r, &args[i], &val) != NGX_OK) {
             return NGX_ERROR;
         }
