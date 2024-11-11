@@ -900,6 +900,10 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         break;
 
 #if (NGX_PCRE)
+    case NGX_HTTP_VAR_OP_IF_RE_MATCH:
+        rc = ngx_http_var_do_if_re_match(r, v, var);
+        break;
+
     case NGX_HTTP_VAR_OP_RE_CAPTURE:
         rc = ngx_http_var_do_re_capture(r, v, var);
         break;
