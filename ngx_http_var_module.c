@@ -1145,7 +1145,7 @@ ngx_http_var_do_and(ngx_http_request_t *r,
             v->no_cacheable = 0;
             v->not_found = 0;
 
-            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+            ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                            "http_var: do_and operation result: \"%*s\"",
                            v->len, v->data);
 
@@ -1162,7 +1162,7 @@ ngx_http_var_do_and(ngx_http_request_t *r,
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http_var: do_and operation result: \"%*s\"",
                    v->len, v->data);
 
