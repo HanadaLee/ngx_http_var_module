@@ -548,10 +548,14 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     /* Add variable definition */
+    ngx_conf_log_error(NGX_LOG_DEBUG, cf, 0, "http_var: inserting variable \"%V\" into configuration", &var_name);
     var = ngx_array_push(vconf->vars);
     if (var == NULL) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "http_var: failed to push variable \"%V\" into vars array", &var_name);
         return NGX_CONF_ERROR;
     }
+
+    ngx_conf_log_error(NGX_LOG_DEBUG, cf, 0, "http_var: successfully pushed variable \"%V\" into vars array", &var_name);
 
     var->name.len = var_name.len;
     var->name.data = ngx_pstrdup(cf->pool, &var_name);
