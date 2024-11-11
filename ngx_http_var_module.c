@@ -165,7 +165,6 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("escape_uri_component"),
                             NGX_HTTP_VAR_OP_ESCAPE_URI_COMPONENT, 0, 1, 1 },
     { ngx_string("unescape_uri"),  NGX_HTTP_VAR_OP_UNESCAPE_URI,  0, 1, 1 },
-    { ngx_string("unescape_uri"),  NGX_HTTP_VAR_OP_UNESCAPE_URI,  0, 1, 1 },
     { ngx_string("base64_encode"), NGX_HTTP_VAR_OP_BASE64_ENCODE, 0, 1, 1 },
     { ngx_string("base64url_encode"),
                                 NGX_HTTP_VAR_OP_BASE64URL_ENCODE, 0, 1, 1 },
@@ -174,7 +173,7 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
                                 NGX_HTTP_VAR_OP_BASE64URL_DECODE, 0, 1, 1 },
 
     { ngx_string("crc32_short"),   NGX_HTTP_VAR_OP_CRC32_SHORT,   0, 1, 1 },
-    { ngx_string("crc32_log"),     NGX_HTTP_VAR_OP_CRC32_LONG,    0, 1, 1 },
+    { ngx_string("crc32_long"),     NGX_HTTP_VAR_OP_CRC32_LONG,    0, 1, 1 },
     { ngx_string("md5sum"),        NGX_HTTP_VAR_OP_MD5SUM,        0, 1, 1 },
     { ngx_string("sha1sum"),       NGX_HTTP_VAR_OP_SHA1SUM,       0, 1, 1 },
 
@@ -700,8 +699,7 @@ ngx_http_var_find_variable(ngx_http_request_t *r,
     ngx_http_var_variable_t **found_var)
 {
     ngx_http_var_variable_t      *vars;
-    ngx_uint_t                    n;
-    ngx_int_t                     i;
+    ngx_uint_t                    i;
 
     if (vconf == NULL || vconf->vars == NULL || vconf->vars->nelts == 0) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
@@ -713,10 +711,9 @@ ngx_http_var_find_variable(ngx_http_request_t *r,
                    "http_var: searching variable \"$%V\" in conf", var_name);
 
     vars = vconf->vars->elts;
-    n = vconf->vars->nelts;
 
     /* Linear search */
-    for (i = 0; i < (ngx_int_t) n; i++) {
+    for (i = 0; i < vconf->vars->nelts; i++) {
         if (vars[i].name.len == var_name->len
             && ngx_strncmp(vars[i].name.data, var_name->data, var_name->len) == 0)
         {
