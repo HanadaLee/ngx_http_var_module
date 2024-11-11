@@ -41,6 +41,8 @@ typedef enum {
     NGX_HTTP_VAR_OP_REPLACE,
 
 #if (NGX_PCRE)
+    NGX_HTTP_VAR_OP_IF_RE_MATCH,
+
     NGX_HTTP_VAR_OP_RE_CAPTURE,
     NGX_HTTP_VAR_OP_RE_SUB,
     NGX_HTTP_VAR_OP_RE_GSUB,
@@ -109,7 +111,6 @@ typedef struct {
 
 #if (NGX_PCRE)
     ngx_http_regex_t              *regex;       /* compiled regex */
-    void                          *value;       /* regex value */
 #endif
 } ngx_http_var_variable_t;
 
@@ -152,6 +153,10 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("replace"),         NGX_HTTP_VAR_OP_REPLACE,        0, 3, 3 },
 
 #if (NGX_PCRE)
+    { ngx_string("if_re_match"),     NGX_HTTP_VAR_OP_IF_RE_MATCH,    0, 2, 2 },
+
+    { ngx_string("if_re_match_i"),   NGX_HTTP_VAR_OP_IF_RE_MATCH,    1, 2, 2 },
+
     { ngx_string("re_capture"),      NGX_HTTP_VAR_OP_RE_CAPTURE,     0, 3, 3 },
     { ngx_string("re_capture_i"),    NGX_HTTP_VAR_OP_RE_CAPTURE,     1, 3, 3 },
     { ngx_string("re_sub"),          NGX_HTTP_VAR_OP_RE_SUB,         0, 3, 3 },
@@ -270,6 +275,9 @@ static ngx_int_t ngx_http_var_do_replace(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 #if (NGX_PCRE)
+static ngx_int_t ngx_http_var_do_if_re_match(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+
 static ngx_int_t ngx_http_var_do_re_capture(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_do_re_sub(ngx_http_request_t *r,
@@ -453,7 +461,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_http_var_conf_t         *vconf = conf;
     ngx_str_t                   *value;
     ngx_uint_t                   last;
-    ngx_str_t                    var_name, operator_str, regex_pattern, s;
+    ngx_str_t                    var_name, operator_str, s;
     ngx_http_variable_t         *v;
     ngx_http_var_variable_t     *var;
     ngx_uint_t                   flags;
@@ -582,26 +590,28 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     var->negative = negative;
 
 #if (NGX_PCRE)
-    if (op == NGX_HTTP_VAR_OP_RE_CAPTURE
+    if (op == NGX_HTTP_VAR_OP_IF_RE_MATCH
+        || op == NGX_HTTP_VAR_OP_RE_CAPTURE
         || op == NGX_HTTP_VAR_OP_RE_SUB
         || op == NGX_HTTP_VAR_OP_RE_GSUB)
     {
         /* Regex operators requires 3 parameters：src_string, regex_pattern, assign_value */
-        if (args_count != 3) {
+        if (args_count < 2) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "http_var: regex operators requires 3 arguments");
+                               "http_var: regex operators "
+                               "requires at least 2 arguments");
             return NGX_CONF_ERROR;
         }
+        args_count--;
 
         /* Compile src_string (complex variable) */
-        var->args = ngx_array_create(cf->pool, 1,
+        var->args = ngx_array_create(cf->pool, args_count ? args_count : 1,
             sizeof(ngx_http_complex_value_t));
         if (var->args == NULL) {
             return NGX_CONF_ERROR;
         }
 
         ngx_http_complex_value_t *cv_src;
-
         cv_src = ngx_array_push(var->args);
         if (cv_src == NULL) {
             return NGX_CONF_ERROR;
@@ -618,22 +628,30 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
 
         /* Get regex pattern */
-        regex_pattern = value[4];
+        if (op != NGX_HTTP_VAR_OP_IF_RE_MATCH) {
+            if (args_count != 2) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "http_var: regex operators "
+                               "requires 3 arguments");
+                return NGX_CONF_ERROR;
+            }
 
-        /* Compile assign_value */
-        var->value = ngx_pcalloc(cf->pool, sizeof(ngx_http_complex_value_t));
-        if (var->value == NULL) {
-            return NGX_CONF_ERROR;
-        }
+            /* Compile assign_value */
+            ngx_http_complex_value_t *cv_value;
+            cv_value = ngx_array_push(var->args);
+            if (cv_value == NULL) {
+                return NGX_CONF_ERROR;
+            }
 
-        ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+            ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
 
-        ccv.cf = cf;
-        ccv.value = &value[5];
-        ccv.complex_value = var->value;
+            ccv.cf = cf;
+            ccv.value = &value[5];
+            ccv.complex_value = cv_value;
 
-        if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
-            return NGX_CONF_ERROR;
+            if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+                return NGX_CONF_ERROR;
+            }
         }
 
         /* Compile regex pattern */
@@ -642,7 +660,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         ngx_memzero(&rc, sizeof(ngx_regex_compile_t));
 
-        rc.pattern = regex_pattern;
+        rc.pattern = value[4];
         rc.pool = cf->pool;
         rc.err.len = NGX_MAX_CONF_ERRSTR;
         rc.err.data = errstr;
@@ -655,6 +673,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         if (var->regex == NULL) {
             return NGX_CONF_ERROR;
         }
+
     } else {
 #endif
 
@@ -1409,7 +1428,7 @@ ngx_http_var_do_if_has_prefix(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-    if (var->ignore_case) {
+    if (var->ignore_case == 1) {
         if (ngx_strncasecmp(str.data, prefix.data, prefix.len) == 0) {
             v->data = (u_char *) "1";
             return NGX_OK;
@@ -1459,7 +1478,7 @@ ngx_http_var_do_if_has_suffix(ngx_http_request_t *r,
     }
 
     u_char *str_end = str.data + str.len - suffix.len;
-    if (var->ignore_case) {
+    if (var->ignore_case == 1) {
         if (ngx_strncasecmp(str_end, suffix.data, suffix.len) == 0) {
             v->data = (u_char *) "1";
             return NGX_OK;
@@ -1499,7 +1518,7 @@ ngx_http_var_do_if_find(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (var->ignore_case) {
+    if (var->ignore_case == 1) {
         p = ngx_strcasestrn(str.data, (char *)sub_str.data, sub_str.len - 1);
     } else {
         p = ngx_strstrn(str.data, (char *)sub_str.data, sub_str.len - 1);
@@ -2094,6 +2113,41 @@ ngx_http_var_do_replace(ngx_http_request_t *r,
 
 #if (NGX_PCRE)
 static ngx_int_t
+ngx_http_var_do_if_re_match(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_str_t                    subject;
+    ngx_int_t                    rc;
+
+    ngx_http_complex_value_t    *args = var->args->elts;
+
+    /* Calculate the value of src_string */
+    if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    v->len = 1;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    /* Perform regex match */
+    rc = ngx_http_regex_exec(r, var->regex, &subject);
+    if (rc == NGX_DECLINED) {
+        v->data = (u_char *) "0";
+        return NGX_OK;
+    } else if (rc != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: regex match failed");
+        return NGX_ERROR;
+    }
+
+    v->data = (u_char *) "1";
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_http_var_do_re_capture(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
@@ -2119,7 +2173,7 @@ ngx_http_var_do_re_capture(ngx_http_request_t *r,
     }
 
     /* Calculate the value of assign_value */
-    if (ngx_http_complex_value(r, var->value, &assign_value) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[1], &assign_value) != NGX_OK) {
         return NGX_ERROR;
     }
 
@@ -2183,7 +2237,7 @@ ngx_http_var_do_re_sub(ngx_http_request_t *r,
     }
 
     /* Compute the replacement string */
-    if (ngx_http_complex_value(r, var->value, &replacement) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[1], &replacement) != NGX_OK) {
         return NGX_ERROR;
     }
 
@@ -2244,7 +2298,7 @@ ngx_http_var_do_re_gsub(ngx_http_request_t *r,
     }
 
     /* Calculate the replacement string template */
-    if (ngx_http_complex_value(r, var->value, &replacement) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[1], &replacement) != NGX_OK) {
         return NGX_ERROR;
     }
 
@@ -2324,7 +2378,7 @@ ngx_http_var_do_re_gsub(ngx_http_request_t *r,
 
         /* Compute the replacement string, handling $n */
         ngx_str_t replaced;
-        if (ngx_http_complex_value(r, var->value, &replaced) != NGX_OK) {
+        if (ngx_http_complex_value(r, &args[1], &replaced) != NGX_OK) {
             return NGX_ERROR;
         }
 
