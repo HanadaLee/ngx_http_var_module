@@ -740,8 +740,7 @@ ngx_http_var_find_variable(ngx_http_request_t *r,
     ngx_http_var_variable_t **found_var)
 {
     ngx_http_var_variable_t      *vars;
-    ngx_uint_t                    n;
-    ngx_int_t                     i;
+    ngx_uint_t                    i;
 
     if (vconf == NULL || vconf->vars == NULL || vconf->vars->nelts == 0) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
@@ -754,10 +753,9 @@ ngx_http_var_find_variable(ngx_http_request_t *r,
                    var_name);
 
     vars = vconf->vars->elts;
-    n = vconf->vars->nelts;
 
     /* Linear search */
-    for (i = 0; i < (ngx_int_t) n; i++) {
+    for (i = 0; i < vconf->vars->nelts; i++) {
         if (vars[i].name.len == var_name->len
             && ngx_strncmp(vars[i].name.data, var_name->data, var_name->len) == 0)
         {
