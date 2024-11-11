@@ -1073,60 +1073,29 @@ ngx_http_var_do_and(ngx_http_request_t *r,
     ngx_http_complex_value_t *args;
     ngx_str_t                 val;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http_var: do_and operation started");
 
     args = var->args->elts;
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http_var: do_and has %ui arguments",
-                   var->args->nelts);
 
     for (i = 0; i < var->args->nelts; i++) {
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "http_var: do_and processing argument %ui", i + 1);
-
         if (ngx_http_complex_value(r, &args[i], &val) != NGX_OK) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: do_and failed to evaluate argument %ui",
-                          i + 1);
             return NGX_ERROR;
         }
 
-        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "http_var: do_and argument %ui value: \"%V\"",
-                       i + 1, &val);
-
         if (val.len == 0 || (val.len == 1 && val.data[0] == '0')) {
-            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                           "http_var: do_and argument %ui is false, "
-                           "result is \"0\"", i + 1);
             v->len = 1;
             v->data = (u_char *) "0";
             v->valid = 1;
             v->no_cacheable = 0;
             v->not_found = 0;
-
-            ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                           "http_var: do_and operation result: \"%*s\"",
-                           v->len, v->data);
-
             return NGX_OK;
         }
     }
-
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http_var: do_and all arguments are true, "
-                   "result is \"1\"");
 
     v->len = 1;
     v->data = (u_char *) "1";
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
-    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http_var: do_and operation result: \"%*s\"",
-                   v->len, v->data);
-
     return NGX_OK;
 }
 
