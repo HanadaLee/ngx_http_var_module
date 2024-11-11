@@ -391,11 +391,8 @@ ngx_http_var_create_loc_conf(ngx_conf_t *cf)
 static char *
 ngx_http_var_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 {
-    ngx_uint_t                 i, j, found;
     ngx_http_var_conf_t       *prev = parent;
     ngx_http_var_conf_t       *conf = child;
-    ngx_http_var_variable_t   *prev_var = prev->vars->elts;
-    ngx_http_var_variable_t   *cur_vars = conf->vars->elts;
 
     if (conf->vars == NULL) {
         if (prev->vars != NULL) {
