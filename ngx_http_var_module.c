@@ -191,9 +191,7 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
 };
 
 
-static void *ngx_http_var_create_main_conf(ngx_conf_t *cf);
-static void *ngx_http_var_create_srv_conf(ngx_conf_t *cf);
-static void *ngx_http_var_create_loc_conf(ngx_conf_t *cf);
+static void *ngx_http_var_create_conf(ngx_conf_t *cf);
 static char *ngx_http_var_merge_conf(ngx_conf_t *cf,
     void *parent, void *child);
 
@@ -347,13 +345,13 @@ static ngx_http_module_t ngx_http_var_module_ctx = {
     NULL,                                  /* preconfiguration */
     NULL,                                  /* postconfiguration */
 
-    ngx_http_var_create_main_conf,         /* create main configuration */
+    ngx_http_var_create_conf,              /* create main configuration */
     NULL,                                  /* init main configuration */
 
-    ngx_http_var_create_srv_conf,          /* create server configuration */
+    ngx_http_var_create_conf,              /* create server configuration */
     ngx_http_var_merge_conf,               /* merge server configuration */
 
-    ngx_http_var_create_loc_conf,          /* create location configuration */
+    ngx_http_var_create_conf,              /* create location configuration */
     ngx_http_var_merge_conf                /* merge location configuration */
 };
 
@@ -374,43 +372,9 @@ ngx_module_t ngx_http_var_module = {
 };
 
 
-/* Create main configuration */
+/* Create configuration */
 static void *
-ngx_http_var_create_main_conf(ngx_conf_t *cf)
-{
-    ngx_http_var_conf_t  *conf;
-
-    conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_var_conf_t));
-    if (conf == NULL) {
-        return NULL;
-    }
-
-    conf->vars = NULL;
-
-    return conf;
-}
-
-
-/* Create server configuration */
-static void *
-ngx_http_var_create_srv_conf(ngx_conf_t *cf)
-{
-    ngx_http_var_conf_t  *conf;
-
-    conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_var_conf_t));
-    if (conf == NULL) {
-        return NULL;
-    }
-
-    conf->vars = NULL;
-
-    return conf;
-}
-
-
-/* Create location configuration */
-static void *
-ngx_http_var_create_loc_conf(ngx_conf_t *cf)
+ngx_http_var_create_conf(ngx_conf_t *cf)
 {
     ngx_http_var_conf_t  *conf;
 
