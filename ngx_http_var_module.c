@@ -193,7 +193,8 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
 
 
 static void *ngx_http_var_create_loc_conf(ngx_conf_t *cf);
-static char *ngx_http_var_merge_loc_conf(ngx_conf_t *cf);
+static char *ngx_http_var_merge_loc_conf(ngx_conf_t *cf,
+    void *parent, void *child);
 
 static char *ngx_http_var_create_variable(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
