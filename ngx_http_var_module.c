@@ -718,6 +718,9 @@ ngx_http_var_find_variable(ngx_http_request_t *r,
     ngx_int_t                     i;
 
     if (vconf == NULL || vconf->vars == NULL || vconf->vars->nelts == 0) {
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "http_var: %s conf do not have any defiend vars",
+                       conf_level);
         return NGX_DECLINED;
     }
 
