@@ -502,7 +502,9 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     var_name.data++;
 
     /* Map operator string to enum and get argument counts */
-    for (i = 0; i < ngx_http_var_operators[i].name.len != 0; i++) {
+    operators_count = sizeof(ngx_http_var_operators) / 
+                  sizeof(ngx_http_var_operator_mapping_t);
+    for (i = 0; i < operators_count; i++) {
         if (operator_str.len == ngx_http_var_operators[i].name.len
             && ngx_strncmp(operator_str.data,
                 ngx_http_var_operators[i].name.data, operator_str.len) == 0)
