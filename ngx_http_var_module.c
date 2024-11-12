@@ -16,7 +16,7 @@
 #endif
 
 typedef enum {
-    NGX_HTTP_VAR_OP_AND,
+    NGX_HTTP_VAR_OP_AND = 0,
     NGX_HTTP_VAR_OP_OR,
     NGX_HTTP_VAR_OP_NOT,
 
@@ -210,7 +210,9 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
 
     { ngx_string("gmt_time"),        NGX_HTTP_VAR_OP_GMT_TIME,       0, 1, 2 },
     { ngx_string("local_time"),      NGX_HTTP_VAR_OP_LOCAL_TIME,     0, 1, 2 },
-    { ngx_string("unix_time"),       NGX_HTTP_VAR_OP_UNIX_TIME,      0, 0, 3 }
+    { ngx_string("unix_time"),       NGX_HTTP_VAR_OP_UNIX_TIME,      0, 0, 3 },
+
+    { ngx_null_string,               NGX_HTTP_VAR_OP_UNKNOWN,        0, 0, 0 }
 };
 
 
@@ -500,9 +502,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     var_name.data++;
 
     /* Map operator string to enum and get argument counts */
-    operators_count = sizeof(ngx_http_var_operators) / 
-                  sizeof(ngx_http_var_operator_mapping_t);
-    for (i = 0; i < operators_count; i++) {
+    for (i = 0; i < ngx_http_var_operators[i].name.len != 0; i++) {
         if (operator_str.len == ngx_http_var_operators[i].name.len
             && ngx_strncmp(operator_str.data,
                 ngx_http_var_operators[i].name.data, operator_str.len) == 0)
