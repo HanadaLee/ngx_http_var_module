@@ -2204,7 +2204,7 @@ ngx_http_var_do_re_sub(ngx_http_request_t *r,
     ngx_str_t                    subject, replacement, result;
     ngx_int_t                    rc;
     u_char                      *p;
-    ngx_uint_t                   start, end, len;
+    size_t                       len, match_start, match_end;
 
     ngx_http_complex_value_t    *args = var->args->elts;
 
@@ -2233,23 +2233,42 @@ ngx_http_var_do_re_sub(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    /* Ensure captures are available */
-    if (r->ncaptures < 2) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: insufficient captures");
-        return NGX_ERROR;
-    }
-
     /* Compute the replacement string */
     if (ngx_http_complex_value(r, &args[1], &replacement) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    /* Build the result string */
-    start = r->captures[0];
-    end = r->captures[1];
+    /* 确保至少有一个捕获（整个匹配） */
+    if (r->ncaptures < 1) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: regex match has no captures");
+        return NGX_ERROR;
+    }
 
-    len = start + replacement.len + (subject.len - end);
+    /* Calculate the start and end position of the match */
+    match_start = r->captures[0].p - subject.data;
+    match_end = match_start + r->captures[0].len;
+
+    /* If there are additional capture groups, you can replace with a specific capture group as needed */
+    /* For example, use the first capture group (index 1) */
+    if (r->ncaptures >= 2) {
+        size_t capture_start = r->captures[1].p - subject.data;
+        size_t capture_end = capture_start + r->captures[1].len;
+
+        /* Update match_start and match_end to the position of the capture group */
+        match_start = capture_start;
+        match_end = capture_end;
+    }
+
+    /* Make sure match_start and match_end are within the string */
+    if (match_start > subject.len || match_end > subject.len || match_start > match_end) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: invalid match positions");
+        return NGX_ERROR;
+    }
+
+    /* Build the result string */
+    len = match_start + replacement.len + (subject.len - match_end);
 
     result.data = ngx_pnalloc(r->pool, len);
     if (result.data == NULL) {
@@ -2258,21 +2277,25 @@ ngx_http_var_do_re_sub(ngx_http_request_t *r,
 
     p = result.data;
 
-    /* Copy the part before the match */
-    ngx_memcpy(p, subject.data, start);
-    p += start;
+    /* 复制匹配前的部分 */
+    if (match_start > 0) {
+        ngx_memcpy(p, subject.data, match_start);
+        p += match_start;
+    }
 
-    /* Copy the replacement */
+    /* 复制替换字符串 */
     ngx_memcpy(p, replacement.data, replacement.len);
     p += replacement.len;
 
-    /* Copy the part after the match */
-    ngx_memcpy(p, subject.data + end, subject.len - end);
-    p += subject.len - end;
+    /* 复制匹配后的部分 */
+    if (subject.len > match_end) {
+        ngx_memcpy(p, subject.data + match_end, subject.len - match_end);
+        p += subject.len - match_end;
+    }
 
     result.len = p - result.data;
 
-    /* Set the variable value */
+    /* 设置变量值 */
     v->len = result.len;
     v->data = result.data;
     v->valid = 1;
