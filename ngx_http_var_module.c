@@ -2201,21 +2201,22 @@ static ngx_int_t
 ngx_http_var_do_re_sub(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 subject, replacement, result;
-    ngx_int_t                 rc;
-    u_char                   *p;
-    size_t                    len;
-    ngx_http_complex_value_t *args = var->args->elts;
+    ngx_str_t                    subject, replacement, result;
+    ngx_int_t                    rc;
+    u_char                      *p;
+    size_t                       len, match_start, match_end;
 
-    /* 计算 src_string 的值 */
+    ngx_http_complex_value_t    *args = var->args->elts;
+
+    /* Calculate the value of src_string */
     if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    /* 执行正则匹配 */
+    /* Perform regex match */
     rc = ngx_http_regex_exec(r, var->regex, &subject);
     if (rc == NGX_DECLINED) {
-        /* 无匹配，返回原始字符串 */
+        /* No match, return the original string */
         v->len = subject.len;
         v->data = ngx_pnalloc(r->pool, v->len);
         if (v->data == NULL) {
@@ -2226,50 +2227,49 @@ ngx_http_var_do_re_sub(ngx_http_request_t *r,
         v->no_cacheable = 0;
         v->not_found = 0;
         return NGX_OK;
-    } else if (rc < 0) {
+    } else if (rc != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: regex substitution failed with code %d", rc);
+                      "http_var: regex substitution failed");
         return NGX_ERROR;
     }
 
-    /* 计算替换字符串 */
+    /* Compute the replacement string */
     if (ngx_http_complex_value(r, &args[1], &replacement) != NGX_OK) {
         return NGX_ERROR;
     }
 
     /* 确保至少有一个捕获（整个匹配） */
-    if (r->ncaptures < 2) {
+    if (r->ncaptures < 1) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: regex match has no captures");
         return NGX_ERROR;
     }
 
-    /* 计算匹配的起始和结束位置 */
-    size_t match_start = r->captures[0];
-    size_t match_end = r->captures[1];
+    /* Calculate the start and end position of the match */
+    match_start = r->captures[0].p - subject.data;
+    match_end = match_start + r->captures[0].len;
 
-    /* 如果有额外的捕获组，按需调整替换的位置 */
-    if (r->ncaptures >= 4) {
-        /* 示例：使用第一个捕获组（索引1）进行替换 */
-        size_t capture_start = r->captures[2];
-        size_t capture_end = r->captures[3];
+    /* If there are additional capture groups, you can replace with a specific capture group as needed */
+    /* For example, use the first capture group (index 1) */
+    if (r->ncaptures >= 2) {
+        size_t capture_start = r->captures[1].p - subject.data;
+        size_t capture_end = capture_start + r->captures[1].len;
 
-        /* 更新 match_start 和 match_end 为捕获组的位置 */
+        /* Update match_start and match_end to the position of the capture group */
         match_start = capture_start;
         match_end = capture_end;
     }
 
-    /* 确保 match_start 和 match_end 在字符串范围内 */
+    /* Make sure match_start and match_end are within the string */
     if (match_start > subject.len || match_end > subject.len || match_start > match_end) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: invalid match positions");
         return NGX_ERROR;
     }
 
-    /* 构建结果字符串的长度 */
+    /* Build the result string */
     len = match_start + replacement.len + (subject.len - match_end);
 
-    /* 分配内存 */
     result.data = ngx_pnalloc(r->pool, len);
     if (result.data == NULL) {
         return NGX_ERROR;
