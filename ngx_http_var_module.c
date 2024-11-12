@@ -275,6 +275,8 @@ static ngx_int_t ngx_http_var_do_replace(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 #if (NGX_PCRE)
+static ngx_int_t ngx_http_var_regex_exec(ngx_http_request_t *r,
+    ngx_http_regex_t *re, ngx_str_t *s);
 static ngx_int_t ngx_http_var_do_if_re_match(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
@@ -2116,6 +2118,75 @@ ngx_http_var_do_replace(ngx_http_request_t *r,
 
 
 #if (NGX_PCRE)
+/* the copy of ngx_http_regex_exec, but it is mandatory to initialize
+the capture group to implement the regex sub capability. */
+static ngx_int_t
+ngx_http_var_regex_exec(ngx_http_request_t *r, ngx_http_regex_t *re, ngx_str_t *s)
+{
+    ngx_int_t                   rc, index;
+    ngx_uint_t                  i, n, len;
+    ngx_http_variable_value_t  *vv;
+    ngx_http_core_main_conf_t  *cmcf;
+
+    cmcf = ngx_http_get_module_main_conf(r, ngx_http_core_module);
+
+    /* Different from ngx_http_regex_exec, even if the regular expression
+    has no capture group, it also allocates memory for r->captures */
+    len = re->ncaptures ? cmcf->ncaptures : 2;
+
+    if (r->captures == NULL || r->realloc_captures) {
+        r->realloc_captures = 0;
+
+        r->captures = ngx_palloc(r->pool, len * sizeof(int));
+        if (r->captures == NULL) {
+            return NGX_ERROR;
+        }
+    }
+
+    rc = ngx_regex_exec(re->regex, s, r->captures, len);
+
+    if (rc == NGX_REGEX_NO_MATCHED) {
+        return NGX_DECLINED;
+    }
+
+    if (rc < 0) {
+        ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0,
+                      ngx_regex_exec_n " failed: %i on \"%V\" using \"%V\"",
+                      rc, s, &re->name);
+        return NGX_ERROR;
+    }
+
+    for (i = 0; i < re->nvariables; i++) {
+
+        n = re->variables[i].capture;
+        index = re->variables[i].index;
+        vv = &r->variables[index];
+
+        vv->len = r->captures[n + 1] - r->captures[n];
+        vv->valid = 1;
+        vv->no_cacheable = 0;
+        vv->not_found = 0;
+        vv->data = &s->data[r->captures[n]];
+
+#if (NGX_DEBUG)
+        {
+        ngx_http_variable_t  *v;
+
+        v = cmcf->variables.elts;
+
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "http regex set $%V to \"%v\"", &v[index].name, vv);
+        }
+#endif
+    }
+
+    r->ncaptures = rc * 2;
+    r->captures_data = s->data;
+
+    return NGX_OK;
+}
+
+
 static ngx_int_t
 ngx_http_var_do_if_re_match(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
@@ -2136,7 +2207,7 @@ ngx_http_var_do_if_re_match(ngx_http_request_t *r,
     v->not_found = 0;
 
     /* Perform regex match */
-    rc = ngx_http_regex_exec(r, var->regex, &subject);
+    rc = ngx_http_var_regex_exec(r, var->regex, &subject);
     if (rc == NGX_DECLINED) {
         v->data = (u_char *) "0";
         return NGX_OK;
@@ -2166,7 +2237,7 @@ ngx_http_var_do_re_capture(ngx_http_request_t *r,
     }
 
     /* Perform regex match */
-    rc = ngx_http_regex_exec(r, var->regex, &subject);
+    rc = ngx_http_var_regex_exec(r, var->regex, &subject);
     if (rc == NGX_DECLINED) {
         v->not_found = 1;
         return NGX_OK;
@@ -2222,7 +2293,7 @@ ngx_http_var_do_re_sub(ngx_http_request_t *r,
             "http_var: debug3");
 
     /* Perform regex match */
-    rc = ngx_http_regex_exec(r, var->regex, &subject);
+    rc = ngx_http_var_regex_exec(r, var->regex, &subject);
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
             "http_var: debug4");
     if (rc == NGX_DECLINED) {
@@ -2374,7 +2445,7 @@ ngx_http_var_do_re_gsub(ngx_http_request_t *r,
         sub.data = subject.data + offset;
 
         /* Perform regex match */
-        rc = ngx_http_regex_exec(r, var->regex, &sub);
+        rc = ngx_http_var_regex_exec(r, var->regex, &sub);
 
         if (rc == NGX_DECLINED) {
             /* No more matches, copy the remaining part */
