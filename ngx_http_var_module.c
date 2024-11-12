@@ -2267,6 +2267,8 @@ ngx_http_var_do_re_sub(ngx_http_request_t *r,
 
     /* Build the result string */
     start = r->captures[0];
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+            "http_var: debug8.5");
     end = r->captures[1];
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
