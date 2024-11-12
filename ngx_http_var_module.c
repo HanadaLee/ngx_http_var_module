@@ -2224,26 +2224,14 @@ ngx_http_var_do_re_sub(ngx_http_request_t *r,
 
     ngx_http_complex_value_t    *args = var->args->elts;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "http_var: debug1");
-
     /* Calculate the value of src_string */
     if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "http_var: debug2");
         return NGX_ERROR;
     }
 
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "http_var: debug3");
-
     /* Perform regex match */
     rc = ngx_http_regex_exec(r, var->regex, &subject);
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "http_var: debug4");
     if (rc == NGX_DECLINED) {
-            ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "http_var: debug5");
         /* No match, return the original string */
         v->len = subject.len;
         v->data = ngx_pnalloc(r->pool, v->len);
@@ -2261,8 +2249,6 @@ ngx_http_var_do_re_sub(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "http_var: debug6");
     /* Ensure captures are available */
     if (r->ncaptures < 2) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -2270,69 +2256,37 @@ ngx_http_var_do_re_sub(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "http_var: debug7");
-
     /* Compute the replacement string */
     if (ngx_http_complex_value(r, &args[1], &replacement) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "http_var: debug8");
-
     /* Build the result string */
     start = r->captures[0];
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "http_var: debug8.5");
     end = r->captures[1];
 
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "http_var: debug9");
-
     len = start + replacement.len + (subject.len - end);
-
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "http_var: debug10");
 
     result.data = ngx_pnalloc(r->pool, len);
     if (result.data == NULL) {
         return NGX_ERROR;
     }
 
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "http_var: debug11");
-
     p = result.data;
-
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "http_var: debug12");
 
     /* Copy the part before the match */
     ngx_memcpy(p, subject.data, start);
     p += start;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "http_var: debug13");
-
     /* Copy the replacement */
     ngx_memcpy(p, replacement.data, replacement.len);
     p += replacement.len;
-
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "http_var: debug14");
 
     /* Copy the part after the match */
     ngx_memcpy(p, subject.data + end, subject.len - end);
     p += subject.len - end;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "http_var: debug15");
-
     result.len = p - result.data;
-
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "http_var: debug16");
 
     /* Set the variable value */
     v->len = result.len;
@@ -2340,9 +2294,6 @@ ngx_http_var_do_re_sub(ngx_http_request_t *r,
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
-
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-            "http_var: debug17");
 
     return NGX_OK;
 }
