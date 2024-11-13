@@ -2488,6 +2488,10 @@ ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
     *int_val1 = ngx_atofp(val1.data, val1.len, max_decimal_places);
     *int_val2 = ngx_atofp(val2.data, val2.len, max_decimal_places);
 
+    if (*int_val1 == NGX_ERROR || *int_val2 == NGX_ERROR) {
+        return NGX_ERROR;
+    }
+
     return NGX_OK;
 }
 
@@ -2520,51 +2524,31 @@ ngx_http_var_do_if_lt(ngx_http_request_t *r,
         val2.len--;
     }
 
-    if (is_negative1 && !is_negative2) {
-        // Negative is always less than positive
-        v->valid = 1;
-        v->no_cacheable = 0;
-        v->not_found = 0;
+    if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: \"if_lt\" failed to convert values to fixed point");
+        return NGX_ERROR;
+    }
+
+    if (is_negative1 == 1) {
+        int_val1 = -int_val1;
+    }
+
+    if (is_negative2 == 1) {
+        int_val2 = -int_val2;
+    }
+
+    if (int_val1 < int_val2) {
         v->len = 1;
         v->data = (u_char *) "1";
-        return NGX_OK;
-    }
-
-    if (!is_negative1 && is_negative2) {
-        // Positive is always greater than negative
-        v->valid = 1;
-        v->no_cacheable = 0;
-        v->not_found = 0;
+    } else {
         v->len = 1;
         v->data = (u_char *) "0";
-        return NGX_OK;
     }
-
-    ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2);
 
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
-
-    if (is_negative1 && is_negative2) {
-        // If both are negative, the comparison is inverted
-        if (int_val1 > int_val2) {
-            v->len = 1;
-            v->data = (u_char *) "1";
-        } else {
-            v->len = 1;
-            v->data = (u_char *) "0";
-        }
-
-    } else {
-        if (int_val1 < int_val2) {
-            v->len = 1;
-            v->data = (u_char *) "1";
-        } else {
-            v->len = 1;
-            v->data = (u_char *) "0";
-        }
-    }
 
     return NGX_OK;
 }
