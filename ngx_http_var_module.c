@@ -2623,6 +2623,7 @@ ngx_http_var_do_max(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     ngx_str_t                  int1_str, int2_str;
     ngx_int_t                  int1, int2, max;
+    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
 
     args = var->args->elts;
 
@@ -2642,13 +2643,15 @@ ngx_http_var_do_max(ngx_http_request_t *r,
 
     /* Convert arguments to integers */
     if (int1_str.len > 0 && int1_str.data[0] == '-') {
-        int1 = -ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+        int1 = ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+        is_negative1 = 1;
     } else {
         int1 = ngx_atoi(int1_str.data, int1_str.len);
     }
 
     if (int2_str.len > 0 && int2_str.data[0] == '-') {
-        int2 = -ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+        int2 = ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+        is_negative2 = 1;
     } else {
         int2 = ngx_atoi(int2_str.data, int2_str.len);
     }
@@ -2657,6 +2660,14 @@ ngx_http_var_do_max(ngx_http_request_t *r,
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: invalid number for max operator");
         return NGX_ERROR;
+    }
+
+    if (is_negative1 == 1) {
+        int1 = -int1;
+    }
+
+    if (is_negative2 == 1) {
+        int2 = -int2;
     }
 
     /* Compute max */
@@ -2685,6 +2696,7 @@ ngx_http_var_do_min(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     ngx_str_t                  int1_str, int2_str;
     ngx_int_t                  int1, int2, min;
+    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
 
     args = var->args->elts;
 
@@ -2704,21 +2716,31 @@ ngx_http_var_do_min(ngx_http_request_t *r,
 
     /* Convert arguments to integers */
     if (int1_str.len > 0 && int1_str.data[0] == '-') {
-        int1 = -ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+        int1 = ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+        is_negative1 = 1;
     } else {
         int1 = ngx_atoi(int1_str.data, int1_str.len);
     }
 
     if (int2_str.len > 0 && int2_str.data[0] == '-') {
-        int2 = -ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+        int2 = ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+        is_negative2 = 1;
     } else {
         int2 = ngx_atoi(int2_str.data, int2_str.len);
     }
 
     if (int1 == NGX_ERROR || int2 == NGX_ERROR) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid number for max operator");
+                      "http_var: invalid number for min operator");
         return NGX_ERROR;
+    }
+
+    if (is_negative1 == 1) {
+        int1 = -int1;
+    }
+
+    if (is_negative2 == 1) {
+        int2 = -int2;
     }
 
     /* Compute min */
@@ -2747,6 +2769,7 @@ ngx_http_var_do_add(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     ngx_str_t                  int1_str, int2_str;
     ngx_int_t                  int1, int2, result;
+    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
     u_char                    *p;
 
     args = var->args->elts;
@@ -2760,13 +2783,15 @@ ngx_http_var_do_add(ngx_http_request_t *r,
     }
 
     if (int1_str.len > 0 && int1_str.data[0] == '-') {
-        int1 = -ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+        int1 = ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+        is_negative1 = 1;
     } else {
         int1 = ngx_atoi(int1_str.data, int1_str.len);
     }
 
     if (int2_str.len > 0 && int2_str.data[0] == '-') {
-        int2 = -ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+        int2 = ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+        is_negative2 = 1;
     } else {
         int2 = ngx_atoi(int2_str.data, int2_str.len);
     }
@@ -2775,6 +2800,14 @@ ngx_http_var_do_add(ngx_http_request_t *r,
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: invalid integer value for add operator");
         return NGX_ERROR;
+    }
+
+    if (is_negative1 == 1) {
+        int1 = -int1;
+    }
+
+    if (is_negative2 == 1) {
+        int2 = -int2;
     }
 
     result = int1 + int2;
@@ -2803,6 +2836,7 @@ ngx_http_var_do_sub(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     ngx_str_t                  int1_str, int2_str;
     ngx_int_t                  int1, int2, result;
+    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;                
     u_char                    *p;
 
     args = var->args->elts;
@@ -2816,13 +2850,15 @@ ngx_http_var_do_sub(ngx_http_request_t *r,
     }
 
     if (int1_str.len > 0 && int1_str.data[0] == '-') {
-        int1 = -ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+        int1 = ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+        is_negative1 = 1;
     } else {
         int1 = ngx_atoi(int1_str.data, int1_str.len);
     }
 
     if (int2_str.len > 0 && int2_str.data[0] == '-') {
-        int2 = -ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+        int2 = ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+        is_negative2 = 1;
     } else {
         int2 = ngx_atoi(int2_str.data, int2_str.len);
     }
@@ -2831,6 +2867,14 @@ ngx_http_var_do_sub(ngx_http_request_t *r,
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: invalid integer value for sub operator");
         return NGX_ERROR;
+    }
+
+    if (is_negative1 == 1) {
+        int1 = -int1;
+    }
+
+    if (is_negative2 == 1) {
+        int2 = -int2;
     }
 
     result = int1 - int2;
@@ -2859,6 +2903,7 @@ ngx_http_var_do_mul(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     ngx_str_t                  int1_str, int2_str;
     ngx_int_t                  int1, int2, result;
+    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
     u_char                    *p;
 
     args = var->args->elts;
@@ -2872,13 +2917,15 @@ ngx_http_var_do_mul(ngx_http_request_t *r,
     }
 
     if (int1_str.len > 0 && int1_str.data[0] == '-') {
-        int1 = -ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+        int1 = ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+        is_negative1 = 1;
     } else {
         int1 = ngx_atoi(int1_str.data, int1_str.len);
     }
 
     if (int2_str.len > 0 && int2_str.data[0] == '-') {
-        int2 = -ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+        int2 = ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+        is_negative2 = 1;
     } else {
         int2 = ngx_atoi(int2_str.data, int2_str.len);
     }
@@ -2887,6 +2934,14 @@ ngx_http_var_do_mul(ngx_http_request_t *r,
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: invalid integer value for mul operator");
         return NGX_ERROR;
+    }
+
+    if (is_negative1 == 1) {
+        int1 = -int1;
+    }
+
+    if (is_negative2 == 1) {
+        int2 = -int2;
     }
 
     result = int1 * int2;
@@ -2915,6 +2970,7 @@ ngx_http_var_do_div(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     ngx_str_t                  int1_str, int2_str;
     ngx_int_t                  int1, int2, result;
+    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
     u_char                    *p;
 
     args = var->args->elts;
@@ -2928,13 +2984,15 @@ ngx_http_var_do_div(ngx_http_request_t *r,
     }
 
     if (int1_str.len > 0 && int1_str.data[0] == '-') {
-        int1 = -ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+        int1 = ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+        is_negative1 = 1;
     } else {
         int1 = ngx_atoi(int1_str.data, int1_str.len);
     }
 
     if (int2_str.len > 0 && int2_str.data[0] == '-') {
-        int2 = -ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+        int2 = ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+        is_negative2 = 1;
     } else {
         int2 = ngx_atoi(int2_str.data, int2_str.len);
     }
@@ -2944,6 +3002,14 @@ ngx_http_var_do_div(ngx_http_request_t *r,
                       "http_var: invalid integer value or division "
                       "by zero for div operator");
         return NGX_ERROR;
+    }
+
+    if (is_negative1 == 1) {
+        int1 = -int1;
+    }
+
+    if (is_negative2 == 1) {
+        int2 = -int2;
     }
 
     result = int1 / int2;
@@ -2972,6 +3038,7 @@ ngx_http_var_do_mod(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     ngx_str_t                  int1_str, int2_str;
     ngx_int_t                  int1, int2, result;
+    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
     u_char                    *p;
 
     args = var->args->elts;
@@ -2984,13 +3051,15 @@ ngx_http_var_do_mod(ngx_http_request_t *r,
     }
 
     if (int1_str.len > 0 && int1_str.data[0] == '-') {
-        int1 = -ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+        int1 = ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+        is_negative1 = 1;
     } else {
         int1 = ngx_atoi(int1_str.data, int1_str.len);
     }
 
     if (int2_str.len > 0 && int2_str.data[0] == '-') {
-        int2 = -ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+        int2 = ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+        is_negative2 = 1;
     } else {
         int2 = ngx_atoi(int2_str.data, int2_str.len);
     }
@@ -2999,6 +3068,14 @@ ngx_http_var_do_mod(ngx_http_request_t *r,
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: invalid integer value or division by zero for mod operator");
         return NGX_ERROR;
+    }
+
+    if (is_negative1 == 1) {
+        int1 = -int1;
+    }
+
+    if (is_negative2 == 1) {
+        int2 = -int2;
     }
 
     result = int1 % int2;
