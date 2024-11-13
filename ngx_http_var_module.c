@@ -51,6 +51,9 @@ typedef enum {
     NGX_HTTP_VAR_OP_IF_EQ,
     NGX_HTTP_VAR_OP_IF_NE,
     NGX_HTTP_VAR_OP_IF_LT,
+    NGX_HTTP_VAR_OP_IF_LE,
+    NGX_HTTP_VAR_OP_IF_GT,
+    NGX_HTTP_VAR_OP_IF_GE,
 
     NGX_HTTP_VAR_OP_ABS,
     NGX_HTTP_VAR_OP_MAX,
@@ -101,7 +104,7 @@ typedef enum {
 
 
 typedef struct {
-    ngx_array_t                   *vars;        /* array of ngx_http_var_variable_t */
+    ngx_array_t                   *vars;
 } ngx_http_var_conf_t;
 
 
@@ -109,7 +112,7 @@ typedef struct {
     ngx_str_t                      name;        /* variable name */
     ngx_http_var_operator_e        operator;    /* operator type */
     ngx_uint_t                     ignore_case; /* ignore case sensitivity */
-    ngx_array_t                   *args;        /* array of ngx_http_complex_value_t */
+    ngx_array_t                   *args;        /* operator extra args */
     ngx_http_complex_value_t      *filter;
     ngx_uint_t                     negative;
 
@@ -123,8 +126,8 @@ typedef struct {
     ngx_str_t                      name;        /* operator string */
     ngx_http_var_operator_e        op;          /* operator enum */
     ngx_uint_t                     ignore_case; /* ignore case for regex */
-    ngx_uint_t                     min_args;    /* minimum number of arguments */
-    ngx_uint_t                     max_args;    /* maximum number of arguments */
+    ngx_uint_t                     min_args;    /* min number of arguments */
+    ngx_uint_t                     max_args;    /* max number of arguments */
 } ngx_http_var_operator_mapping_t;
 
 
@@ -172,6 +175,9 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("if_eq"),           NGX_HTTP_VAR_OP_IF_EQ,          0, 2, 2 },
     { ngx_string("if_ne"),           NGX_HTTP_VAR_OP_IF_NE,          0, 2, 2 },
     { ngx_string("if_lt"),           NGX_HTTP_VAR_OP_IF_LT,          0, 2, 2 },
+    { ngx_string("if_le"),           NGX_HTTP_VAR_OP_IF_LE,          0, 2, 2 },
+    { ngx_string("if_gt"),           NGX_HTTP_VAR_OP_IF_GE,          0, 2, 2 },
+    { ngx_string("if_ge"),           NGX_HTTP_VAR_OP_IF_GE,          0, 2, 2 },
 
     { ngx_string("abs"),             NGX_HTTP_VAR_OP_ABS,            0, 1, 1 },
     { ngx_string("max"),             NGX_HTTP_VAR_OP_MAX,            0, 2, 2 },
@@ -305,6 +311,12 @@ static ngx_int_t ngx_http_var_do_if_eq(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_do_if_ne(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_do_if_lt(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_do_if_le(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_do_if_gt(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_do_if_ge(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 static ngx_int_t ngx_http_var_do_abs(ngx_http_request_t *r,
@@ -616,7 +628,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         || op == NGX_HTTP_VAR_OP_RE_SUB
         || op == NGX_HTTP_VAR_OP_RE_GSUB)
     {
-        /* Regex operators requires 3 parameters：src_string, regex_pattern, assign_value */
+        /* src_string, regex_pattern */
         if (args_count < 2) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "http_var: regex operators "
@@ -648,7 +660,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             return NGX_CONF_ERROR;
         }
 
-        /* Get regex pattern */
+        /* Compile assign_value */
         if (op != NGX_HTTP_VAR_OP_IF_RE_MATCH) {
             if (args_count != 2) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -657,7 +669,6 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                 return NGX_CONF_ERROR;
             }
 
-            /* Compile assign_value */
             ngx_http_complex_value_t *cv_value;
             cv_value = ngx_array_push(var->args);
             if (cv_value == NULL) {
@@ -807,7 +818,8 @@ ngx_http_var_find_variable(ngx_http_request_t *r,
     /* Linear search */
     for (i = 0; i < vconf->vars->nelts; i++) {
         if (vars[i].name.len == var_name->len
-            && ngx_strncmp(vars[i].name.data, var_name->data, var_name->len) == 0)
+            && ngx_strncmp(vars[i].name.data,
+                   var_name->data, var_name->len) == 0)
         {
             if (vars[i].filter) {
                 ngx_str_t  val;
@@ -964,6 +976,18 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
 
     case NGX_HTTP_VAR_OP_IF_LT:
         rc = ngx_http_var_do_if_lt(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_IF_LE:
+        rc = ngx_http_var_do_if_le(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_IF_GT:
+        rc = ngx_http_var_do_if_gt(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_IF_GE:
+        rc = ngx_http_var_do_if_ge(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_ABS:
@@ -1934,7 +1958,8 @@ ngx_http_var_do_find(ngx_http_request_t *r,
     } else {
         p = ngx_strnstr(src_str.data, (char *)sub_str.data, src_str.len);
         if (p) {
-            pos = (ngx_int_t)(p - src_str.data) + 1; /* Position starts from 1 */
+            /* Position starts from 1 */
+            pos = (ngx_int_t)(p - src_str.data) + 1;
         } else {
             pos = 0;
         }
@@ -2372,7 +2397,8 @@ ngx_http_var_do_re_gsub(ngx_http_request_t *r,
 
     /* Initialize the result string, initially allocate 2 times the original length */
     allocated = subject.len * 2;
-    if (allocated < 256) {  /* Set a smaller initial buffer limit to avoid excessive allocation for very small strings */
+    /* Set a smaller initial buffer limit to avoid excessive allocation for very small strings */
+    if (allocated < 256) {  
         allocated = 256;
     }
     result.len = 0;
@@ -2702,7 +2728,8 @@ ngx_http_var_do_if_lt(ngx_http_request_t *r,
 
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: \"if_lt\" failed to convert values to fixed point");
+                      "http_var: \"if_lt\" failed to convert "
+                      "values to fixed point");
         return NGX_ERROR;
     }
 
@@ -2715,6 +2742,242 @@ ngx_http_var_do_if_lt(ngx_http_request_t *r,
     }
 
     if (int_val1 < int_val2) {
+        v->len = 1;
+        v->data = (u_char *) "1";
+    } else {
+        v->len = 1;
+        v->data = (u_char *) "0";
+    }
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_do_if_le(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val1, val2;
+    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
+    ngx_int_t                  int_val1, int_val2;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &val1) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &val2) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (val1.len > 0 && val1.data[0] == '-') {
+        is_negative1 = 1;
+        val1.data++;
+        val1.len--;
+    }
+
+    if (val2.len > 0 && val2.data[0] == '-') {
+        is_negative2 = 1;
+        val2.data++;
+        val2.len--;
+    }
+
+    if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: \"if_le\" failed to convert "
+                      "values to fixed point");
+        return NGX_ERROR;
+    }
+
+    if (is_negative1 == 1) {
+        int_val1 = -int_val1;
+    }
+
+    if (is_negative2 == 1) {
+        int_val2 = -int_val2;
+    }
+
+    if (int_val1 <= int_val2) {
+        v->len = 1;
+        v->data = (u_char *) "1";
+    } else {
+        v->len = 1;
+        v->data = (u_char *) "0";
+    }
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_do_if_gt(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val1, val2;
+    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
+    ngx_int_t                  int_val1, int_val2;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &val1) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &val2) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (val1.len > 0 && val1.data[0] == '-') {
+        is_negative1 = 1;
+        val1.data++;
+        val1.len--;
+    }
+
+    if (val2.len > 0 && val2.data[0] == '-') {
+        is_negative2 = 1;
+        val2.data++;
+        val2.len--;
+    }
+
+    if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: \"if_gt\" failed to convert "
+                      "values to fixed point");
+        return NGX_ERROR;
+    }
+
+    if (is_negative1 == 1) {
+        int_val1 = -int_val1;
+    }
+
+    if (is_negative2 == 1) {
+        int_val2 = -int_val2;
+    }
+
+    if (int_val1 > int_val2) {
+        v->len = 1;
+        v->data = (u_char *) "1";
+    } else {
+        v->len = 1;
+        v->data = (u_char *) "0";
+    }
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_do_if_ge(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val1, val2;
+    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
+    ngx_int_t                  int_val1, int_val2;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &val1) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &val2) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (val1.len > 0 && val1.data[0] == '-') {
+        is_negative1 = 1;
+        val1.data++;
+        val1.len--;
+    }
+
+    if (val2.len > 0 && val2.data[0] == '-') {
+        is_negative2 = 1;
+        val2.data++;
+        val2.len--;
+    }
+
+    if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: \"if_gt\" failed to convert "
+                      "values to fixed point");
+        return NGX_ERROR;
+    }
+
+    if (is_negative1 == 1) {
+        int_val1 = -int_val1;
+    }
+
+    if (is_negative2 == 1) {
+        int_val2 = -int_val2;
+    }
+
+    if (int_val1 >= int_val2) {
+        v->len = 1;
+        v->data = (u_char *) "1";
+    } else {
+        v->len = 1;
+        v->data = (u_char *) "0";
+    }
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_do_if_ge(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val1, val2;
+    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
+    ngx_int_t                  int_val1, int_val2;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &val1) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &val2) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (val1.len > 0 && val1.data[0] == '-') {
+        is_negative1 = 1;
+        val1.data++;
+        val1.len--;
+    }
+
+    if (val2.len > 0 && val2.data[0] == '-') {
+        is_negative2 = 1;
+        val2.data++;
+        val2.len--;
+    }
+
+    if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: \"if_gt\" failed to convert "
+                      "values to fixed point");
+        return NGX_ERROR;
+    }
+
+    if (is_negative1 == 1) {
+        int_val1 = -int_val1;
+    }
+
+    if (is_negative2 == 1) {
+        int_val2 = -int_val2;
+    }
+
+    if (int_val1 >= int_val2) {
         v->len = 1;
         v->data = (u_char *) "1";
     } else {
@@ -2812,7 +3075,8 @@ ngx_http_var_do_max(ngx_http_request_t *r,
 
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: \"max\" failed to convert values to fixed point");
+                      "http_var: \"max\" failed to convert "
+                      "values to fixed point");
         return NGX_ERROR;
     }
 
@@ -2884,7 +3148,8 @@ ngx_http_var_do_min(ngx_http_request_t *r,
 
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: \"min\" failed to convert values to fixed point");
+                      "http_var: \"min\" failed to convert "
+                      "values to fixed point");
         return NGX_ERROR;
     }
 
@@ -2987,7 +3252,7 @@ ngx_http_var_do_sub(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     ngx_str_t                  int1_str, int2_str;
     ngx_int_t                  int1, int2, result;
-    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;                
+    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
     u_char                    *p;
 
     args = var->args->elts;
@@ -3197,7 +3462,8 @@ ngx_http_var_do_mod(ngx_http_request_t *r,
     if (ngx_http_complex_value(r, &args[0], &int1_str) != NGX_OK ||
         ngx_http_complex_value(r, &args[1], &int2_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: failed to compute arguments for mod operator");
+                      "http_var: failed to compute arguments "
+                      "for mod operator");
         return NGX_ERROR;
     }
 
@@ -3217,7 +3483,8 @@ ngx_http_var_do_mod(ngx_http_request_t *r,
 
     if (int1 == NGX_ERROR || int2 == NGX_ERROR || int2 == 0) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid integer value or division by zero for mod operator");
+                      "http_var: invalid integer value or "
+                      "division by zero for mod operator");
         return NGX_ERROR;
     }
 
@@ -3580,7 +3847,8 @@ ngx_http_var_do_ceil(ngx_http_request_t *r,
         ngx_memcpy(result, num_data, decimal_point);
         result[decimal_point] = '\0';
     } else {
-        /* Truncate everything after the decimal point and add 1 if necessary for positive numbers */
+        /* Truncate everything after the decimal point */
+        /* and add 1 if necessary for positive numbers */
         result = ngx_palloc(r->pool, decimal_point + 2);
         if (result == NULL) {
             return NGX_ERROR;
@@ -4370,7 +4638,7 @@ ngx_http_var_do_crc32_short(ngx_http_request_t *r,
     }
 
     /* Convert CRC32 result to string */
-    v->len = ngx_sprintf(p, "%08xD", crc) - p;  // Use lowercase %08x for CRC32 result
+    v->len = ngx_sprintf(p, "%08xD", crc) - p;
 
     v->data = p;
     v->valid = 1;
@@ -4847,7 +5115,8 @@ ngx_http_var_do_gmt_time(ngx_http_request_t *r,
         /* One argument: date format, use current time */
         if (ngx_http_complex_value(r, &args[0], &date_format) != NGX_OK) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: failed to compute argument for gmt_time date_format");
+                          "http_var: failed to compute argument "
+                          "for gmt_time date_format");
             return NGX_ERROR;
         }
 
@@ -4955,7 +5224,8 @@ ngx_http_var_do_local_time(ngx_http_request_t *r,
         /* One argument: date format, use current time */
         if (ngx_http_complex_value(r, &args[0], &date_format) != NGX_OK) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: failed to compute argument for gmt_time date_format");
+                          "http_var: failed to compute argument "
+                          "for gmt_time date_format");
             return NGX_ERROR;
         }
 
