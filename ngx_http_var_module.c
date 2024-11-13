@@ -2543,9 +2543,7 @@ ngx_http_var_do_abs(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  num_str, num_abs_str;
-    ngx_int_t                  num;
-    ngx_uint_t                 decimal_places = 0;
+    ngx_str_t                  num_str;
 
     args = var->args->elts;
 
@@ -2564,14 +2562,13 @@ ngx_http_var_do_abs(ngx_http_request_t *r,
     }
 
     /* Convert arguments to integers */
-    num_abs_str = num_str;
     if (num_str.len > 0 && num_str.data[0] == '-') {
-        num_abs_str.data++;
-        num_abs_str.len--;
+        num_str.data++;
+        num_str.len--;
     }
 
-    v->len = num_abs_str.len;
-    v->data = num_abs_str.data;
+    v->len = num_str.len;
+    v->data = num_str.data;
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
