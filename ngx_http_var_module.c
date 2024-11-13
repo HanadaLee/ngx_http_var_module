@@ -48,6 +48,8 @@ typedef enum {
     NGX_HTTP_VAR_OP_RE_GSUB,
 #endif
 
+    NGX_HTTP_VAR_OP_IF_LT,
+
     NGX_HTTP_VAR_OP_ABS,
     NGX_HTTP_VAR_OP_MAX,
     NGX_HTTP_VAR_OP_MIN,
@@ -164,6 +166,8 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("re_gsub"),         NGX_HTTP_VAR_OP_RE_GSUB,        0, 3, 3 },
     { ngx_string("re_gsub_i"),       NGX_HTTP_VAR_OP_RE_GSUB,        1, 3, 3 },
 #endif
+
+    { ngx_string("if_lt"),           NGX_HTTP_VAR_OP_IF_LT,          0, 2, 2 },
 
     { ngx_string("abs"),             NGX_HTTP_VAR_OP_ABS,            0, 1, 1 },
     { ngx_string("max"),             NGX_HTTP_VAR_OP_MAX,            0, 2, 2 },
@@ -287,6 +291,11 @@ static ngx_int_t ngx_http_var_do_re_sub(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_do_re_gsub(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 #endif
+
+static ngx_unt_t ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
+    ngx_uint_t *int_val1, ngx_uint_t *int_val2);
+static ngx_int_t ngx_http_var_do_if_lt(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 static ngx_int_t ngx_http_var_do_abs(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -935,6 +944,10 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         break;
 #endif
 
+    case NGX_HTTP_VAR_IF_LT:
+        rc = ngx_http_var_do_if_lt(r, v, var);
+        break;
+
     case NGX_HTTP_VAR_OP_ABS:
         rc = ngx_http_var_do_abs(r, v, var);
         break;
@@ -1167,9 +1180,9 @@ static ngx_int_t
 ngx_http_var_do_and(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_uint_t                i;
-    ngx_http_complex_value_t *args;
-    ngx_str_t                 val;
+    ngx_http_complex_value_t  *args;
+    ngx_uint_t                 i;
+    ngx_str_t                  val;
 
 
     args = var->args->elts;
@@ -1204,9 +1217,9 @@ static ngx_int_t
 ngx_http_var_do_or(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_uint_t                i;
-    ngx_http_complex_value_t *args;
-    ngx_str_t                 val;
+    ngx_http_complex_value_t  *args;
+    ngx_uint_t                 i;
+    ngx_str_t                  val;
 
     args = var->args->elts;
 
@@ -1240,8 +1253,8 @@ static ngx_int_t
 ngx_http_var_do_not(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t *args;
-    ngx_str_t                 val;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val;
 
     args = var->args->elts;
 
@@ -1270,8 +1283,8 @@ static ngx_int_t
 ngx_http_var_do_if_empty(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t *args;
-    ngx_str_t val;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val;
 
     args = var->args->elts;
 
@@ -1302,8 +1315,8 @@ static ngx_int_t
 ngx_http_var_do_if_not_empty(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t *args;
-    ngx_str_t val;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val;
 
     args = var->args->elts;
 
@@ -1334,11 +1347,11 @@ static ngx_int_t
 ngx_http_var_do_if_is_number(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t *args;
-    ngx_str_t val;
-    u_char *p;
-    size_t i;
-    ngx_uint_t dot_count = 0;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val;
+    u_char                    *p;
+    size_t                     i;
+    ngx_uint_t                 dot_count = 0;
 
     args = var->args->elts;
 
@@ -1421,8 +1434,8 @@ static ngx_int_t
 ngx_http_var_do_if_has_prefix(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t *args;
-    ngx_str_t str, prefix;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  str, prefix;
 
     args = var->args->elts;
 
@@ -1470,8 +1483,8 @@ static ngx_int_t
 ngx_http_var_do_if_has_suffix(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t *args;
-    ngx_str_t str, suffix;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  str, suffix;
 
     args = var->args->elts;
 
@@ -1520,9 +1533,9 @@ static ngx_int_t
 ngx_http_var_do_if_find(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t *args;
-    ngx_str_t str, sub_str;
-    u_char *p;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  str, sub_str;
+    u_char                    *p;
 
     args = var->args->elts;
 
@@ -1564,18 +1577,18 @@ static ngx_int_t
 ngx_http_var_do_copy(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 value_str;
-    ngx_http_complex_value_t *args;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &value_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: failed to compute variable value");
         return NGX_ERROR;
     }
 
-    v->len = value_str.len;
+    v->len = val.len;
     v->data = ngx_pnalloc(r->pool, v->len);
     if (v->data == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -1583,7 +1596,7 @@ ngx_http_var_do_copy(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    ngx_memcpy(v->data, value_str.data, v->len);
+    ngx_memcpy(v->data, val.data, v->len);
 
     v->valid = 1;
     v->no_cacheable = 0;
@@ -1597,8 +1610,8 @@ static ngx_int_t
 ngx_http_var_do_len(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                  src_str;
     ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str;
     u_char                    *p;
     size_t                     len;
 
@@ -1632,8 +1645,8 @@ static ngx_int_t
 ngx_http_var_do_upper(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 value_str;
-    ngx_http_complex_value_t *args;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  value_str;
 
     args = var->args->elts;
 
@@ -1668,8 +1681,8 @@ static ngx_int_t
 ngx_http_var_do_lower(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 value_str;
-    ngx_http_complex_value_t *args;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  value_str;
 
     args = var->args->elts;
 
@@ -1704,9 +1717,9 @@ static ngx_int_t
 ngx_http_var_do_trim(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 src_str, trimmed_str;
-    ngx_http_complex_value_t *args;
-    u_char                   *start, *end;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, trimmed_str;
+    u_char                    *start, *end;
 
     args = var->args->elts;
 
@@ -1748,9 +1761,9 @@ static ngx_int_t
 ngx_http_var_do_ltrim(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 src_str, trimmed_str;
-    ngx_http_complex_value_t *args;
-    u_char                   *start, *end;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, trimmed_str;
+    u_char                    *start, *end;
 
     args = var->args->elts;
 
@@ -1787,9 +1800,9 @@ static ngx_int_t
 ngx_http_var_do_rtrim(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 src_str, trimmed_str;
-    ngx_http_complex_value_t *args;
-    u_char                   *start, *end;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, trimmed_str;
+    u_char                    *start, *end;
 
     args = var->args->elts;
 
@@ -1826,9 +1839,9 @@ static ngx_int_t
 ngx_http_var_do_reverse(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 src_str, reversed_str;
-    ngx_http_complex_value_t *args;
-    u_char                   *p, *q;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, reversed_str;
+    u_char                    *p, *q;
 
     args = var->args->elts;
 
@@ -1867,10 +1880,10 @@ static ngx_int_t
 ngx_http_var_do_find(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 src_str, sub_str;
-    ngx_http_complex_value_t *args;
-    u_char                   *p;
-    ngx_int_t                 pos = 0;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, sub_str;
+    u_char                    *p;
+    ngx_int_t                  pos = 0;
 
     args = var->args->elts;
 
@@ -1914,12 +1927,12 @@ static ngx_int_t
 ngx_http_var_do_repeat(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 src_str, repeat_times_str;
-    ngx_http_complex_value_t *args;
-    ngx_int_t                 times;
-    size_t                    total_len;
-    u_char                   *p;
-    ngx_uint_t                i;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, repeat_times_str;
+    ngx_int_t                  times;
+    size_t                     total_len;
+    u_char                    *p;
+    ngx_uint_t                 i;
 
     args = var->args->elts;
 
@@ -1981,10 +1994,10 @@ static ngx_int_t
 ngx_http_var_do_substr(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 src_str, start_str, len_str;
-    ngx_http_complex_value_t *args;
-    ngx_int_t                 start, len;
-    ngx_uint_t                src_len;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, start_str, len_str;
+    ngx_int_t                  start, len;
+    ngx_uint_t                 src_len;
 
     args = var->args->elts;
 
@@ -2045,11 +2058,11 @@ static ngx_int_t
 ngx_http_var_do_replace(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 src_str, search_str, replace_str, result_str;
-    ngx_http_complex_value_t *args;
-    u_char                   *p, *q;
-    size_t                    count = 0, new_len;
-    ngx_uint_t                i;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, search_str, replace_str, result_str;
+    u_char                    *p, *q;
+    size_t                     count = 0, new_len;
+    ngx_uint_t                 i;
 
     args = var->args->elts;
 
@@ -2451,12 +2464,118 @@ ngx_http_var_do_re_gsub(ngx_http_request_t *r,
 
 
 static ngx_int_t
+ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
+    ngx_uint_t *int_val1, ngx_uint_t *int_val2)
+{
+    ngx_uint_t decimal_places1 = 0, decimal_places2 = 0;
+
+    for (ngx_uint_t i = 0; i < val1.len; i++) {
+        if (val1.data[i] == '.') {
+            decimal_places1 = val1.len - i - 1;
+            break;
+        }
+    }
+    for (ngx_uint_t i = 0; i < val2.len; i++) {
+        if (val2.data[i] == '.') {
+            decimal_places2 = val2.len - i - 1;
+            break;
+        }
+    }
+
+    ngx_uint_t max_decimal_places = (decimal_places1 > decimal_places2)
+        ? decimal_places1 : decimal_places2;
+
+    *int_val1 = ngx_atofp(val1.data, val1.len, max_decimal_places);
+    *int_val2 = ngx_atofp(val2.data, val2.len, max_decimal_places);
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t ngx_http_var_do_if_lt(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val1, val2;
+    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
+    ngx_int_t                  int_val1, int_val2;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &val1) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &val2) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (val1.len > 0 && val1.data[0] == '-') {
+        is_negative1 = 1;
+        val1.data++;
+        val1.len--;
+    }
+
+    if (val2.len > 0 && val2.data[0] == '-') {
+        is_negative2 = 1;
+        val2.data++;
+        val2.len--;
+    }
+
+    if (is_negative1 && !is_negative2) {
+        // Negative is always less than positive
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+        v->len = 1;
+        v->data = (u_char *) "1";
+        return NGX_OK;
+    }
+
+    if (!is_negative1 && is_negative2) {
+        // Positive is always greater than negative
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+        v->len = 1;
+        v->data = (u_char *) "0";
+        return NGX_OK;
+    }
+
+    ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2);
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    if (is_negative1 && is_negative2) {
+        // If both are negative, the comparison is inverted
+        if (int_val1 > int_val2) {
+            v->len = 1;
+            v->data = (u_char *) "1";
+        } else {
+            v->len = 1;
+            v->data = (u_char *) "0";
+        }
+
+    } else {
+        if (int_val1 < int_val2) {
+            v->len = 1;
+            v->data = (u_char *) "1";
+        } else {
+            v->len = 1;
+            v->data = (u_char *) "0";
+        }
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_http_var_do_abs(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t *args;
-    ngx_str_t                 num_str;
-    ngx_int_t                 num;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  num_str;
+    ngx_int_t                  num;
 
     args = var->args->elts;
 
@@ -2500,9 +2619,9 @@ static ngx_int_t
 ngx_http_var_do_max(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t *args;
-    ngx_str_t                 int1_str, int2_str;
-    ngx_int_t                 int1, int2, max;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  int1_str, int2_str;
+    ngx_int_t                  int1, int2, max;
 
     args = var->args->elts;
 
@@ -2562,9 +2681,9 @@ static ngx_int_t
 ngx_http_var_do_min(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t *args;
-    ngx_str_t                 int1_str, int2_str;
-    ngx_int_t                 int1, int2, min;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  int1_str, int2_str;
+    ngx_int_t                  int1, int2, min;
 
     args = var->args->elts;
 
@@ -2624,8 +2743,8 @@ static ngx_int_t
 ngx_http_var_do_add(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                  int1_str, int2_str;
     ngx_http_complex_value_t  *args;
+    ngx_str_t                  int1_str, int2_str;
     ngx_int_t                  int1, int2, result;
     u_char                    *p;
 
@@ -2680,8 +2799,8 @@ static ngx_int_t
 ngx_http_var_do_sub(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                  int1_str, int2_str;
     ngx_http_complex_value_t  *args;
+    ngx_str_t                  int1_str, int2_str;
     ngx_int_t                  int1, int2, result;
     u_char                    *p;
 
@@ -2736,8 +2855,8 @@ static ngx_int_t
 ngx_http_var_do_mul(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                  int1_str, int2_str;
     ngx_http_complex_value_t  *args;
+    ngx_str_t                  int1_str, int2_str;
     ngx_int_t                  int1, int2, result;
     u_char                    *p;
 
@@ -2792,8 +2911,8 @@ static ngx_int_t
 ngx_http_var_do_div(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                  int1_str, int2_str;
     ngx_http_complex_value_t  *args;
+    ngx_str_t                  int1_str, int2_str;
     ngx_int_t                  int1, int2, result;
     u_char                    *p;
 
@@ -2849,8 +2968,8 @@ static ngx_int_t
 ngx_http_var_do_mod(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                  int1_str, int2_str;
     ngx_http_complex_value_t  *args;
+    ngx_str_t                  int1_str, int2_str;
     ngx_int_t                  int1, int2, result;
     u_char                    *p;
 
@@ -2904,8 +3023,8 @@ static ngx_int_t
 ngx_http_var_do_round(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                  num_str, precision_str;
     ngx_http_complex_value_t  *args;
+    ngx_str_t                  num_str, precision_str;
     ngx_int_t                  precision, i, j, decimal_point = -1, len;
     u_char                    *num_data, *result;
     size_t                     num_len;
@@ -3048,8 +3167,8 @@ static ngx_int_t
 ngx_http_var_do_floor(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                  num_str;
     ngx_http_complex_value_t  *args;
+    ngx_str_t                  num_str;
     ngx_int_t                  i, decimal_point = -1;
     u_char                    *num_data, *result;
     size_t                     num_len;
@@ -3165,8 +3284,8 @@ static ngx_int_t
 ngx_http_var_do_ceil(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                  num_str;
     ngx_http_complex_value_t  *args;
+    ngx_str_t                  num_str;
     ngx_int_t                  i, decimal_point = -1;
     u_char                    *num_data, *result;
     size_t                     num_len;
@@ -3307,8 +3426,8 @@ static ngx_int_t
 ngx_http_var_do_rand_range(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                  start_str, end_str;
     ngx_http_complex_value_t  *args;
+    ngx_str_t                  start_str, end_str;
     ngx_int_t                  start, end, result;
     u_char                    *p;
 
@@ -3358,8 +3477,8 @@ static ngx_int_t
 ngx_http_var_do_hex_encode(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                  src_str, hex_str;
     ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, hex_str;
 
     args = var->args->elts;
 
@@ -3394,8 +3513,8 @@ static ngx_int_t
 ngx_http_var_do_hex_decode(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                  hex_str, bin_str;
     ngx_http_complex_value_t  *args;
+    ngx_str_t                  hex_str, bin_str;
     u_char                    *p;
     ngx_int_t                  n;
     size_t                     i;
@@ -3563,11 +3682,11 @@ static ngx_int_t
 ngx_http_var_do_escape_uri(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 src_str, escaped_str;
-    ngx_http_complex_value_t *args;
-    size_t                    len;
-    uintptr_t                 escape;
-    u_char                   *src, *dst;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, escaped_str;
+    size_t                     len;
+    uintptr_t                  escape;
+    u_char                    *src, *dst;
 
     args = var->args->elts;
 
@@ -3628,11 +3747,11 @@ static ngx_int_t
 ngx_http_var_do_escape_args(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 src_str, escaped_str;
-    ngx_http_complex_value_t *args;
-    size_t                    len;
-    uintptr_t                 escape;
-    u_char                   *src, *dst;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, escaped_str;
+    size_t                     len;
+    uintptr_t                  escape;
+    u_char                    *src, *dst;
 
     args = var->args->elts;
 
@@ -3693,11 +3812,11 @@ static ngx_int_t
 ngx_http_var_do_escape_uri_component(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 src_str, escaped_str;
-    ngx_http_complex_value_t *args;
-    size_t                    len;
-    uintptr_t                 escape;
-    u_char                   *src, *dst;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, escaped_str;
+    size_t                     len;
+    uintptr_t                  escape;
+    u_char                    *src, *dst;
 
     args = var->args->elts;
 
@@ -3760,10 +3879,10 @@ static ngx_int_t
 ngx_http_var_do_unescape_uri(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 src_str, unescaped_str;
-    ngx_http_complex_value_t *args;
-    size_t                    len;
-    u_char                   *p, *src, *dst;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, unescaped_str;
+    size_t                     len;
+    u_char                    *p, *src, *dst;
 
     args = var->args->elts;
 
@@ -3824,8 +3943,8 @@ static ngx_int_t
 ngx_http_var_do_base64_encode(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                  src_str, encoded_str;
     ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, encoded_str;
     size_t                     len;
 
     args = var->args->elts;
@@ -3864,8 +3983,8 @@ static ngx_int_t
 ngx_http_var_do_base64url_encode(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                  src_str, encoded_str;
     ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, encoded_str;
     size_t                     len;
 
     args = var->args->elts;
@@ -3905,8 +4024,8 @@ static ngx_int_t
 ngx_http_var_do_base64_decode(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                  src_str, decoded_str;
     ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, decoded_str;
     size_t                     len;
 
     args = var->args->elts;
@@ -3950,8 +4069,8 @@ static ngx_int_t
 ngx_http_var_do_base64url_decode(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                  src_str, decoded_str;
     ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, decoded_str;
     size_t                     len;
 
     args = var->args->elts;
@@ -4078,8 +4197,8 @@ static ngx_int_t
 ngx_http_var_do_md5sum(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                  src_str;
     ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str;
     u_char                    *hash_data;
     ngx_md5_t                  md5;
 
@@ -4123,8 +4242,8 @@ static ngx_int_t
 ngx_http_var_do_sha1sum(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                  src_str;
     ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str;
     u_char                    *hash_data;
     ngx_sha1_t                 sha1;
 
@@ -4168,10 +4287,10 @@ static ngx_int_t
 ngx_http_var_do_sha256sum(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 src_str;
-    ngx_http_complex_value_t *args;
-    u_char                   *hash_data;
-    EVP_MD_CTX               *md;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str;
+    u_char                    *hash_data;
+    EVP_MD_CTX                *md;
 
     args = var->args->elts;
 
@@ -4234,10 +4353,10 @@ static ngx_int_t
 ngx_http_var_do_sha384sum(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 src_str;
-    ngx_http_complex_value_t *args;
-    u_char                   *hash_data;
-    EVP_MD_CTX               *md;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str;
+    u_char                    *hash_data;
+    EVP_MD_CTX                *md;
 
     args = var->args->elts;
 
@@ -4300,10 +4419,10 @@ static ngx_int_t
 ngx_http_var_do_sha512sum(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                 src_str;
-    ngx_http_complex_value_t *args;
-    u_char                   *hash_data;
-    EVP_MD_CTX               *md;
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str;
+    u_char                    *hash_data;
+    EVP_MD_CTX                *md;
 
     args = var->args->elts;
 
