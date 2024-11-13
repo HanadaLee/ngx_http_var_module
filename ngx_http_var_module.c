@@ -1113,7 +1113,7 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
     }
 
     ngx_log_debug4(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http_var: evaluated variable \"%V\", "
+                   "http_var: evaluated variable \"$%V\", "
                    "result length: %uz, value: \"%*s\"",
                    &var->name, v->len, v->len, v->data);
 
@@ -2485,8 +2485,13 @@ ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
     ngx_uint_t max_decimal_places = (decimal_places1 > decimal_places2)
         ? decimal_places1 : decimal_places2;
 
-    *int_val1 = ngx_atofp(val1.data, val1.len, max_decimal_places);
-    *int_val2 = ngx_atofp(val2.data, val2.len, max_decimal_places);
+    if (max_decimal_places == 0) {
+        *int_val1 = ngx_atoi(val1.data, val1.len);
+        *int_val2 = ngx_atoi(val2.data, val2.len);
+    } else {
+        *int_val1 = ngx_atofp(val1.data, val1.len, max_decimal_places);
+        *int_val2 = ngx_atofp(val2.data, val2.len, max_decimal_places);
+    }
 
     if (*int_val1 == NGX_ERROR || *int_val2 == NGX_ERROR) {
         return NGX_ERROR;
