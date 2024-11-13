@@ -2586,7 +2586,7 @@ ngx_http_var_do_max(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  int1_str, int2_str, val1, val2;
-    ngx_int_t                  int_val1, int_val2, max;
+    ngx_int_t                  int_val1, int_val2;
     ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
 
     args = var->args->elts;
@@ -2658,7 +2658,7 @@ ngx_http_var_do_min(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  int1_str, int2_str, val1, val2;
-    ngx_int_t                  int_val1, int_val2, max;
+    ngx_int_t                  int_val1, int_val2;
     ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
 
     args = var->args->elts;
