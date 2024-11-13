@@ -292,7 +292,7 @@ static ngx_int_t ngx_http_var_do_re_gsub(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 #endif
 
-static ngx_unt_t ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
+static ngx_int_t ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
     ngx_uint_t *int_val1, ngx_uint_t *int_val2);
 static ngx_int_t ngx_http_var_do_if_lt(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -2492,7 +2492,8 @@ ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
 }
 
 
-static ngx_int_t ngx_http_var_do_if_lt(ngx_http_request_t *r,
+static ngx_int_t
+ngx_http_var_do_if_lt(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
