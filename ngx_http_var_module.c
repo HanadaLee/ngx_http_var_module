@@ -235,6 +235,10 @@ static ngx_int_t ngx_http_var_evaluate_variable(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_variable_handler(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 
+static ngx_int_t ngx_http_var_check_str_is_number(ngx_str_t num_str);
+static ngx_int_t ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
+    ngx_int_t *int_val1, ngx_int_t *int_val2);
+
 static ngx_int_t ngx_http_var_do_and(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_do_or(ngx_http_request_t *r,
@@ -292,8 +296,6 @@ static ngx_int_t ngx_http_var_do_re_gsub(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 #endif
 
-static ngx_int_t ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
-    ngx_int_t *int_val1, ngx_int_t *int_val2);
 static ngx_int_t ngx_http_var_do_if_lt(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
@@ -1177,6 +1179,77 @@ found:
 
 
 static ngx_int_t
+ngx_http_var_check_str_is_number(ngx_str_t num_str)
+{
+    ngx_str_t  num_abs_str = num_str;
+    ngx_int_t  num;
+    ngx_uint_t decimal_places = 0;
+
+    if (num_abs_str.len > 0 && num_abs_str.data[0] == '-') {
+        num_abs_str.data++;
+        num_abs_str.len--;
+    }
+
+    for (ngx_uint_t i = 0; i < num_abs_str.len; i++) {
+        if (num_abs_str.data[i] == '.') {
+            decimal_places = num_abs_str.len - i - 1;
+            break;
+        }
+    }
+
+    if (decimal_places == 0) {
+        num = ngx_atoi(num_abs_str.data, num_abs_str.len);
+    } else {
+        num = ngx_atofp(num_abs_str.data, num_abs_str.len, decimal_places);
+    }
+
+    if (num == NGX_ERROR) {
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
+    ngx_int_t *int_val1, ngx_int_t *int_val2)
+{
+    ngx_uint_t decimal_places1 = 0, decimal_places2 = 0;
+
+    for (ngx_uint_t i = 0; i < val1.len; i++) {
+        if (val1.data[i] == '.') {
+            decimal_places1 = val1.len - i - 1;
+            break;
+        }
+    }
+    for (ngx_uint_t i = 0; i < val2.len; i++) {
+        if (val2.data[i] == '.') {
+            decimal_places2 = val2.len - i - 1;
+            break;
+        }
+    }
+
+    ngx_uint_t max_decimal_places = (decimal_places1 > decimal_places2)
+        ? decimal_places1 : decimal_places2;
+
+    if (max_decimal_places == 0) {
+        *int_val1 = ngx_atoi(val1.data, val1.len);
+        *int_val2 = ngx_atoi(val2.data, val2.len);
+    } else {
+        *int_val1 = ngx_atofp(val1.data, val1.len, max_decimal_places);
+        *int_val2 = ngx_atofp(val2.data, val2.len, max_decimal_places);
+    }
+
+    if (*int_val1 == NGX_ERROR || *int_val2 == NGX_ERROR) {
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_http_var_do_and(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
@@ -1349,9 +1422,6 @@ ngx_http_var_do_if_is_number(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  val;
-    u_char                    *p;
-    size_t                     i;
-    ngx_uint_t                 dot_count = 0;
 
     args = var->args->elts;
 
@@ -1362,69 +1432,16 @@ ngx_http_var_do_if_is_number(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (val.len == 0) {
-        v->len = 1;
-        v->data = (u_char *) "0";
-        v->valid = 1;
-        v->no_cacheable = 0;
-        v->not_found = 0;
-        return NGX_OK;
-    }
-
-    p = val.data;
-
-    if (p[0] == '-') {
-        if (val.len == 1) {
-            v->len = 1;
-            v->data = (u_char *) "0";
-            v->valid = 1;
-            v->no_cacheable = 0;
-            v->not_found = 0;
-            return NGX_OK;
-        }
-        p++;
-        val.len--;
-    }
-
-    for (i = 0; i < val.len; i++) {
-        if (p[i] == '.') {
-            dot_count++;
-
-            if (dot_count > 1) {
-                v->len = 1;
-                v->data = (u_char *) "0";
-                v->valid = 1;
-                v->no_cacheable = 0;
-                v->not_found = 0;
-                return NGX_OK;
-            }
-
-            if (i == 0 || i == val.len - 1) {
-                v->len = 1;
-                v->data = (u_char *) "0";
-                v->valid = 1;
-                v->no_cacheable = 0;
-                v->not_found = 0;
-                return NGX_OK;
-            }
-            continue;
-        }
-
-        if (p[i] < '0' || p[i] > '9') {
-            v->len = 1;
-            v->data = (u_char *) "0";
-            v->valid = 1;
-            v->no_cacheable = 0;
-            v->not_found = 0;
-            return NGX_OK;
-        }
-    }
-
     v->len = 1;
-    v->data = (u_char *) "1";
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
+
+    if (ngx_http_var_check_str_is_number(val) != NGX_OK) {
+        v->data = (u_char *) "0";
+    } else {
+        v->data = (u_char *) "1";
+    }
 
     return NGX_OK;
 }
@@ -2464,44 +2481,6 @@ ngx_http_var_do_re_gsub(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
-    ngx_int_t *int_val1, ngx_int_t *int_val2)
-{
-    ngx_uint_t decimal_places1 = 0, decimal_places2 = 0;
-
-    for (ngx_uint_t i = 0; i < val1.len; i++) {
-        if (val1.data[i] == '.') {
-            decimal_places1 = val1.len - i - 1;
-            break;
-        }
-    }
-    for (ngx_uint_t i = 0; i < val2.len; i++) {
-        if (val2.data[i] == '.') {
-            decimal_places2 = val2.len - i - 1;
-            break;
-        }
-    }
-
-    ngx_uint_t max_decimal_places = (decimal_places1 > decimal_places2)
-        ? decimal_places1 : decimal_places2;
-
-    if (max_decimal_places == 0) {
-        *int_val1 = ngx_atoi(val1.data, val1.len);
-        *int_val2 = ngx_atoi(val2.data, val2.len);
-    } else {
-        *int_val1 = ngx_atofp(val1.data, val1.len, max_decimal_places);
-        *int_val2 = ngx_atofp(val2.data, val2.len, max_decimal_places);
-    }
-
-    if (*int_val1 == NGX_ERROR || *int_val2 == NGX_ERROR) {
-        return NGX_ERROR;
-    }
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
 ngx_http_var_do_if_lt(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
@@ -2564,8 +2543,9 @@ ngx_http_var_do_abs(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  num_str;
+    ngx_str_t                  num_str, num_abs_str;
     ngx_int_t                  num;
+    ngx_uint_t                 decimal_places = 0;
 
     args = var->args->elts;
 
@@ -2576,30 +2556,25 @@ ngx_http_var_do_abs(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    /* Convert arguments to integers */
-    if (num_str.len > 0 && num_str.data[0] == '-') {
-        num = ngx_atoi(num_str.data + 1, num_str.len - 1);
-    } else {
-        num = ngx_atoi(num_str.data, num_str.len);
-    }
-
-    if (num == NGX_ERROR) {
+    /* Check if is number */
+    if (ngx_http_var_check_str_is_number(num_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: invalid number for abs operator");
         return NGX_ERROR;
     }
 
-    /* Convert result to string */
-    u_char *p;
-    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
-    if (p == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed");
-        return NGX_ERROR;
+    /* Convert arguments to integers */
+    num_abs_str = num_str;
+    if (num_str.len > 0 && num_str.data[0] == '-') {
+        num_abs_str.data++;
+        num_abs_str.len--;
     }
 
-    v->len = ngx_sprintf(p, "%i", num) - p;
-    v->data = p;
+    v->len = num_abs_str.len;
+    v->data = num_abs_str.data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
 
     return NGX_OK;
 }
