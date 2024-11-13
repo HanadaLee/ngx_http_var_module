@@ -2610,8 +2610,8 @@ ngx_http_var_do_max(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  int1_str, int2_str;
-    ngx_int_t                  int1, int2, max;
+    ngx_str_t                  int1_str, int2_str, val1, val2;
+    ngx_int_t                  int_val1, int_val2, max;
     ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
 
     args = var->args->elts;
@@ -2630,49 +2630,48 @@ ngx_http_var_do_max(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    val1 = int1_str;
+    val2 = int2_str;
+
     /* Convert arguments to integers */
-    if (int1_str.len > 0 && int1_str.data[0] == '-') {
-        int1 = ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+    if (val1.len > 0 && val1.data[0] == '-') {
         is_negative1 = 1;
-    } else {
-        int1 = ngx_atoi(int1_str.data, int1_str.len);
+        val1.data++;
+        val1.len--;
     }
 
-    if (int2_str.len > 0 && int2_str.data[0] == '-') {
-        int2 = ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+    if (val2.len > 0 && val2.data[0] == '-') {
         is_negative2 = 1;
-    } else {
-        int2 = ngx_atoi(int2_str.data, int2_str.len);
+        val2.data++;
+        val2.len--;
     }
 
-    if (int1 == NGX_ERROR || int2 == NGX_ERROR) {
+    if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid number for max operator");
+                      "http_var: \"max\" failed to convert values to fixed point");
         return NGX_ERROR;
     }
 
     if (is_negative1 == 1) {
-        int1 = -int1;
+        int_val1 = -int_val1;
     }
 
     if (is_negative2 == 1) {
-        int2 = -int2;
+        int_val2 = -int_val2;
     }
 
     /* Compute max */
-    max = (int1 > int2) ? int1 : int2;
-
-    /* Convert result to string */
-    u_char *p;
-    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
-    if (p == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed");
-        return NGX_ERROR;
+    if (int_val1 > int_val2) {
+        v->len = int1_str.len;
+        v->data = int1_str.data;
+    } else {
+        v->len = int2_str.len;
+        v->data = int2_str.data;
     }
 
-    v->len = ngx_sprintf(p, "%i", max) - p;
-    v->data = p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
 
     return NGX_OK;
 }
@@ -2683,8 +2682,8 @@ ngx_http_var_do_min(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  int1_str, int2_str;
-    ngx_int_t                  int1, int2, min;
+    ngx_str_t                  int1_str, int2_str, val1, val2;
+    ngx_int_t                  int_val1, int_val2, max;
     ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
 
     args = var->args->elts;
@@ -2703,49 +2702,48 @@ ngx_http_var_do_min(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    val1 = int1_str;
+    val2 = int2_str;
+
     /* Convert arguments to integers */
-    if (int1_str.len > 0 && int1_str.data[0] == '-') {
-        int1 = ngx_atoi(int1_str.data + 1, int1_str.len - 1);
+    if (val1.len > 0 && val1.data[0] == '-') {
         is_negative1 = 1;
-    } else {
-        int1 = ngx_atoi(int1_str.data, int1_str.len);
+        val1.data++;
+        val1.len--;
     }
 
-    if (int2_str.len > 0 && int2_str.data[0] == '-') {
-        int2 = ngx_atoi(int2_str.data + 1, int2_str.len - 1);
+    if (val2.len > 0 && val2.data[0] == '-') {
         is_negative2 = 1;
-    } else {
-        int2 = ngx_atoi(int2_str.data, int2_str.len);
+        val2.data++;
+        val2.len--;
     }
 
-    if (int1 == NGX_ERROR || int2 == NGX_ERROR) {
+    if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid number for min operator");
+                      "http_var: \"min\" failed to convert values to fixed point");
         return NGX_ERROR;
     }
 
     if (is_negative1 == 1) {
-        int1 = -int1;
+        int_val1 = -int_val1;
     }
 
     if (is_negative2 == 1) {
-        int2 = -int2;
+        int_val2 = -int_val2;
     }
 
     /* Compute min */
-    min = (int1 < int2) ? int1 : int2;
-
-    /* Convert result to string */
-    u_char *p;
-    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
-    if (p == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed");
-        return NGX_ERROR;
+    if (int_val1 < int_val2) {
+        v->len = int1_str.len;
+        v->data = int1_str.data;
+    } else {
+        v->len = int2_str.len;
+        v->data = int2_str.data;
     }
 
-    v->len = ngx_sprintf(p, "%i", min) - p;
-    v->data = p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
 
     return NGX_OK;
 }
