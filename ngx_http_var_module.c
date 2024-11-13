@@ -2935,65 +2935,6 @@ ngx_http_var_do_if_ge(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_do_if_ge(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
-{
-    ngx_http_complex_value_t  *args;
-    ngx_str_t                  val1, val2;
-    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
-    ngx_int_t                  int_val1, int_val2;
-
-    args = var->args->elts;
-
-    if (ngx_http_complex_value(r, &args[0], &val1) != NGX_OK
-        || ngx_http_complex_value(r, &args[1], &val2) != NGX_OK) {
-        return NGX_ERROR;
-    }
-
-    if (val1.len > 0 && val1.data[0] == '-') {
-        is_negative1 = 1;
-        val1.data++;
-        val1.len--;
-    }
-
-    if (val2.len > 0 && val2.data[0] == '-') {
-        is_negative2 = 1;
-        val2.data++;
-        val2.len--;
-    }
-
-    if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: \"if_gt\" failed to convert "
-                      "values to fixed point");
-        return NGX_ERROR;
-    }
-
-    if (is_negative1 == 1) {
-        int_val1 = -int_val1;
-    }
-
-    if (is_negative2 == 1) {
-        int_val2 = -int_val2;
-    }
-
-    if (int_val1 >= int_val2) {
-        v->len = 1;
-        v->data = (u_char *) "1";
-    } else {
-        v->len = 1;
-        v->data = (u_char *) "0";
-    }
-
-    v->valid = 1;
-    v->no_cacheable = 0;
-    v->not_found = 0;
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
 ngx_http_var_do_abs(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
