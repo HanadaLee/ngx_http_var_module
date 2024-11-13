@@ -48,6 +48,8 @@ typedef enum {
     NGX_HTTP_VAR_OP_RE_GSUB,
 #endif
 
+    NGX_HTTP_VAR_OP_IF_EQ,
+    NGX_HTTP_VAR_OP_IF_NE,
     NGX_HTTP_VAR_OP_IF_LT,
 
     NGX_HTTP_VAR_OP_ABS,
@@ -167,6 +169,8 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("re_gsub_i"),       NGX_HTTP_VAR_OP_RE_GSUB,        1, 3, 3 },
 #endif
 
+    { ngx_string("if_eq"),           NGX_HTTP_VAR_OP_IF_EQ,          0, 2, 2 },
+    { ngx_string("if_ne"),           NGX_HTTP_VAR_OP_IF_NE,          0, 2, 2 },
     { ngx_string("if_lt"),           NGX_HTTP_VAR_OP_IF_LT,          0, 2, 2 },
 
     { ngx_string("abs"),             NGX_HTTP_VAR_OP_ABS,            0, 1, 1 },
@@ -945,6 +949,14 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_do_re_gsub(r, v, var);
         break;
 #endif
+
+    case NGX_HTTP_VAR_OP_IF_EQ:
+        rc = ngx_http_var_do_if_eq(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_IF_NE:
+        rc = ngx_http_var_do_if_ne(r, v, var);
+        break;
 
     case NGX_HTTP_VAR_OP_IF_LT:
         rc = ngx_http_var_do_if_lt(r, v, var);
@@ -2478,6 +2490,182 @@ ngx_http_var_do_re_gsub(ngx_http_request_t *r,
     return NGX_OK;
 }
 #endif
+
+
+static ngx_int_t
+ngx_http_var_do_if_eq(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val1, val2;
+    ngx_str_t                  original_val1, original_val2;
+    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
+    ngx_int_t                  int_val1, int_val2;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &val1) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &val2) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    original_val1 = val1;
+    original_val2 = val2;
+
+    if (val1.len > 0 && val1.data[0] == '-') {
+        is_negative1 = 1;
+        val1.data++;
+        val1.len--;
+    }
+
+    if (val2.len > 0 && val2.data[0] == '-') {
+        is_negative2 = 1;
+        val2.data++;
+        val2.len--;
+    }
+
+    if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                "http_var: for non-numeric scenarios, "
+                "perform string comparison");
+
+        v->len = 1;
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+
+        if (original_val1.len != original_val2.len) {
+            v->data = (u_char *) "0";
+            return NGX_OK;
+        }
+
+        if (var->ignore_case == 1) {
+            if (ngx_strncasecmp(original_val1.data,
+                    original_val2.data, original_val1.len) == 0) {
+                v->data = (u_char *) "1";
+                return NGX_OK;
+            }
+
+        } else if (ngx_strncmp(original_val1.data,
+                            original_val2.data, original_val1.len) == 0) {
+            v->data = (u_char *) "1";
+            return NGX_OK;
+        }
+
+        v->data = (u_char *) "0";
+        return NGX_OK;
+    }
+
+    if (is_negative1 == 1) {
+        int_val1 = -int_val1;
+    }
+
+    if (is_negative2 == 1) {
+        int_val2 = -int_val2;
+    }
+
+    if (int_val1 == int_val2) {
+        v->len = 1;
+        v->data = (u_char *) "1";
+    } else {
+        v->len = 1;
+        v->data = (u_char *) "0";
+    }
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_do_if_ne(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val1, val2;
+    ngx_str_t                  original_val1, original_val2;
+    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
+    ngx_int_t                  int_val1, int_val2;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &val1) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &val2) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    original_val1 = val1;
+    original_val2 = val2;
+
+    if (val1.len > 0 && val1.data[0] == '-') {
+        is_negative1 = 1;
+        val1.data++;
+        val1.len--;
+    }
+
+    if (val2.len > 0 && val2.data[0] == '-') {
+        is_negative2 = 1;
+        val2.data++;
+        val2.len--;
+    }
+
+    if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                "http_var: for non-numeric scenarios, "
+                "perform string comparison");
+
+        v->len = 1;
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+
+        if (original_val1.len != original_val2.len) {
+            v->data = (u_char *) "1";
+            return NGX_OK;
+        }
+
+        if (var->ignore_case == 1) {
+            if (ngx_strncasecmp(original_val1.data,
+                    original_val2.data, original_val1.len) == 0) {
+                v->data = (u_char *) "0";
+                return NGX_OK;
+            }
+
+        } else if (ngx_strncmp(original_val1.data,
+                            original_val2.data, original_val1.len) == 0) {
+            v->data = (u_char *) "0";
+            return NGX_OK;
+        }
+
+        v->data = (u_char *) "1";
+        return NGX_OK;
+    }
+
+    if (is_negative1 == 1) {
+        int_val1 = -int_val1;
+    }
+
+    if (is_negative2 == 1) {
+        int_val2 = -int_val2;
+    }
+
+    if (int_val1 != int_val2) {
+        v->len = 1;
+        v->data = (u_char *) "1";
+    } else {
+        v->len = 1;
+        v->data = (u_char *) "0";
+    }
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
 
 
 static ngx_int_t
