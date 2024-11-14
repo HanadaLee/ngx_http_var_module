@@ -97,6 +97,8 @@ typedef enum {
     NGX_HTTP_VAR_OP_HMAC_SHA256,
 #endif
 
+    NGX_HTTP_VAR_OP_IF_TIME_RANGE,
+
     NGX_HTTP_VAR_OP_GMT_TIME,
     NGX_HTTP_VAR_OP_LOCAL_TIME,
     NGX_HTTP_VAR_OP_UNIX_TIME,
@@ -227,6 +229,8 @@ static ngx_http_var_operator_map_t ngx_http_var_operators[] = {
     { ngx_string("hmac_sha256"),     NGX_HTTP_VAR_OP_HMAC_SHA256,    0, 2, 2 },
 #endif
 
+    { ngx_string("if_time_range"),   NGX_HTTP_VAR_OP_IF_TIME_RANGE,  0, 1, 8 },
+
     { ngx_string("gmt_time"),        NGX_HTTP_VAR_OP_GMT_TIME,       0, 1, 2 },
     { ngx_string("local_time"),      NGX_HTTP_VAR_OP_LOCAL_TIME,     0, 1, 2 },
     { ngx_string("unix_time"),       NGX_HTTP_VAR_OP_UNIX_TIME,      0, 0, 3 },
@@ -253,6 +257,8 @@ static ngx_int_t ngx_http_var_variable_handler(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_check_str_is_num(ngx_str_t num_str);
 static ngx_int_t ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
     ngx_int_t *int_val1, ngx_int_t *int_val2);
+static ngx_int_t ngx_http_var_parse_int_range(ngx_str_t str,
+    ngx_int_t *start, ngx_int_t *end);
 
 static ngx_int_t ngx_http_var_do_and(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -404,6 +410,8 @@ static ngx_int_t ngx_http_var_do_hmac_sha256(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 #endif
 
+static ngx_int_t ngx_http_var_do_if_time_range(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_do_gmt_time(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_do_local_time(ngx_http_request_t *r,
@@ -1146,6 +1154,10 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         break;
 #endif
 
+    case NGX_HTTP_VAR_OP_IF_TIME_RANGE:
+        rc = ngx_http_var_do_if_time_range(r, v, var);
+        break;
+
     case NGX_HTTP_VAR_OP_GMT_TIME:
         rc = ngx_http_var_do_gmt_time(r, v, var);
         break;
@@ -1302,6 +1314,44 @@ ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
     if (*int_val1 == NGX_ERROR || *int_val2 == NGX_ERROR) {
         return NGX_ERROR;
     }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_parse_int_range(ngx_str_t str,
+    ngx_int_t *start, ngx_int_t *end)
+{
+    ngx_uint_t i = 0;
+    ngx_int_t temp_start = 0, temp_end = 0;
+    ngx_int_t is_range = 0;
+
+    while (i < str.len) {
+        if (str.data[i] == '-') {
+            is_range = 1;
+            i++;
+            break;
+        }
+        if (str.data[i] < '0' || str.data[i] > '9') {
+            return NGX_ERROR;
+        }
+        temp_start = temp_start * 10 + (str.data[i] - '0');
+        i++;
+    }
+
+    if (is_range) {
+        while (i < str.len) {
+            if (str.data[i] < '0' || str.data[i] > '9') {
+                return NGX_ERROR;
+            }
+            temp_end = temp_end * 10 + (str.data[i] - '0');
+            i++;
+        }
+    }
+
+    *start = temp_start;
+    *end = is_range ? temp_end : temp_start;
 
     return NGX_OK;
 }
@@ -5088,105 +5138,224 @@ ngx_http_var_do_hmac_sha256(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_do_gmt_time(ngx_http_request_t *r,
+ngx_http_var_do_if_time_range(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  ts_str, date_format;
-    time_t                     ts;
-    u_char                    *p;
-    struct tm                  tm;
+    ngx_str_t                  param_str;
+    ngx_int_t                  year_start = -1, year_end = -1;
+    ngx_int_t                  month_start = -1, month_end = -1;
+    ngx_int_t                  day_start = -1, day_end = -1;
+    ngx_int_t                  wday_start = -1, wday_end = -1;
+    ngx_int_t                  hour_start = -1, hour_end = -1;
+    ngx_int_t                  min_start = -1, min_end = -1;
+    ngx_int_t                  sec_start = -1, sec_end = -1;
+    ngx_int_t                  tz_offset = 0;
+    ngx_uint_t                 i, j;
+    time_t                     raw_time;
+    struct tm                  *time_info;
+    struct tm                  tm_copy;
 
     args = var->args->elts;
 
-    if (var->args->nelts == 2) {
-        /* Two arguments: unix_time and date format */
-        if (ngx_http_complex_value(r, &args[0], &ts_str) != NGX_OK) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: failed to compute argument for "
-                          "gmt_time unix_time");
+    /* parse time range */
+    for (i = 0; i < var->args->nelts; i++) {
+        if (ngx_http_complex_value(r, &args[i], &param_str) != NGX_OK) {
             return NGX_ERROR;
         }
 
-        ts = ngx_atoi(ts_str.data, ts_str.len);
-        if (ts == NGX_ERROR) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: invalid unix_time value for gmt_time");
-            return NGX_ERROR;
-        }
+        if (ngx_strncmp(param_str.data, "year=", 5) == 0) {
+            if (ngx_http_var_parse_int_range(
+                    (ngx_str_t){param_str.len - 5, param_str.data + 5},
+                    &year_start, &year_end) != NGX_OK) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "http_var: invalid year range value");
+                return NGX_ERROR;
+            }
 
-        if (ngx_http_complex_value(r, &args[1], &date_format) != NGX_OK) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: failed to compute argument for "
-                          "gmt_time date_format");
-            return NGX_ERROR;
+            if (year_start < 1970 || year_end < year_start) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "http_var: invalid year range value");
+                return NGX_ERROR;
+            }
+
+        } else if (ngx_strncmp(param_str.data, "month=", 6) == 0) {
+            if (ngx_http_var_parse_int_range(
+                    (ngx_str_t){param_str.len - 6, param_str.data + 6},
+                    &month_start, &month_end) != NGX_OK) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "http_var: invalid month range value");
+                return NGX_ERROR;
+            }
+
+            if (month_start < 1 || month_start > 12
+                || month_end < month_start || month_end > 12) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "http_var: invalid month range value");
+                return NGX_ERROR;
+            }
+
+        } else if (ngx_strncmp(param_str.data, "day=", 4) == 0) {
+            if (ngx_http_var_parse_int_range(
+                    (ngx_str_t){param_str.len - 4, param_str.data + 4},
+                    &day_start, &day_end) != NGX_OK) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "http_var: invalid day range value");
+                return NGX_ERROR;
+            }
+
+            if (day_start < 1 || day_start > 31
+                || day_end < day_start || day_end > 31) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "http_var: invalid day range value");
+                return NGX_ERROR;
+            }
+
+        } else if (ngx_strncmp(param_str.data, "wday=", 5) == 0) {
+            if (ngx_http_var_parse_int_range(
+                    (ngx_str_t){param_str.len - 5, param_str.data + 5},
+                    &wday_start, &wday_end) != NGX_OK) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "http_var: invalid wday range value");
+                return NGX_ERROR;
+            }
+
+            if (wday_start < 1 || wday_start > 7
+                || wday_end < wday_start || wday_end > 7) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "http_var: invalid wday range value");
+                return NGX_ERROR;
+            }
+
+        } else if (ngx_strncmp(param_str.data, "hour=", 5) == 0) {
+            if (ngx_http_var_parse_int_range(
+                    (ngx_str_t){param_str.len - 5, param_str.data + 5},
+                    &hour_start, &hour_end) != NGX_OK) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "http_var: invalid hour range value");
+                return NGX_ERROR;
+            }
+
+            if (hour_start < 0 || hour_start > 23
+                || hour_end < hour_start || hour_end > 23) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "http_var: invalid hour range value");
+                return NGX_ERROR;
+            }
+
+        } else if (ngx_strncmp(param_str.data, "min=", 4) == 0) {
+            if (ngx_http_var_parse_int_range(
+                    (ngx_str_t){param_str.len - 4, param_str.data + 4},
+                    &min_start, &min_end) != NGX_OK) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "http_var: invalid minute range value");
+                return NGX_ERROR;
+            }
+
+            if (min_start < 0 || min_start > 59
+                || min_end < min_start || min_end > 59) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "http_var: invalid minute range value");
+                return NGX_ERROR;
+            }
+
+        } else if (ngx_strncmp(param_str.data, "sec=", 4) == 0) {
+            if (ngx_http_var_parse_int_range(
+                    (ngx_str_t){param_str.len - 4, param_str.data + 4},
+                    &sec_start, &sec_end) != NGX_OK) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "http_var: invalid second range value");
+                return NGX_ERROR;
+            }
+
+            if (sec_start < 0 || sec_start > 59
+                || sec_end < sec_start || sec_end > 59) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "http_var: invalid second range value");
+                return NGX_ERROR;
+            }
+
+        } else if (ngx_strncmp(param_str.data, "timezone=", 9) == 0) {
+            if (var->args->nelts == 1) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "http_var: at least one time range "
+                    "args must be present");
+                return NGX_ERROR;
+            }
+
+            if (ngx_strncmp(param_str.data + 9, "gmt", 3) == 0) {
+                if (param_str.len == 12) {
+                    tz_offset = 0;
+                } else if (param_str.len == 17
+                    && (param_str.data[12] == '+' 
+                        || param_str.data[12] == '-')) {
+                    for (j = 13; j < 17; j++) {
+                        if (param_str.data[j] < '0'
+                            || param_str.data[j] > '9') {
+                            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                                "http_var: invalid timezone offset value");
+                            return NGX_ERROR;
+                        }
+                    }
+
+                    tz_offset = ((param_str.data[13] - '0') * 10
+                                  + (param_str.data[14] - '0')) * 3600;
+                    tz_offset += ((param_str.data[15] - '0') * 10
+                                   + (param_str.data[16] - '0')) * 60;
+
+                    if (param_str.data[12] == '-') {
+                        tz_offset = -tz_offset;
+                    }
+                } else {
+                    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                        "http_var: invalid timezone offset value");
+                    return NGX_ERROR;
+                }
+            } else {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "http_var: invalid timezone format");
+                return NGX_ERROR;
+            }
         }
+    }
+
+    /* get current time */
+    if (tz_offset >= 0) {
+        raw_time = ngx_time() + (time_t)tz_offset;
     } else {
-        /* One argument: date format, use current time */
-        if (ngx_http_complex_value(r, &args[0], &date_format) != NGX_OK) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: failed to compute argument "
-                          "for gmt_time date_format");
-            return NGX_ERROR;
-        }
-
-        ts = ngx_time();
+        raw_time = ngx_time() - (time_t)(-tz_offset);
     }
+    time_info = gmtime(&raw_time);
+    tm_copy = *time_info; /* copy the current time structure */
 
-    if (ngx_strcmp(date_format.data, "http_time") == 0) {
-        p = ngx_pnalloc(r->pool, sizeof("Mon, 28 Sep 1970 06:00:00 GMT") - 1);
-        if (p == NULL) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: memory allocation failed for gmt_time");
-            return NGX_ERROR;
-        }
-
-        v->len = ngx_http_time(p, ts)- p;
-        v->data = p;
+    /* check whether each time parameter meets the requirements */
+    if ((year_start != -1
+            && (tm_copy.tm_year + 1900 < year_start
+                || tm_copy.tm_year + 1900 > year_end))
+        || (month_start != -1
+            && (tm_copy.tm_mon + 1 < month_start
+                || tm_copy.tm_mon + 1 > month_end))
+        || (day_start != -1
+            && (tm_copy.tm_mday < day_start || tm_copy.tm_mday > day_end))
+        || (wday_start != -1
+            && ((tm_copy.tm_wday == 0 ? 7 : tm_copy.tm_wday) < wday_start
+                || (tm_copy.tm_wday == 0 ? 7 : tm_copy.tm_wday) > wday_end))
+        || (hour_start != -1
+            && (tm_copy.tm_hour < hour_start || tm_copy.tm_hour > hour_end))
+        || (min_start != -1
+            && (tm_copy.tm_min < min_start || tm_copy.tm_min > min_end))
+        || (sec_start != -1
+            && (tm_copy.tm_sec < sec_start || tm_copy.tm_sec > sec_end))) {
+        v->len = 1;
+        v->data = (u_char *) "0";
         v->valid = 1;
         v->no_cacheable = 0;
         v->not_found = 0;
-
         return NGX_OK;
     }
-  
-    if (ngx_strcmp(date_format.data, "cookie_time") == 0) {
-        p = ngx_pnalloc(r->pool, sizeof("Thu, 18-Nov-10 11:27:35 GMT") - 1);
-        if (p == NULL) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: memory allocation failed for gmt_time");
-            return NGX_ERROR;
-        }
 
-        v->len = ngx_http_cookie_time(p, ts) - p;
-        v->data = p;
-        v->valid = 1;
-        v->no_cacheable = 0;
-        v->not_found = 0;
-
-        return NGX_OK;
-    }
-  
-    ngx_libc_gmtime(ts, &tm);
-
-    /* Allocate extra space for formatting */
-    p = ngx_palloc(r->pool, 256);
-    if (p == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for gmt_time");
-        return NGX_ERROR;
-    }
-
-    v->len = strftime((char *) p, 256,
-                      (char *) date_format.data, &tm);
-
-    if (v->len == 0) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: strftime failed for gmt_time");
-        return NGX_ERROR;
-    }
-
-    v->data = p;
+    v->len = 1;
+    v->data = (u_char *) "1";
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
@@ -5345,6 +5514,15 @@ ngx_http_var_do_unix_time(ngx_http_request_t *r,
                 tz_offset = 0;
             } else if ((tz_str.len == 8)
                        && (tz_str.data[3] == '+' || tz_str.data[3] == '-')) {
+                for (j = 4; j < 8; j++) {
+                    if (param_str.data[j] < '0'
+                        || param_str.data[j] > '9') {
+                        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                            "http_var: invalid timezone offset value");
+                        return NGX_ERROR;
+                    }
+                }
+
                 /* Parse timezone offset, e.g., +0800 or -0200 */
                 tz_offset = ((tz_str.data[4] - '0') * 10
                               + (tz_str.data[5] - '0')) * 3600;
