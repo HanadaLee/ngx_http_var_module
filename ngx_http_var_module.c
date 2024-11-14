@@ -368,6 +368,9 @@ static ngx_int_t ngx_http_var_do_escape_args(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_do_escape_uri_component(
     ngx_http_request_t *r, ngx_http_variable_value_t *v,
     ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_do_escape_html(
+    ngx_http_request_t *r, ngx_http_variable_value_t *v,
+    ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_do_unescape_uri(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_do_base64_encode(ngx_http_request_t *r,
@@ -1083,10 +1086,6 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
 
     case NGX_HTTP_VAR_OP_ESCAPE_URI_COMPONENT:
         rc = ngx_http_var_do_escape_uri_component(r, v, var);
-        break;
-
-    case NGX_HTTP_VAR_OP_ESCAPE_HTML:
-        rc = ngx_http_var_do_escape_html(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_UNESCAPE_URI:
