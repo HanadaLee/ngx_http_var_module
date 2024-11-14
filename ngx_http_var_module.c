@@ -5556,6 +5556,7 @@ ngx_http_var_do_unix_time(ngx_http_request_t *r,
     int                        tz_offset = 0;
     u_char                    *p;
     ngx_time_t                *tp;
+    ngx_uint_t                 i;
 
     args = var->args->elts;
 
@@ -5621,9 +5622,9 @@ ngx_http_var_do_unix_time(ngx_http_request_t *r,
                 tz_offset = 0;
             } else if ((tz_str.len == 8)
                        && (tz_str.data[3] == '+' || tz_str.data[3] == '-')) {
-                for (j = 4; j < 8; j++) {
-                    if (param_str.data[j] < '0'
-                        || param_str.data[j] > '9') {
+                for (i = 4; i < 8; i++) {
+                    if (tz_str.data[i] < '0'
+                        || tz_str.data[i] > '9') {
                         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                             "http_var: invalid timezone offset value");
                         return NGX_ERROR;
