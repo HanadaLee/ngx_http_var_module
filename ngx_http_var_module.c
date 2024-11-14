@@ -1541,6 +1541,9 @@ ngx_http_var_do_if_str_eq(ngx_http_request_t *r,
         v->data = (u_char *) "1";
         return NGX_OK;
     }
+
+    v->data = (u_char *) "0";
+    return NGX_OK;
 }
 
 
