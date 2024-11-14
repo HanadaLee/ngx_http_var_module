@@ -2585,7 +2585,6 @@ ngx_http_var_do_if_eq(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  val1, val2;
-    ngx_str_t                  original_val1, original_val2;
     ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
     ngx_int_t                  int_val1, int_val2;
 
@@ -2595,9 +2594,6 @@ ngx_http_var_do_if_eq(ngx_http_request_t *r,
         || ngx_http_complex_value(r, &args[1], &val2) != NGX_OK) {
         return NGX_ERROR;
     }
-
-    original_val1 = val1;
-    original_val2 = val2;
 
     if (val1.len > 0 && val1.data[0] == '-') {
         is_negative1 = 1;
@@ -2648,7 +2644,6 @@ ngx_http_var_do_if_ne(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  val1, val2;
-    ngx_str_t                  original_val1, original_val2;
     ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
     ngx_int_t                  int_val1, int_val2;
 
@@ -2658,9 +2653,6 @@ ngx_http_var_do_if_ne(ngx_http_request_t *r,
         || ngx_http_complex_value(r, &args[1], &val2) != NGX_OK) {
         return NGX_ERROR;
     }
-
-    original_val1 = val1;
-    original_val2 = val2;
 
     if (val1.len > 0 && val1.data[0] == '-') {
         is_negative1 = 1;
