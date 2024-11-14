@@ -5153,7 +5153,6 @@ ngx_http_var_do_if_time_range(ngx_http_request_t *r,
     ngx_int_t                  tz_offset = 0;
     ngx_uint_t                 i, j;
     time_t                     raw_time;
-    struct tm                  *time_info;
     struct tm                  tm_copy;
 
     args = var->args->elts;
@@ -5325,8 +5324,8 @@ ngx_http_var_do_if_time_range(ngx_http_request_t *r,
     } else {
         raw_time = ngx_time() - (time_t)(-tz_offset);
     }
-    time_info = gmtime(&raw_time);
-    tm_copy = *time_info; /* copy the current time structure */
+
+    ngx_libc_gmtime(raw_time, &tm_copy);
 
     /* check whether each time parameter meets the requirements */
     if ((year_start != -1
