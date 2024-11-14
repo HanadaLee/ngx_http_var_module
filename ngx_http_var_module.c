@@ -22,7 +22,8 @@ typedef enum {
 
     NGX_HTTP_VAR_OP_IF_EMPTY,
     NGX_HTTP_VAR_OP_IF_NOT_EMPTY,
-    NGX_HTTP_VAR_OP_IF_IS_NUMBER,
+    NGX_HTTP_VAR_OP_IF_STR_EQ,
+    NGX_HTTP_VAR_OP_IF_IS_NUM,
     NGX_HTTP_VAR_OP_IF_HAS_PREFIX,
     NGX_HTTP_VAR_OP_IF_HAS_SUFFIX,
     NGX_HTTP_VAR_OP_IF_FIND,
@@ -76,6 +77,7 @@ typedef enum {
     NGX_HTTP_VAR_OP_ESCAPE_URI,
     NGX_HTTP_VAR_OP_ESCAPE_ARGS,
     NGX_HTTP_VAR_OP_ESCAPE_URI_COMPONENT,
+    NGX_HTTP_VAR_OP_ESCAPE_HTML,
     NGX_HTTP_VAR_OP_UNESCAPE_URI,
     NGX_HTTP_VAR_OP_BASE64_ENCODE,
     NGX_HTTP_VAR_OP_BASE64URL_ENCODE,
@@ -128,17 +130,19 @@ typedef struct {
     ngx_uint_t                     ignore_case; /* ignore case for regex */
     ngx_uint_t                     min_args;    /* min number of arguments */
     ngx_uint_t                     max_args;    /* max number of arguments */
-} ngx_http_var_operator_mapping_t;
+} ngx_http_var_operator_map_t;
 
 
-static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
+static ngx_http_var_operator_map_t ngx_http_var_operators[] = {
     { ngx_string("and"),             NGX_HTTP_VAR_OP_AND,            0, 2, 9 },
     { ngx_string("or"),              NGX_HTTP_VAR_OP_OR,             0, 2, 9 },
     { ngx_string("not"),             NGX_HTTP_VAR_OP_NOT,            0, 1, 1 },
 
     { ngx_string("if_empty"),        NGX_HTTP_VAR_OP_IF_EMPTY,       0, 1, 1 },
     { ngx_string("if_not_empty"),    NGX_HTTP_VAR_OP_IF_NOT_EMPTY,   0, 1, 1 },
-    { ngx_string("if_is_number"),    NGX_HTTP_VAR_OP_IF_IS_NUMBER,   0, 1, 1 },
+    { ngx_string("if_str_eq"),       NGX_HTTP_VAR_OP_IF_STR_EQ,      0, 1, 1 },
+    { ngx_string("if_str_eq_i"),     NGX_HTTP_VAR_OP_IF_STR_EQ,      1, 1, 1 },
+    { ngx_string("if_is_num"),       NGX_HTTP_VAR_OP_IF_IS_NUM,      0, 1, 1 },
     { ngx_string("if_has_prefix"),   NGX_HTTP_VAR_OP_IF_HAS_PREFIX,  0, 2, 2 },
     { ngx_string("if_has_prefix_i"), NGX_HTTP_VAR_OP_IF_HAS_PREFIX,  1, 2, 2 },
     { ngx_string("if_has_suffix"),   NGX_HTTP_VAR_OP_IF_HAS_SUFFIX,  0, 2, 2 },
@@ -201,6 +205,7 @@ static ngx_http_var_operator_mapping_t ngx_http_var_operators[] = {
     { ngx_string("escape_args"),     NGX_HTTP_VAR_OP_ESCAPE_ARGS,    0, 1, 1 },
     { ngx_string("escape_uri_component"),
                                NGX_HTTP_VAR_OP_ESCAPE_URI_COMPONENT, 0, 1, 1 },
+    { ngx_string("escape_html"),     NGX_HTTP_VAR_OP_ESCAPE_HTML,    0, 1, 1 },
     { ngx_string("unescape_uri"),    NGX_HTTP_VAR_OP_UNESCAPE_URI,   0, 1, 1 },
     { ngx_string("base64_encode"),   NGX_HTTP_VAR_OP_BASE64_ENCODE,  0, 1, 1 },
     { ngx_string("base64url_encode"),
@@ -245,7 +250,7 @@ static ngx_int_t ngx_http_var_evaluate_variable(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_variable_handler(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 
-static ngx_int_t ngx_http_var_check_str_is_number(ngx_str_t num_str);
+static ngx_int_t ngx_http_var_check_str_is_num(ngx_str_t num_str);
 static ngx_int_t ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
     ngx_int_t *int_val1, ngx_int_t *int_val2);
 
@@ -260,7 +265,9 @@ static ngx_int_t ngx_http_var_do_if_empty(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_do_if_not_empty(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_do_if_is_number(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_do_if_str_eq(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_do_if_is_num(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_do_if_has_prefix(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -534,7 +541,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     /* Map operator string to enum and get argument counts */
     operators_count = sizeof(ngx_http_var_operators) / 
-                  sizeof(ngx_http_var_operator_mapping_t);
+                  sizeof(ngx_http_var_operator_map_t);
     for (i = 0; i < operators_count; i++) {
         if (operator_str.len == ngx_http_var_operators[i].name.len
             && ngx_strncmp(operator_str.data,
@@ -884,8 +891,12 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_do_if_not_empty(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_IS_NUMBER:
-        rc = ngx_http_var_do_if_is_number(r, v, var);
+    case NGX_HTTP_VAR_OP_IF_IS_NUM:
+        rc = ngx_http_var_do_if_is_num(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_IF_STR_EQ:
+        rc = ngx_http_var_do_if_str_eq(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_IF_HAS_PREFIX:
@@ -1045,7 +1056,7 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
     case NGX_HTTP_VAR_OP_HEX_ENCODE:
         rc = ngx_http_var_do_hex_encode(r, v, var);
         break;
-    
+
     case NGX_HTTP_VAR_OP_DEC_TO_HEX:
         rc = ngx_http_var_do_dec_to_hex(r, v, var);
         break;
@@ -1061,15 +1072,19 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
     case NGX_HTTP_VAR_OP_ESCAPE_URI:
         rc = ngx_http_var_do_escape_uri(r, v, var);
         break;
-    
+
     case NGX_HTTP_VAR_OP_ESCAPE_ARGS:
         rc = ngx_http_var_do_escape_args(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_ESCAPE_HTML:
+        rc = ngx_http_var_do_escape_html(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_ESCAPE_URI_COMPONENT:
         rc = ngx_http_var_do_escape_uri_component(r, v, var);
         break;
-    
+
     case NGX_HTTP_VAR_OP_UNESCAPE_URI:
         rc = ngx_http_var_do_unescape_uri(r, v, var);
         break;
@@ -1219,7 +1234,7 @@ found:
 
 
 static ngx_int_t
-ngx_http_var_check_str_is_number(ngx_str_t num_str)
+ngx_http_var_check_str_is_num(ngx_str_t num_str)
 {
     ngx_str_t  num_abs_str = num_str;
     ngx_int_t  num;
@@ -1457,7 +1472,7 @@ ngx_http_var_do_if_not_empty(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_do_if_is_number(ngx_http_request_t *r,
+ngx_http_var_do_if_is_num(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -1467,7 +1482,7 @@ ngx_http_var_do_if_is_number(ngx_http_request_t *r,
 
     if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: \"if_is_number\" failed to "
+                      "http_var: \"if_is_num\" failed to "
                       "evaluate argument");
         return NGX_ERROR;
     }
@@ -1477,13 +1492,52 @@ ngx_http_var_do_if_is_number(ngx_http_request_t *r,
     v->no_cacheable = 0;
     v->not_found = 0;
 
-    if (ngx_http_var_check_str_is_number(val) != NGX_OK) {
+    if (ngx_http_var_check_str_is_num(val) != NGX_OK) {
         v->data = (u_char *) "0";
     } else {
         v->data = (u_char *) "1";
     }
 
     return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_do_if_str_eq(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val1, val2;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &val1) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &val2) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    v->len = 1;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    if (val1.len != val2.len) {
+        v->data = (u_char *) "0";
+        return NGX_OK;
+    }
+
+    if (var->ignore_case == 1) {
+        if (ngx_strncasecmp(val1.data,
+                val2.data, val1.len) == 0) {
+            v->data = (u_char *) "1";
+            return NGX_OK;
+        }
+
+    } else if (ngx_strncmp(val1.data,
+                        val2.data, val1.len) == 0) {
+        v->data = (u_char *) "1";
+        return NGX_OK;
+    }
 }
 
 
@@ -2555,35 +2609,10 @@ ngx_http_var_do_if_eq(ngx_http_request_t *r,
     }
 
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                "http_var: for non-numeric scenarios, "
-                "perform string comparison");
-
-        v->len = 1;
-        v->valid = 1;
-        v->no_cacheable = 0;
-        v->not_found = 0;
-
-        if (original_val1.len != original_val2.len) {
-            v->data = (u_char *) "0";
-            return NGX_OK;
-        }
-
-        if (var->ignore_case == 1) {
-            if (ngx_strncasecmp(original_val1.data,
-                    original_val2.data, original_val1.len) == 0) {
-                v->data = (u_char *) "1";
-                return NGX_OK;
-            }
-
-        } else if (ngx_strncmp(original_val1.data,
-                            original_val2.data, original_val1.len) == 0) {
-            v->data = (u_char *) "1";
-            return NGX_OK;
-        }
-
-        v->data = (u_char *) "0";
-        return NGX_OK;
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: \"if_eq\" failed to convert "
+                      "values to fixed point");
+        return NGX_ERROR;
     }
 
     if (is_negative1 == 1) {
@@ -2643,35 +2672,10 @@ ngx_http_var_do_if_ne(ngx_http_request_t *r,
     }
 
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                "http_var: for non-numeric scenarios, "
-                "perform string comparison");
-
-        v->len = 1;
-        v->valid = 1;
-        v->no_cacheable = 0;
-        v->not_found = 0;
-
-        if (original_val1.len != original_val2.len) {
-            v->data = (u_char *) "1";
-            return NGX_OK;
-        }
-
-        if (var->ignore_case == 1) {
-            if (ngx_strncasecmp(original_val1.data,
-                    original_val2.data, original_val1.len) == 0) {
-                v->data = (u_char *) "0";
-                return NGX_OK;
-            }
-
-        } else if (ngx_strncmp(original_val1.data,
-                            original_val2.data, original_val1.len) == 0) {
-            v->data = (u_char *) "0";
-            return NGX_OK;
-        }
-
-        v->data = (u_char *) "1";
-        return NGX_OK;
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: \"if_ne\" failed to convert "
+                      "values to fixed point");
+        return NGX_ERROR;
     }
 
     if (is_negative1 == 1) {
@@ -2951,7 +2955,7 @@ ngx_http_var_do_abs(ngx_http_request_t *r,
     }
 
     /* Check if is number */
-    if (ngx_http_var_check_str_is_number(num_str) != NGX_OK) {
+    if (ngx_http_var_check_str_is_num(num_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: invalid number for abs operator");
         return NGX_ERROR;
@@ -4296,6 +4300,73 @@ ngx_http_var_do_escape_uri_component(ngx_http_request_t *r,
         ngx_memcpy(dst, src, src_str.len);
     } else {
         ngx_escape_uri(dst, src, src_str.len, NGX_ESCAPE_URI_COMPONENT);
+    }
+
+    /* Set the escaped string */
+    escaped_str.data = dst;
+    escaped_str.len = len;
+
+    /* Set the variable value */
+    v->len = escaped_str.len;
+    v->data = escaped_str.data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_do_escape_html(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, escaped_str;
+    size_t                     len;
+    uintptr_t                  escape;
+    u_char                    *src, *dst;
+
+    args = var->args->elts;
+
+    /* Compute the source string */
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument "
+                      "for escape_uri_component operator");
+        return NGX_ERROR;
+    }
+
+    /* Handle empty source string */
+    if (src_str.len == 0) {
+        v->len = 0;
+        v->data = (u_char *)"";
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+        return NGX_OK;
+    }
+
+    src = src_str.data;
+
+    /* Calculate the escaped length */
+    escape = 2 * ngx_escape_uri(NULL, src, src_str.len,
+                                NGX_ESCAPE_HTML);
+    len = src_str.len + escape;
+
+    dst = ngx_pnalloc(r->pool, len);
+    if (dst == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for "
+                      "escape_html");
+        return NGX_ERROR;
+    }
+
+    /* Perform the escaping */
+    if (escape == 0) {
+        ngx_memcpy(dst, src, src_str.len);
+    } else {
+        ngx_escape_uri(dst, src, src_str.len, NGX_ESCAPE_HTML);
     }
 
     /* Set the escaped string */
