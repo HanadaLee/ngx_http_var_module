@@ -849,7 +849,7 @@ ngx_http_var_get_lock_ctx(ngx_http_request_t *r)
             return NULL;
         }
 
-        ngx_http_set_ctx(r, ctx, ngx_http_var_lock_module);
+        ngx_http_set_ctx(r, ctx, ngx_http_var_module);
     }
 
     return ctx;
@@ -859,11 +859,10 @@ ngx_http_var_get_lock_ctx(ngx_http_request_t *r)
 static ngx_int_t
 ngx_http_variable_acquire_lock(ngx_http_request_t *r, ngx_str_t *var_name)
 {
-    ngx_http_var_ctx_t  *ctx;
+    ngx_http_var_ctx_t       *ctx;
     ngx_uint_t                var_index;
     ngx_uint_t                new_count;
     ngx_uint_t               *new_locked_vars;
-    ngx_http_var_ctx_t  *ctx;
 
     // Get or create the context
     ctx = ngx_http_var_get_lock_ctx(r);
@@ -894,7 +893,7 @@ ngx_http_variable_acquire_lock(ngx_http_request_t *r, ngx_str_t *var_name)
     if (ctx->locked_vars[var_index]) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: circular reference detected "
-                      "for variable: %V", var_name);
+                      "for variable: \"$%V\"", var_name);
         return NGX_ERROR;
     }
 
@@ -908,11 +907,11 @@ ngx_http_variable_acquire_lock(ngx_http_request_t *r, ngx_str_t *var_name)
 static void
 ngx_http_variable_release_lock(ngx_http_request_t *r, ngx_str_t *var_name)
 {
-    ngx_http_var_ctx_t  *ctx;
+    ngx_http_var_ctx_t       *ctx;
     ngx_uint_t                var_index;
 
     // Get the current request context
-    ctx = ngx_http_get_module_ctx(r, ngx_http_var_lock_module);
+    ctx = ngx_http_get_module_ctx(r, ngx_http_var_module);
     if (ctx == NULL) {
         return;  // If the context does not exist, there are no locks to clear
     }
