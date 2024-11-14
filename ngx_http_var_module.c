@@ -5365,6 +5365,114 @@ ngx_http_var_do_if_time_range(ngx_http_request_t *r,
 
 
 static ngx_int_t
+ngx_http_var_do_gmt_time(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  ts_str, date_format;
+    time_t                     ts;
+    u_char                    *p;
+    struct tm                  tm;
+
+    args = var->args->elts;
+
+    if (var->args->nelts == 2) {
+        /* Two arguments: unix_time and date format */
+        if (ngx_http_complex_value(r, &args[0], &ts_str) != NGX_OK) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: failed to compute argument for "
+                          "gmt_time unix_time");
+            return NGX_ERROR;
+        }
+
+        ts = ngx_atoi(ts_str.data, ts_str.len);
+        if (ts == NGX_ERROR) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: invalid unix_time value for gmt_time");
+            return NGX_ERROR;
+        }
+
+        if (ngx_http_complex_value(r, &args[1], &date_format) != NGX_OK) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: failed to compute argument for "
+                          "gmt_time date_format");
+            return NGX_ERROR;
+        }
+    } else {
+        /* One argument: date format, use current time */
+        if (ngx_http_complex_value(r, &args[0], &date_format) != NGX_OK) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: failed to compute argument "
+                          "for gmt_time date_format");
+            return NGX_ERROR;
+        }
+
+        ts = ngx_time();
+    }
+
+    if (ngx_strcmp(date_format.data, "http_time") == 0) {
+        p = ngx_pnalloc(r->pool, sizeof("Mon, 28 Sep 1970 06:00:00 GMT") - 1);
+        if (p == NULL) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: memory allocation failed for gmt_time");
+            return NGX_ERROR;
+        }
+
+        v->len = ngx_http_time(p, ts)- p;
+        v->data = p;
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+
+        return NGX_OK;
+    }
+  
+    if (ngx_strcmp(date_format.data, "cookie_time") == 0) {
+        p = ngx_pnalloc(r->pool, sizeof("Thu, 18-Nov-10 11:27:35 GMT") - 1);
+        if (p == NULL) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: memory allocation failed for gmt_time");
+            return NGX_ERROR;
+        }
+
+        v->len = ngx_http_cookie_time(p, ts) - p;
+        v->data = p;
+        v->valid = 1;
+        v->no_cacheable = 0;
+        v->not_found = 0;
+
+        return NGX_OK;
+    }
+  
+    ngx_libc_gmtime(ts, &tm);
+
+    /* Allocate extra space for formatting */
+    p = ngx_palloc(r->pool, 256);
+    if (p == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for gmt_time");
+        return NGX_ERROR;
+    }
+
+    v->len = strftime((char *) p, 256,
+                      (char *) date_format.data, &tm);
+
+    if (v->len == 0) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: strftime failed for gmt_time");
+        return NGX_ERROR;
+    }
+
+    v->data = p;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_http_var_do_local_time(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
