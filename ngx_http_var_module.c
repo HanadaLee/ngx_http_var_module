@@ -22,8 +22,8 @@ typedef enum {
 
     NGX_HTTP_VAR_OP_IF_EMPTY,
     NGX_HTTP_VAR_OP_IF_NOT_EMPTY,
-    NGX_HTTP_VAR_OP_IF_STR_EQ,
     NGX_HTTP_VAR_OP_IF_IS_NUM,
+    NGX_HTTP_VAR_OP_IF_STR_EQ,
     NGX_HTTP_VAR_OP_IF_HAS_PREFIX,
     NGX_HTTP_VAR_OP_IF_HAS_SUFFIX,
     NGX_HTTP_VAR_OP_IF_FIND,
@@ -140,9 +140,9 @@ static ngx_http_var_operator_map_t ngx_http_var_operators[] = {
 
     { ngx_string("if_empty"),        NGX_HTTP_VAR_OP_IF_EMPTY,       0, 1, 1 },
     { ngx_string("if_not_empty"),    NGX_HTTP_VAR_OP_IF_NOT_EMPTY,   0, 1, 1 },
-    { ngx_string("if_str_eq"),       NGX_HTTP_VAR_OP_IF_STR_EQ,      0, 1, 1 },
-    { ngx_string("if_str_eq_i"),     NGX_HTTP_VAR_OP_IF_STR_EQ,      1, 1, 1 },
     { ngx_string("if_is_num"),       NGX_HTTP_VAR_OP_IF_IS_NUM,      0, 1, 1 },
+    { ngx_string("if_str_eq"),       NGX_HTTP_VAR_OP_IF_STR_EQ,      0, 2, 2 },
+    { ngx_string("if_str_eq_i"),     NGX_HTTP_VAR_OP_IF_STR_EQ,      1, 2, 2 },
     { ngx_string("if_has_prefix"),   NGX_HTTP_VAR_OP_IF_HAS_PREFIX,  0, 2, 2 },
     { ngx_string("if_has_prefix_i"), NGX_HTTP_VAR_OP_IF_HAS_PREFIX,  1, 2, 2 },
     { ngx_string("if_has_suffix"),   NGX_HTTP_VAR_OP_IF_HAS_SUFFIX,  0, 2, 2 },
@@ -265,9 +265,9 @@ static ngx_int_t ngx_http_var_do_if_empty(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_do_if_not_empty(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_do_if_str_eq(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_do_if_is_num(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_do_if_str_eq(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_do_if_has_prefix(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
