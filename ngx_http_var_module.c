@@ -129,7 +129,7 @@ typedef struct {
 typedef struct {
     ngx_uint_t                    *locked_vars;
     ngx_uint_t                     count;
-} ngx_http_var_lock_ctx_t;
+} ngx_http_var_ctx_t;
 
 
 typedef struct {
@@ -252,7 +252,7 @@ static char *ngx_http_var_merge_conf(ngx_conf_t *cf,
 static char *ngx_http_var_create_variable(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
 
-static ngx_http_var_lock_ctx_t *ngx_http_var_get_lock_ctx(
+static ngx_http_var_ctx_t *ngx_http_var_get_lock_ctx(
     ngx_http_request_t *r);
 static ngx_int_t ngx_http_variable_acquire_lock(ngx_http_request_t *r,
     ngx_str_t *var_name);
@@ -824,17 +824,17 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 }
 
 
-static ngx_http_var_lock_ctx_t *
+static ngx_http_var_ctx_t *
 ngx_http_var_get_lock_ctx(ngx_http_request_t *r)
 {
-    ngx_http_var_lock_ctx_t  *ctx;
+    ngx_http_var_ctx_t  *ctx;
 
     // Attempt to get the current request context
-    ctx = ngx_http_get_module_ctx(r, ngx_http_var_lock_module);
+    ctx = ngx_http_get_module_ctx(r, ngx_http_var_module);
 
     // If the context does not exist, create and attach it to the request
     if (ctx == NULL) {
-        ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_var_lock_ctx_t));
+        ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_var_ctx_t));
         if (ctx == NULL) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                           "http_var: failed to create lock context");
@@ -859,11 +859,11 @@ ngx_http_var_get_lock_ctx(ngx_http_request_t *r)
 static ngx_int_t
 ngx_http_variable_acquire_lock(ngx_http_request_t *r, ngx_str_t *var_name)
 {
-    ngx_http_var_lock_ctx_t  *ctx;
+    ngx_http_var_ctx_t  *ctx;
     ngx_uint_t                var_index;
     ngx_uint_t                new_count;
     ngx_uint_t               *new_locked_vars;
-    ngx_http_var_lock_ctx_t  *ctx;
+    ngx_http_var_ctx_t  *ctx;
 
     // Get or create the context
     ctx = ngx_http_var_get_lock_ctx(r);
@@ -908,7 +908,7 @@ ngx_http_variable_acquire_lock(ngx_http_request_t *r, ngx_str_t *var_name)
 static void
 ngx_http_variable_release_lock(ngx_http_request_t *r, ngx_str_t *var_name)
 {
-    ngx_http_var_lock_ctx_t  *ctx;
+    ngx_http_var_ctx_t  *ctx;
     ngx_uint_t                var_index;
 
     // Get the current request context
