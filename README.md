@@ -6,9 +6,10 @@
 
 # Table of Content
 
-- [Name](#name)
+- [ngx\_http\_var\_module](#ngx_http_var_module)
+  - [Name](#name)
+- [Table of Content](#table-of-content)
 - [Status](#status)
-- [Features](#features)
 - [Synopsis](#synopsis)
 - [Installation](#installation)
 - [Directives](#directives)
@@ -51,44 +52,76 @@ Define a variable whose value is the result of function calculation. The variabl
 
 The following functions are available:
 ```nginx
-# String Operations
-var $new_var copy src_str; # Copy the value of a complex variable
+# Conditional Judgement
+var $bool_var not str; # Returns 1 if the input parameter is empty or 0, otherwise returns 0
+var $bool_var and str1 str2...; # Returns 1 if all input parameters are non-empty and not 0, otherwise returns 0
+var $bool_var or str1 str2...; # Returns 1 if any input parameter is non-empty and not 0, otherwise returns 0
+
+# String Judgement
+var $bool_var if_empty str; # Checks if the string is empty, returns 1 or 0
+var $bool_var if_not_empty str; # Checks if the string is non-empty, returns 1 or 0
+var $bool_var if_is_num str; # Checks if the string is a number, returns 1 or 0
+var $bool_var if_str_eq str1 str2; # Checks if the strings are equal
+var $bool_var if_str_eq_i str1 str2; # Checks if the strings are equal (case-insensitive)
+var $bool_var if_has_prefix str prefix; # Checks if the string has the specified prefix, returns 1 or 0
+var $bool_var if_has_prefix_i str prefix; # Checks if the string has the specified prefix, returns 1 or 0 (case-insensitive)
+var $bool_var if_has_suffix str suffix; # Checks if the string has the specified suffix, returns 1 or 0
+var $bool_var if_has_suffix_i str suffix; # Checks if the string has the specified suffix, returns 1 or 0 (case-insensitive)
+var $bool_var if_find str sub_str; # Checks if the substring is present, returns 1 or 0
+var $bool_var if_find_i str sub_str; # Checks if the substring is present, returns 1 or 0 (case-insensitive)
+
+# General String Operations
+var $new_var copy src_str; # Copy the value of the variable
 var $new_var len src_str; # Length of the string
 var $new_var upper src_str; # Convert to uppercase
 var $new_var lower src_str; # Convert to lowercase
-var $new_var trim src_str; # Trim whitespace or blank characters from both ends
-var $new_var ltrim src_str; # Trim whitespace or blank characters from the left
-var $new_var rtrim src_str; # Trim whitespace or blank characters from the right
+var $new_var trim src_str; # Trim leading and trailing whitespace characters
+var $new_var ltrim src_str; # Trim leading whitespace characters
+var $new_var rtrim src_str; # Trim trailing whitespace characters
 var $new_var reverse src_str; # Reverse the string
-var $new_var find src_str sub_str; # Find the starting position of the substring
-var $new_var repeat src_str times; # Repeat the string
-var $new_var substr src_str start len; # Extract a substring
-var $new_var replace src_str src dst; # Replace a keyword
+var $new_var find src_str sub_str; # Get starting position of substring
+var $new_var repeat src_str times; # Repeat the string a given number of times
+var $new_var substr src_str start len; # Extract substring
+var $new_var replace src_str src dst; # Replace keyword
 
-# Regular Expression Operations
-var $new_var re_capture src_str capture_regex assign_value; # Regular expression capture
-var $new_var re_capture_i src_str capture_regex assign_value; # Regular expression capture (case-insensitive)
-var $new_var re_sub src_str capture_regex assign_value; # Regular expression substitution
-var $new_var re_sub_i src_str capture_regex assign_value; # Regular expression substitution (case-insensitive)
-var $new_var re_gsub src_str capture_regex assign_value; # Regular expression global substitution
-var $new_var re_gsub_i src_str capture_regex assign_value; # Regular expression global substitution (case-insensitive)
+# Regex Judgement
+var $bool_var if_re_match src_str match_regex; # Check if regex matches, returns 1 or 0
+var $bool_var if_re_match_i src_str match_regex; # Check if regex matches, returns 1 or 0 (case-insensitive)
 
-# Mathematical Calculations
-var $new_var abs int; # Absolute value of an integer
-var $new_var max int1 int2; # Maximum of two integers
-var $new_var min int1 int2; # Minimum of two integers
-var $new_var add int1 int2; # Addition of two integers
-var $new_var sub int1 int2; # Subtraction of two integers
-var $new_var mul int1 int2; # Multiplication of two integers
-var $new_var div int1 int2; # Integer division (quotient)
-var $new_var mod int1 int2; # Integer division (remainder)
+# Regex Operations
+var $new_var re_capture src_str capture_regex assign_value; # Capture regex
+var $new_var re_capture_i src_str capture_regex assign_value; # Capture regex (case-insensitive)
+var $new_var re_sub src_str capture_regex assign_value; # Substitute regex
+var $new_var re_sub_i src_str capture_regex assign_value; # Substitute regex (case-insensitive)
+var $new_var re_gsub src_str capture_regex assign_value; # Global regex substitution
+var $new_var re_gsub_i src_str capture_regex assign_value; # Global regex substitution (case-insensitive)
+
+# Mathematical Judgement (supports decimals, returns empty if parameters are invalid)
+var $bool_var if_eq num1/str1 num2/str2; # Check equality, numbers are compared by value, strings by exact match, returns 1 or 0
+var $bool_var if_eq_i num1/str1 num2/str2; # Check equality, numbers by value, strings case-insensitive exact match, returns 1 or 0
+var $bool_var if_ne num1/str1 num2/str2; # Check inequality, numbers are compared by value, strings by exact match, returns 1 or 0
+var $bool_var if_ne_i num1/str1 num2/str2; # Check inequality, numbers by value, strings case-insensitive exact match, returns 1 or 0
+var $bool_var if_lt num1 num2; # Check if less than, returns 1 or 0
+var $bool_var if_le num1 num2; # Check if less than or equal, returns 1 or 0
+var $bool_var if_gt num1 num2; # Check if greater than, returns 1 or 0
+var $bool_var if_ge num1 num2; # Check if greater than or equal, returns 1 or 0
+
+# Mathematical Operations (returns empty if parameters are invalid)
+var $new_var abs num; # Absolute value (returns original format without negative sign)
+var $new_var max num1 num2; # Maximum value (returns original format)
+var $new_var min num1 num2; # Minimum value (returns original format)
+var $new_var add int1 int2; # Integer addition
+var $new_var sub int1 int2; # Integer subtraction
+var $new_var mul int1 int2; # Integer multiplication
+var $new_var div int1 int2; # Integer division, int2 cannot be 0
+var $new_var mod int1 int2; # Integer modulus, int2 cannot be 0
 var $new_var round src_num int; # Round to n significant digits
-var $new_var floor src_num; # Floor operation, rounds down to the nearest integer
-var $new_var ceil src_num; # Ceiling operation, rounds up to the nearest integer
+var $new_var floor src_num; # Floor value, the largest integer less than or equal to the source
+var $new_var ceil src_num; # Ceiling value, the smallest integer greater than or equal to the source
 var $new_var rand; # Random large positive integer
-var $new_var rand_range start_int end_int; # Random positive integer within a specified range
+var $new_var rand_range start_int end_int; # Random positive integer in specified range
 
-# Encoding and Decoding Conversions
+# Encoding and Decoding
 var $new_var hex_encode src_str; # Convert binary to hexadecimal
 var $new_var hex_decode src_str; # Convert hexadecimal to binary
 var $new_var dec_to_hex dec; # Decimal to hexadecimal
@@ -98,11 +131,11 @@ var $new_var escape_args src_str; # Argument encoding
 var $new_var escape_uri_component src_str; # URI component encoding
 var $new_var unescape_uri src_str; # URI decoding
 var $new_var base64_encode src_str; # Base64 encoding
-var $new_var base64url_encode src_str; # Base64 URL encoding
+var $new_var base64url_encode src_str; # Base64url encoding
 var $new_var base64_decode src_str; # Base64 decoding
-var $new_var base64url_decode src_str; # Base64 URL decoding
+var $new_var base64url_decode src_str; # Base64url decoding
 
-# Password Hashing
+# Cryptographic Hash Calculations
 var $new_var crc32_short src_str; # CRC32 encoding
 var $new_var crc32_log src_str; # CRC32 encoding
 var $new_var md5sum src_str; # MD5 encoding
@@ -113,14 +146,17 @@ var $new_var sha512sum src_str; # SHA512 encoding
 var $new_var hmac_sha1 src_str secret; # HMAC_SHA1 encryption
 var $new_var hmac_sha256 src_str secret; # HMAC_SHA256 encryption
 
-# Time Formatting
-var $new_var gmt_time [src_ts] date_format; # Convert timestamp to specified GMT time format (if timestamp is omitted, use current time)
-var $new_var gmt_time [src_ts] http_time; # Convert timestamp to HTTP time (if timestamp is omitted, use current time)
-var $new_var gmt_time [src_ts] cookie_time; # Convert timestamp to cookie time (if timestamp is omitted, use current time)
-var $new_var local_time [src_ts] date_format; # Convert timestamp to specified local time format (if timestamp is omitted, use current time)
-var $new_var unixtime; # Return the current timestamp
+# Time Format
+var $new_var gmt_time [src_ts] date_format; # Convert timestamp to GMT time in specified format (current time if timestamp is omitted)
+var $new_var gmt_time [src_ts] http_time; # Convert timestamp to HTTP time (current time if timestamp is omitted)
+var $new_var gmt_time [src_ts] cookie_time; # Convert timestamp to cookie time (current time if timestamp is omitted)
+var $new_var local_time [src_ts] date_format; # Convert timestamp to local time in specified format (current time if timestamp is omitted)
+var $new_var unixtime; # Return current timestamp
 var $new_var unixtime src_http_time http_time; # Convert HTTP time to timestamp
-var $new_var unixtime src_time date_format timezone; # Convert specified date to timestamp (if omitted, returns current timestamp)
+var $new_var unixtime src_time date_format timezone; # Convert specified date to timestamp (return current timestamp if all are omitted)
+
+# Time Range Judgement: Determine if the current time meets the given time range, requires at least one parameter. Returns 1 if all conditions are met, otherwise returns 0. The day of the week is represented by 1-7, where Sunday is 7, and timezone format is gmt+0800
+var $bool_var time_range [year=year_range] [month=month_range] [day=day_range] [wday=wday_range(1-7)] [hour=hour_range] [min=min_range] [sec=sec_range] [timezone];
 ```
 
 Variables defined with the var directive can be overwritten by directives such as `set` and `auth_request_set`.
@@ -136,7 +172,6 @@ var $new_var copy have-header-b if=$http_b;
 
 # When both request header A and B are not present, the value of the variable is 'not-have-a-or-b'
 var $new_var copy not-have-a-or-b;
-add_header Test-Var $new_var;
 ```
 
 # Author
