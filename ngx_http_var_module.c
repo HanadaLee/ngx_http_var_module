@@ -1085,6 +1085,10 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_do_escape_uri_component(r, v, var);
         break;
 
+    case NGX_HTTP_VAR_OP_ESCAPE_HTML:
+        rc = ngx_http_var_do_escape_html(r, v, var);
+        break;
+
     case NGX_HTTP_VAR_OP_UNESCAPE_URI:
         rc = ngx_http_var_do_unescape_uri(r, v, var);
         break;
