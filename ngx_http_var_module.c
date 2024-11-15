@@ -104,6 +104,8 @@ typedef enum {
     NGX_HTTP_VAR_OP_LOCAL_TIME,
     NGX_HTTP_VAR_OP_UNIX_TIME,
 
+    NGX_HTTP_VAR_OP_IF_IP_RANGE,
+
     NGX_HTTP_VAR_OP_UNKNOWN
 } ngx_http_var_operator_e;
 
@@ -242,6 +244,8 @@ static ngx_http_var_operator_enum_t ngx_http_var_operators[] = {
     { ngx_string("gmt_time"),        NGX_HTTP_VAR_OP_GMT_TIME,       0, 1, 2 },
     { ngx_string("local_time"),      NGX_HTTP_VAR_OP_LOCAL_TIME,     0, 1, 2 },
     { ngx_string("unix_time"),       NGX_HTTP_VAR_OP_UNIX_TIME,      0, 0, 3 },
+
+    { ngx_string("if_ip_range"),     NGX_HTTP_VAR_OP_IF_IP_RANGE,    0, 2, 9 },
 
     { ngx_null_string,               NGX_HTTP_VAR_OP_UNKNOWN,        0, 0, 0 }
 };
@@ -436,6 +440,10 @@ static ngx_int_t ngx_http_var_do_local_time(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_do_unix_time(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+
+static ngx_int_t ngx_http_var_do_if_ip_range(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+
 
 static ngx_command_t ngx_http_var_commands[] = {
 
@@ -835,10 +843,10 @@ ngx_http_var_get_lock_ctx(ngx_http_request_t *r)
 {
     ngx_http_var_ctx_t  *ctx;
 
-    // Attempt to get the current request context
+    /* Attempt to get the current request context */
     ctx = ngx_http_get_module_ctx(r, ngx_http_var_module);
 
-    // If the context does not exist, create and attach it to the request
+    /* If the context does not exist, create and attach it to the request */
     if (ctx == NULL) {
         ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_var_ctx_t));
         if (ctx == NULL) {
@@ -847,8 +855,8 @@ ngx_http_var_get_lock_ctx(ngx_http_request_t *r)
             return NULL;
         }
 
-        // Initialize the variable lock array, assuming a maximum number of variables
-        ctx->count = 32;  // Set initial variable count to 16
+        /* Initialize the variable lock array, assuming a maximum number of variables */
+        ctx->count = 32;  /* Set initial variable count to 32 */
         ctx->locked_vars = ngx_pcalloc(r->pool,
             ctx->count * sizeof(ngx_uint_t));
         if (ctx->locked_vars == NULL) {
@@ -870,16 +878,16 @@ ngx_http_variable_acquire_lock(ngx_http_request_t *r, ngx_str_t *var_name)
     ngx_uint_t                new_count;
     ngx_uint_t               *new_locked_vars;
 
-    // Get or create the context
+    /* Get or create the context */
     ctx = ngx_http_var_get_lock_ctx(r);
     if (ctx == NULL) {
-        return NGX_ERROR; // Context creation failed
+        return NGX_ERROR; /* Context creation failed */
     }
 
-    // Calculate the variable index
+    /* Calculate the variable index */
     var_index = ngx_hash_key(var_name->data, var_name->len) % ctx->count;
 
-    // Dynamically expand the lock array
+    /* Dynamically expand the lock array */
     if (var_index >= ctx->count) {
         new_count = ctx->count * 2;
         new_locked_vars = ngx_pcalloc(r->pool,
@@ -895,7 +903,7 @@ ngx_http_variable_acquire_lock(ngx_http_request_t *r, ngx_str_t *var_name)
         ctx->count = new_count;
     }
 
-    // Check if it is already locked
+    /* Check if it is already locked */
     if (ctx->locked_vars[var_index]) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http_var: circular reference detected "
@@ -903,7 +911,7 @@ ngx_http_variable_acquire_lock(ngx_http_request_t *r, ngx_str_t *var_name)
         return NGX_ERROR;
     }
 
-    // Mark the variable as locked
+    /* Mark the variable as locked */
     ctx->locked_vars[var_index] = 1;
 
     return NGX_OK;
@@ -916,16 +924,16 @@ ngx_http_variable_release_lock(ngx_http_request_t *r, ngx_str_t *var_name)
     ngx_http_var_ctx_t       *ctx;
     ngx_uint_t                var_index;
 
-    // Get the current request context
+    /* Get the current request context */
     ctx = ngx_http_get_module_ctx(r, ngx_http_var_module);
     if (ctx == NULL) {
-        return;  // If the context does not exist, there are no locks to clear
+        return;
     }
 
-    // Calculate the variable index
+    /* Calculate the variable index */
     var_index = ngx_hash_key(var_name->data, var_name->len) % ctx->count;
 
-    // Clear the lock mark
+    /* Clear the lock mark */
     ctx->locked_vars[var_index] = 0;
 }
 
@@ -955,11 +963,11 @@ ngx_http_var_find_variable(ngx_http_request_t *r,
     for (i = 0; i < vconf->vars->nelts; i++) {
         if (vars[i].name.len == var_name->len
             && ngx_strncmp(vars[i].name.data,
-                   var_name->data, var_name->len) == 0)
-        {
+                   var_name->data, var_name->len) == 0) {
             if (vars[i].filter) {
                 ngx_str_t  val;
-                if (ngx_http_complex_value(r, vars[i].filter, &val) != NGX_OK) {
+                if (ngx_http_complex_value(r, vars[i].filter, &val)
+                        != NGX_OK) {
                     return NGX_ERROR;
                 }
 
@@ -1296,6 +1304,10 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
 
     case NGX_HTTP_VAR_OP_UNIX_TIME:
         rc = ngx_http_var_do_unix_time(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_IF_TIME_RANGE:
+        rc = ngx_http_var_do_if_time_range(r, v, var);
         break;
 
     default:
@@ -5636,12 +5648,13 @@ ngx_http_var_do_unix_time(ngx_http_request_t *r,
             } else {
                 ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                               "http_var: invalid timezone format for "
-                              "unix_time");
+                              "\"unix_time\" operator");
                 return NGX_ERROR;
             }
         } else {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: invalid timezone format for unix_time");
+                          "http_var: invalid timezone format for "
+                          "\"unix_time\" operator");
             return NGX_ERROR;
         }
     }
@@ -5652,7 +5665,7 @@ ngx_http_var_do_unix_time(ngx_http_request_t *r,
         (char *) date_format.data, &tm) == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                         "http_var: failed to parse date string for "
-                        "unix_time");
+                        "\"unix_time\" operator");
         return NGX_ERROR;
     }
 
@@ -5665,12 +5678,124 @@ set_unix_time:
     p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
     if (p == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for unix_time");
+                      "http_var: memory allocation failed for "
+                      "\"unix_time\" operator");
         return NGX_ERROR;
     }
 
     v->len = ngx_sprintf(p, "%T", unix_time) - p;
     v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_do_if_ip_range(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  ip_str, range_str;
+    ngx_uint_t                 i;
+    ngx_cidr_t                 cidr;
+    in_addr_t                  ipv4_addr;
+
+#if (NGX_HAVE_INET6)
+    struct in6_addr            ipv6_addr;
+    struct sockaddr_in6        addr_in6;
+#endif
+
+    args = var->args->elts;
+
+    /* Get the IP address to match */
+    if (ngx_http_complex_value(r, &args[0], &ip_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to compute argument "
+                      "for \"if_ip_range\" operator");
+        return NGX_ERROR;
+    }
+
+    /* Parse IPv4 address */
+    ipv4_addr = ngx_inet_addr(ip_str.data, ip_str.len);
+    if (ipv4_addr == INADDR_NONE) {
+
+#if (NGX_HAVE_INET6)
+        /* If it's not IPv4, try to parse as IPv6 */
+        if (ngx_inet6_addr(ip_str.data, ip_str.len, &ipv6_addr) == NGX_OK) {
+            /* IPv6 address */
+            addr_in6.sin6_family = AF_INET6;
+            ngx_memcpy(&addr_in6.sin6_addr, &ipv6_addr,
+                       sizeof(struct in6_addr));
+
+            /* Check if the IPv6 address is an IPv4-mapped address */
+            if (IN6_IS_ADDR_V4MAPPED(&ipv6_addr)) {
+                /* Extract the IPv4 address from the mapped IPv6 address */
+                u_char *p = ipv6_addr.s6_addr;
+                ipv4_addr = p[12] << 24;
+                ipv4_addr += p[13] << 16;
+                ipv4_addr += p[14] << 8;
+                ipv4_addr += p[15];
+                ipv4_addr = htonl(ipv4_addr);
+            }
+        }
+#endif
+
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: invalid IP address: \"%V\"", &ip_str);
+        return NGX_ERROR;
+
+    }
+
+    /* Iterate over all IP ranges to find a match */
+    for (i = 1; i < var->args->nelts; i++) {
+        if (ngx_http_complex_value(r, &args[i], &range_str) != NGX_OK) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: failed to compute argument for "
+                          "\"if_ip_range\" operator");
+            return NGX_ERROR;
+        }
+
+        /* Try to parse the range as a CIDR */
+        if (ngx_ptocidr(&range_str, &cidr) == NGX_OK) {
+            /* Check if the IP is within the CIDR range */
+            if (cidr.family == AF_INET) {
+                if (ipv4_addr != INADDR_NONE && 
+                    (ipv4_addr & cidr.u.in.mask) == cidr.u.in.addr) {
+                    v->len = 1;
+                    v->data = (u_char *) "1";
+                    return NGX_OK;
+                }
+
+#if (NGX_HAVE_INET6)
+            } else if (cidr.family == AF_INET6) {
+                ngx_uint_t n;
+                for (n = 0; n < 16; n++) {
+                    if ((p[n] & cidr.u.in6.mask.s6_addr[n])
+                        != cidr.u.in6.addr.s6_addr[n]) {
+                        goto next;
+                    }
+                }
+
+                v->len = 1;
+                v->data = (u_char *) "1";
+                return NGX_OK;
+
+            next:
+                continue;
+#endif
+            }
+
+        } else {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                          "http_var: invalid IP or CIDR range: \"%V\"",
+                          &range_str);
+            return NGX_ERROR;
+        }
+    }
+
+    /* No matching range found */
+    v->len = 1;
+    v->data = (u_char *) "0";
 
     return NGX_OK;
 }
