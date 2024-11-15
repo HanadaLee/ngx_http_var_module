@@ -1586,7 +1586,7 @@ ngx_http_var_do_and(ngx_http_request_t *r,
 
     for (i = 0; i < var->args->nelts; i++) {
         if (ngx_http_complex_value(r, &args[i], &val) != NGX_OK) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "http_var: \"and\" failed to evaluate argument");
             return NGX_ERROR;
         }
@@ -1616,7 +1616,7 @@ ngx_http_var_do_or(ngx_http_request_t *r,
 
     for (i = 0; i < var->args->nelts; i++) {
         if (ngx_http_complex_value(r, &args[i], &val) != NGX_OK) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "http_var: \"or\" failed to evaluate argument");
             return NGX_ERROR;
         }
@@ -1644,7 +1644,7 @@ ngx_http_var_do_not(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"not\" failed to evaluate argument");
         return NGX_ERROR;
     }
@@ -1670,7 +1670,7 @@ ngx_http_var_do_if_empty(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"if_empty\" failed to "
                       "evaluate argument");
         return NGX_ERROR;
@@ -1698,7 +1698,7 @@ ngx_http_var_do_if_not_empty(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"if_not_empty\" failed to "
                       "evaluate argument");
         return NGX_ERROR;
@@ -1726,7 +1726,7 @@ ngx_http_var_do_if_is_num(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"if_is_num\" failed to "
                       "evaluate argument");
         return NGX_ERROR;
@@ -1793,15 +1793,15 @@ ngx_http_var_do_if_has_prefix(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: \"if_has_prefix / if_has_prefix_i\" "
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: \"if_has_prefix\" "
                       "failed to evaluate the first argument");
         return NGX_ERROR;
     }
 
     if (ngx_http_complex_value(r, &args[1], &prefix) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: \"if_has_prefix / if_has_prefix_i\" "
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: \"if_has_prefix\" "
                       "failed to evaluate the second argument");
         return NGX_ERROR;
     }
@@ -1839,15 +1839,15 @@ ngx_http_var_do_if_has_suffix(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: \"if_has_suffix / if_has_suffix_i\" "
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: \"if_has_suffix\" "
                       "failed to evaluate the first argument");
         return NGX_ERROR;
     }
 
     if (ngx_http_complex_value(r, &args[1], &suffix) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: \"if_has_suffix / if_has_suffix_i\" "
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: \"if_has_suffix\" "
                       "failed to evaluate the second argument");
         return NGX_ERROR;
     }
@@ -1887,15 +1887,15 @@ ngx_http_var_do_if_find(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: \"if_find / if_find_i\" failed to "
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: \"if_find\" failed to "
                       "evaluate the first argument");
         return NGX_ERROR;
     }
 
     if (ngx_http_complex_value(r, &args[1], &sub_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: \"if_find / if_find_i\" failed to "
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: \"if_find\" failed to "
                       "evaluate the second argument");
         return NGX_ERROR;
     }
@@ -1927,7 +1927,7 @@ ngx_http_var_do_copy(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute variable value");
         return NGX_ERROR;
     }
@@ -1958,9 +1958,9 @@ ngx_http_var_do_len(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument "
-                      "for len operator");
+                      "for \"len\" operator");
         return NGX_ERROR;
     }
 
@@ -1988,9 +1988,9 @@ ngx_http_var_do_upper(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &value_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument "
-                      "for upper operator");
+                      "for \"upper\" operator");
         return NGX_ERROR;
     }
 
@@ -2024,9 +2024,9 @@ ngx_http_var_do_lower(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &value_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument "
-                      "for lower operator");
+                      "for \"lower\" operator");
         return NGX_ERROR;
     }
 
@@ -2061,9 +2061,9 @@ ngx_http_var_do_trim(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument "
-                      "for trim operator");
+                      "for \"trim\" operator");
         return NGX_ERROR;
     }
 
@@ -2102,9 +2102,9 @@ ngx_http_var_do_ltrim(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument "
-                      "for ltrim operator");
+                      "for \"ltrim\" operator");
         return NGX_ERROR;
     }
 
@@ -2138,9 +2138,9 @@ ngx_http_var_do_rtrim(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument "
-                      "for rtrim operator");
+                      "for \"rtrim\" operator");
         return NGX_ERROR;
     }
 
@@ -2174,9 +2174,9 @@ ngx_http_var_do_reverse(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument "
-                      "for reverse operator");
+                      "for \"reverse\" operator");
         return NGX_ERROR;
     }
 
@@ -2214,9 +2214,9 @@ ngx_http_var_do_find(ngx_http_request_t *r,
 
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK
         || ngx_http_complex_value(r, &args[1], &sub_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute arguments "
-                      "for find operator");
+                      "for \"find\" operator");
         return NGX_ERROR;
     }
 
@@ -2262,16 +2262,16 @@ ngx_http_var_do_repeat(ngx_http_request_t *r,
     /* Compute arguments */
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK
         || ngx_http_complex_value(r, &args[1], &repeat_times_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute arguments "
-                      "for repeat operator");
+                      "for \"repeat\" operator");
         return NGX_ERROR;
     }
 
     /* Parse repeat times */
     times = ngx_atoi(repeat_times_str.data, repeat_times_str.len);
     if (times == NGX_ERROR || times < 0) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: invalid repeat times");
         return NGX_ERROR;
     }
@@ -2320,9 +2320,9 @@ ngx_http_var_do_substr(ngx_http_request_t *r,
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK
         || ngx_http_complex_value(r, &args[1], &start_str) != NGX_OK
         || ngx_http_complex_value(r, &args[2], &len_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute arguments "
-                      "for substr operator");
+                      "for \"substr\" operator");
         return NGX_ERROR;
     }
 
@@ -2331,7 +2331,7 @@ ngx_http_var_do_substr(ngx_http_request_t *r,
     len = ngx_atoi(len_str.data, len_str.len);
 
     if (start == NGX_ERROR || len == NGX_ERROR || start < 0 || len < 0) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: invalid start or length in substr");
         return NGX_ERROR;
     }
@@ -2353,7 +2353,7 @@ ngx_http_var_do_substr(ngx_http_request_t *r,
         if (v->data == NULL) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                           "http_var: memory allocation failed "
-                          "for substr result");
+                          "for \"substr\" result");
             return NGX_ERROR;
         }
         ngx_memcpy(v->data, src_str.data + start, v->len);
@@ -2378,15 +2378,15 @@ ngx_http_var_do_replace(ngx_http_request_t *r,
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK
         || ngx_http_complex_value(r, &args[1], &search_str) != NGX_OK
         || ngx_http_complex_value(r, &args[2], &replace_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute arguments "
-                      "for replace operator");
+                      "for \"replace\" operator");
         return NGX_ERROR;
     }
 
     if (search_str.len == 0) {
         /* Prevent infinite loop */
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: search string is empty in replace");
         return NGX_ERROR;
     }
@@ -2413,7 +2413,7 @@ ngx_http_var_do_replace(ngx_http_request_t *r,
     new_len = src_str.len + count * (replace_str.len - search_str.len);
 
     if (new_len > NGX_MAX_SIZE_T_VALUE) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: replacement result too large");
         return NGX_ERROR;
     }
@@ -2472,7 +2472,7 @@ ngx_http_var_do_if_re_match(ngx_http_request_t *r,
         v->data = (u_char *) "0";
         return NGX_OK;
     } else if (rc != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: regex match failed");
         return NGX_ERROR;
     }
@@ -2501,7 +2501,7 @@ ngx_http_var_do_re_capture(ngx_http_request_t *r,
     if (rc == NGX_DECLINED) {
         return NGX_ERROR;
     } else if (rc != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: regex match failed");
         return NGX_ERROR;
     }
@@ -2552,14 +2552,14 @@ ngx_http_var_do_re_sub(ngx_http_request_t *r,
         ngx_memcpy(v->data, subject.data, v->len);
         return NGX_OK;
     } else if (rc != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: regex substitution failed");
         return NGX_ERROR;
     }
 
     /* Ensure captures are available */
     if (r->ncaptures < 2) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: insufficient captures");
         return NGX_ERROR;
     }
@@ -2670,7 +2670,7 @@ ngx_http_var_do_re_gsub(ngx_http_request_t *r,
             result.len += sub.len;
             break;
         } else if (rc != NGX_OK) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "http_var: regex substitution failed");
             return NGX_ERROR;
         }
@@ -2780,7 +2780,7 @@ ngx_http_var_do_if_eq(ngx_http_request_t *r,
     }
 
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"if_eq\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
@@ -2835,7 +2835,7 @@ ngx_http_var_do_if_ne(ngx_http_request_t *r,
     }
 
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"if_ne\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
@@ -2890,7 +2890,7 @@ ngx_http_var_do_if_lt(ngx_http_request_t *r,
     }
 
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"if_lt\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
@@ -2945,7 +2945,7 @@ ngx_http_var_do_if_le(ngx_http_request_t *r,
     }
 
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"if_le\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
@@ -3000,7 +3000,7 @@ ngx_http_var_do_if_gt(ngx_http_request_t *r,
     }
 
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"if_gt\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
@@ -3055,7 +3055,7 @@ ngx_http_var_do_if_ge(ngx_http_request_t *r,
     }
 
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"if_gt\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
@@ -3108,7 +3108,7 @@ ngx_http_var_do_if_range(ngx_http_request_t *r,
 
     dash = ngx_strlchr(range_val.data, range_val.data + range_val.len, '-');
     if (dash == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"if_range\" failed to "
                       "parse range, missing '-'");
         return NGX_ERROR;
@@ -3134,7 +3134,7 @@ ngx_http_var_do_if_range(ngx_http_request_t *r,
 
     if (ngx_http_var_auto_atofp3(val, start_str, end_str,
         &src_val, &start_val, &end_val) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"if_range\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
@@ -3175,15 +3175,15 @@ ngx_http_var_do_abs(ngx_http_request_t *r,
 
     /* Evaluate argument */
     if (ngx_http_complex_value(r, &args[0], &num_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute first argument");
         return NGX_ERROR;
     }
 
     /* Check if is number */
     if (ngx_http_var_check_str_is_num(num_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid number for abs operator");
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: invalid number for \"abs\" operator");
         return NGX_ERROR;
     }
 
@@ -3213,14 +3213,14 @@ ngx_http_var_do_max(ngx_http_request_t *r,
 
     /* Evaluate first argument */
     if (ngx_http_complex_value(r, &args[0], &int1_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute first argument");
         return NGX_ERROR;
     }
 
     /* Evaluate second argument */
     if (ngx_http_complex_value(r, &args[1], &int2_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute second argument");
         return NGX_ERROR;
     }
@@ -3242,7 +3242,7 @@ ngx_http_var_do_max(ngx_http_request_t *r,
     }
 
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"max\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
@@ -3282,14 +3282,14 @@ ngx_http_var_do_min(ngx_http_request_t *r,
 
     /* Evaluate first argument */
     if (ngx_http_complex_value(r, &args[0], &int1_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute first argument");
         return NGX_ERROR;
     }
 
     /* Evaluate second argument */
     if (ngx_http_complex_value(r, &args[1], &int2_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute second argument");
         return NGX_ERROR;
     }
@@ -3311,7 +3311,7 @@ ngx_http_var_do_min(ngx_http_request_t *r,
     }
 
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"min\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
@@ -3352,7 +3352,7 @@ ngx_http_var_do_add(ngx_http_request_t *r,
 
     if (ngx_http_complex_value(r, &args[0], &int1_str) != NGX_OK
         || ngx_http_complex_value(r, &args[1], &int2_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute arguments for "
                       "add operator");
         return NGX_ERROR;
@@ -3373,8 +3373,8 @@ ngx_http_var_do_add(ngx_http_request_t *r,
     }
 
     if (int1 == NGX_ERROR || int2 == NGX_ERROR) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid integer value for add operator");
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: invalid integer value for \"add\" operator");
         return NGX_ERROR;
     }
 
@@ -3391,7 +3391,7 @@ ngx_http_var_do_add(ngx_http_request_t *r,
     p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
     if (p == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for add result");
+                      "http_var: memory allocation failed for \"add\" result");
         return NGX_ERROR;
     }
 
@@ -3416,8 +3416,8 @@ ngx_http_var_do_sub(ngx_http_request_t *r,
 
     if (ngx_http_complex_value(r, &args[0], &int1_str) != NGX_OK
         || ngx_http_complex_value(r, &args[1], &int2_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: failed to compute arguments for sub "
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: failed to compute arguments for \"sub\" "
                       "operator");
         return NGX_ERROR;
     }
@@ -3437,8 +3437,8 @@ ngx_http_var_do_sub(ngx_http_request_t *r,
     }
 
     if (int1 == NGX_ERROR || int2 == NGX_ERROR) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid integer value for sub operator");
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: invalid integer value for \"sub\" operator");
         return NGX_ERROR;
     }
 
@@ -3455,7 +3455,7 @@ ngx_http_var_do_sub(ngx_http_request_t *r,
     p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
     if (p == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for sub result");
+                      "http_var: memory allocation failed for \"sub\" result");
         return NGX_ERROR;
     }
 
@@ -3480,7 +3480,7 @@ ngx_http_var_do_mul(ngx_http_request_t *r,
 
     if (ngx_http_complex_value(r, &args[0], &int1_str) != NGX_OK
         || ngx_http_complex_value(r, &args[1], &int2_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute arguments for "
                       "mul operator");
         return NGX_ERROR;
@@ -3501,8 +3501,8 @@ ngx_http_var_do_mul(ngx_http_request_t *r,
     }
 
     if (int1 == NGX_ERROR || int2 == NGX_ERROR) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid integer value for mul operator");
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: invalid integer value for \"mul\" operator");
         return NGX_ERROR;
     }
 
@@ -3519,7 +3519,7 @@ ngx_http_var_do_mul(ngx_http_request_t *r,
     p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
     if (p == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for mul result");
+                      "http_var: memory allocation failed for \"mul\" result");
         return NGX_ERROR;
     }
 
@@ -3544,7 +3544,7 @@ ngx_http_var_do_div(ngx_http_request_t *r,
 
     if (ngx_http_complex_value(r, &args[0], &int1_str) != NGX_OK
         || ngx_http_complex_value(r, &args[1], &int2_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute arguments for "
                       "div operator");
         return NGX_ERROR;
@@ -3565,9 +3565,9 @@ ngx_http_var_do_div(ngx_http_request_t *r,
     }
 
     if (int1 == NGX_ERROR || int2 == NGX_ERROR || int2 == 0) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: invalid integer value or division "
-                      "by zero for div operator");
+                      "by zero for \"div\" operator");
         return NGX_ERROR;
     }
 
@@ -3584,7 +3584,7 @@ ngx_http_var_do_div(ngx_http_request_t *r,
     p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
     if (p == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for div result");
+                      "http_var: memory allocation failed for \"div\" result");
         return NGX_ERROR;
     }
 
@@ -3609,9 +3609,9 @@ ngx_http_var_do_mod(ngx_http_request_t *r,
 
     if (ngx_http_complex_value(r, &args[0], &int1_str) != NGX_OK ||
         ngx_http_complex_value(r, &args[1], &int2_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute arguments "
-                      "for mod operator");
+                      "for \"mod\" operator");
         return NGX_ERROR;
     }
 
@@ -3630,9 +3630,9 @@ ngx_http_var_do_mod(ngx_http_request_t *r,
     }
 
     if (int1 == NGX_ERROR || int2 == NGX_ERROR || int2 == 0) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: invalid integer value or "
-                      "division by zero for mod operator");
+                      "division by zero for \"mod\" operator");
         return NGX_ERROR;
     }
 
@@ -3649,7 +3649,7 @@ ngx_http_var_do_mod(ngx_http_request_t *r,
     p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
     if (p == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for mod result");
+                      "http_var: memory allocation failed for \"mod\" result");
         return NGX_ERROR;
     }
 
@@ -3674,7 +3674,7 @@ ngx_http_var_do_round(ngx_http_request_t *r,
 
     if (ngx_http_complex_value(r, &args[0], &num_str) != NGX_OK
         || ngx_http_complex_value(r, &args[1], &precision_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute arguments for "
                       "round operator");
         return NGX_ERROR;
@@ -3682,8 +3682,8 @@ ngx_http_var_do_round(ngx_http_request_t *r,
 
     precision = ngx_atoi(precision_str.data, precision_str.len);
     if (precision == NGX_ERROR || precision < 0) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid precision value for round operator");
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: invalid precision value for \"round\" operator");
         return NGX_ERROR;
     }
 
@@ -3692,7 +3692,7 @@ ngx_http_var_do_round(ngx_http_request_t *r,
 
     /* Check if it is a number and find the decimal point */
     if (num_data[0] == '.' || (num_data[0] == '-' && num_data[1] == '.')) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: decimal point cannot "
                       "appear at the beginning");
         return NGX_ERROR;
@@ -3705,15 +3705,15 @@ ngx_http_var_do_round(ngx_http_request_t *r,
 
         if (num_data[i] == '.') {
             if (decimal_point != -1) {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: illegal decimal point found");
                 return NGX_ERROR;
             }
             decimal_point = i;
 
         } else if (num_data[i] < '0' || num_data[i] > '9') {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: input for round operator must be a number");
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: input for \"round\" operator must be a number");
             return NGX_ERROR;
         }
     }
@@ -3808,7 +3808,7 @@ ngx_http_var_do_floor(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &num_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "floor operator");
         return NGX_ERROR;
@@ -3819,7 +3819,7 @@ ngx_http_var_do_floor(ngx_http_request_t *r,
 
     /* Check if it is a number and find the decimal point */
     if (num_data[0] == '.' || (num_data[0] == '-' && num_data[1] == '.')) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: decimal point cannot "
                       "appear at the beginning");
         return NGX_ERROR;
@@ -3832,15 +3832,15 @@ ngx_http_var_do_floor(ngx_http_request_t *r,
 
         if (num_data[i] == '.') {
             if (decimal_point != -1) {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: illegal decimal point found");
                 return NGX_ERROR;
             }
             decimal_point = i;
 
         } else if (num_data[i] < '0' || num_data[i] > '9') {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: input for round operator must be a number");
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: input for \"round\" operator must be a number");
             return NGX_ERROR;
         }
     }
@@ -3916,7 +3916,7 @@ ngx_http_var_do_ceil(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &num_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "ceil operator");
         return NGX_ERROR;
@@ -3927,7 +3927,7 @@ ngx_http_var_do_ceil(ngx_http_request_t *r,
 
     /* Check if it is a number and find the decimal point */
     if (num_data[0] == '.' || (num_data[0] == '-' && num_data[1] == '.')) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: decimal point cannot "
                       "appear at the beginning");
         return NGX_ERROR;
@@ -3940,15 +3940,15 @@ ngx_http_var_do_ceil(ngx_http_request_t *r,
 
         if (num_data[i] == '.') {
             if (decimal_point != -1) {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: illegal decimal point found");
                 return NGX_ERROR;
             }
             decimal_point = i;
 
         } else if (num_data[i] < '0' || num_data[i] > '9') {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: input for round operator must be a number");
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: input for \"round\" operator must be a number");
             return NGX_ERROR;
         }
     }
@@ -4051,7 +4051,7 @@ ngx_http_var_do_rand_range(ngx_http_request_t *r,
 
     /* Compute the start and end values */
     if (ngx_http_complex_value(r, &args[0], &range_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument "
                       "for \"rand_range\" operator");
         return NGX_ERROR;
@@ -4059,7 +4059,7 @@ ngx_http_var_do_rand_range(ngx_http_request_t *r,
 
     dash = ngx_strlchr(range_str.data, range_str.data + range_str.len, '-');
     if (dash == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to parse range, missing '-'");
         return NGX_ERROR;
     }
@@ -4074,7 +4074,7 @@ ngx_http_var_do_rand_range(ngx_http_request_t *r,
     end = ngx_atoi(end_str.data, end_str.len);
 
     if (start == NGX_ERROR || end == NGX_ERROR || start > end) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: invalid start or end value for \"rand_range\"");
         return NGX_ERROR;
     }
@@ -4107,9 +4107,9 @@ ngx_http_var_do_hex_encode(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument "
-                      "for hex_encode operator");
+                      "for \"hex_encode\" operator");
         return NGX_ERROR;
     }
 
@@ -4144,15 +4144,15 @@ ngx_http_var_do_hex_decode(ngx_http_request_t *r,
 
     /* Compute argument */
     if (ngx_http_complex_value(r, &args[0], &hex_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument "
-                      "for hex_decode operator");
+                      "for \"hex_decode\" operator");
         return NGX_ERROR;
     }
 
     /* Check if the input string is of even length */
     if (hex_str.len % 2 != 0) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: hex_decode requires even-length string");
         return NGX_ERROR;
     }
@@ -4171,7 +4171,7 @@ ngx_http_var_do_hex_decode(ngx_http_request_t *r,
     for (i = 0; i < bin_str.len; i++) {
         n = ngx_hextoi(p, 2);
         if (n == NGX_ERROR || n > 255) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "http_var: invalid hex character "
                           "in hex_decode at position %d",
                           (int)(p - hex_str.data));
@@ -4203,7 +4203,7 @@ ngx_http_var_do_dec_to_hex(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &dec_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for dec_to_hex");
         return NGX_ERROR;
     }
@@ -4216,7 +4216,7 @@ ngx_http_var_do_dec_to_hex(ngx_http_request_t *r,
     dec_value = ngx_atoi(dec_str.data + (negative ? 1 : 0),
                            dec_str.len - (negative ? 1 : 0));
     if (dec_value == NGX_ERROR) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: invalid decimal value for dec_to_hex");
         return NGX_ERROR;
     }
@@ -4253,7 +4253,7 @@ ngx_http_var_do_hex_to_dec(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &hex_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for hex_to_dec");
         return NGX_ERROR;
     }
@@ -4266,7 +4266,7 @@ ngx_http_var_do_hex_to_dec(ngx_http_request_t *r,
     dec_value = ngx_hextoi(hex_str.data + (negative ? 1 : 0),
                            hex_str.len - (negative ? 1 : 0));
     if (dec_value == NGX_ERROR) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: invalid hexadecimal value for hex_to_dec");
         return NGX_ERROR;
     }
@@ -4304,9 +4304,9 @@ ngx_http_var_do_escape_uri(ngx_http_request_t *r,
 
     /* Compute the source string */
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument "
-                      "for escape_uri operator");
+                      "for \"escape_uri\" operator");
         return NGX_ERROR;
     }
 
@@ -4361,9 +4361,9 @@ ngx_http_var_do_escape_args(ngx_http_request_t *r,
 
     /* Compute the source string */
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument "
-                      "for escape_args operator");
+                      "for \"escape_args\" operator");
         return NGX_ERROR;
     }
 
@@ -4418,9 +4418,9 @@ ngx_http_var_do_escape_uri_component(ngx_http_request_t *r,
 
     /* Compute the source string */
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument "
-                      "for escape_uri_component operator");
+                      "for \"escape_uri_component\" operator");
         return NGX_ERROR;
     }
 
@@ -4477,9 +4477,9 @@ ngx_http_var_do_escape_html(ngx_http_request_t *r,
 
     /* Compute the source string */
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument "
-                      "for escape_uri_component operator");
+                      "for \"escape_uri_component\" operator");
         return NGX_ERROR;
     }
 
@@ -4535,7 +4535,7 @@ ngx_http_var_do_unescape_uri(ngx_http_request_t *r,
 
     /* Compute the source string */
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "unescape_uri operator");
         return NGX_ERROR;
@@ -4561,7 +4561,7 @@ ngx_http_var_do_unescape_uri(ngx_http_request_t *r,
     ngx_unescape_uri(&dst, &src, src_str.len, 0);
 
     if (src != src_str.data + src_str.len) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: input data not consumed completely "
                       "in unescape_uri");
         return NGX_ERROR;
@@ -4590,7 +4590,7 @@ ngx_http_var_do_base64_encode(ngx_http_request_t *r,
 
     /* Compute the source string */
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "base64_encode operator");
         return NGX_ERROR;
@@ -4627,7 +4627,7 @@ ngx_http_var_do_base64url_encode(ngx_http_request_t *r,
 
     /* Compute the source string */
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "base64url_encode operator");
         return NGX_ERROR;
@@ -4665,7 +4665,7 @@ ngx_http_var_do_base64_decode(ngx_http_request_t *r,
 
     /* Compute the source string */
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "base64_decode operator");
         return NGX_ERROR;
@@ -4682,7 +4682,7 @@ ngx_http_var_do_base64_decode(ngx_http_request_t *r,
     }
 
     if (ngx_decode_base64(&decoded_str, &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to decode base64 string");
         return NGX_ERROR;
     }
@@ -4707,7 +4707,7 @@ ngx_http_var_do_base64url_decode(ngx_http_request_t *r,
 
     /* Compute the source string */
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "base64url_decode operator");
         return NGX_ERROR;
@@ -4724,7 +4724,7 @@ ngx_http_var_do_base64url_decode(ngx_http_request_t *r,
     }
 
     if (ngx_decode_base64url(&decoded_str, &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to decode base64url string");
         return NGX_ERROR;
     }
@@ -4749,7 +4749,7 @@ ngx_http_var_do_crc32_short(ngx_http_request_t *r,
 
     /* Evaluate source string */
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "crc32_short source string");
         return NGX_ERROR;
@@ -4788,7 +4788,7 @@ ngx_http_var_do_crc32_long(ngx_http_request_t *r,
 
     /* Evaluate source string */
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "crc32_long source string");
         return NGX_ERROR;
@@ -4826,7 +4826,7 @@ ngx_http_var_do_md5sum(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "md5sum operator");
         return NGX_ERROR;
@@ -4868,7 +4868,7 @@ ngx_http_var_do_sha1sum(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "sha1sum operator");
         return NGX_ERROR;
@@ -4910,7 +4910,7 @@ ngx_http_var_do_sha256sum(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "sha256sum operator");
         return NGX_ERROR;
@@ -4929,19 +4929,19 @@ ngx_http_var_do_sha256sum(ngx_http_request_t *r,
     }
 
     if (EVP_DigestInit_ex(md, EVP_sha256(), NULL) == 0) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "EVP_DigestInit_ex() failed");
         return NGX_ERROR;
     }
 
     if (EVP_DigestUpdate(md, src_str.data, src_str.len) == 0) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "EVP_DigestUpdate() failed");
         return NGX_ERROR;
     }
 
     if (EVP_DigestFinal_ex(md, hash_data, NULL) == 0) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "EVP_DigestFinal_ex() failed");
         return NGX_ERROR;
     }
@@ -4973,7 +4973,7 @@ ngx_http_var_do_sha384sum(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "sha256sum operator");
         return NGX_ERROR;
@@ -4992,19 +4992,19 @@ ngx_http_var_do_sha384sum(ngx_http_request_t *r,
     }
 
     if (EVP_DigestInit_ex(md, EVP_sha384(), NULL) == 0) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "EVP_DigestInit_ex() failed");
         return NGX_ERROR;
     }
 
     if (EVP_DigestUpdate(md, src_str.data, src_str.len) == 0) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "EVP_DigestUpdate() failed");
         return NGX_ERROR;
     }
 
     if (EVP_DigestFinal_ex(md, hash_data, NULL) == 0) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "EVP_DigestFinal_ex() failed");
         return NGX_ERROR;
     }
@@ -5036,7 +5036,7 @@ ngx_http_var_do_sha512sum(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "sha512sum operator");
         return NGX_ERROR;
@@ -5055,19 +5055,19 @@ ngx_http_var_do_sha512sum(ngx_http_request_t *r,
     }
 
     if (EVP_DigestInit_ex(md, EVP_sha512(), NULL) == 0) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "EVP_DigestInit_ex() failed");
         return NGX_ERROR;
     }
 
     if (EVP_DigestUpdate(md, src_str.data, src_str.len) == 0) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "EVP_DigestUpdate() failed");
         return NGX_ERROR;
     }
 
     if (EVP_DigestFinal_ex(md, hash_data, NULL) == 0) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "EVP_DigestFinal_ex() failed");
         return NGX_ERROR;
     }
@@ -5099,14 +5099,14 @@ ngx_http_var_do_hmac_sha1(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "HMAC_SHA1 src_string");
         return NGX_ERROR;
     }
 
     if (ngx_http_complex_value(r, &args[1], &secret_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "HMAC_SHA1 secret");
         return NGX_ERROR;
@@ -5145,14 +5145,14 @@ ngx_http_var_do_hmac_sha256(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "HMAC_SHA256 src_string");
         return NGX_ERROR;
     }
 
     if (ngx_http_complex_value(r, &args[1], &secret_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "HMAC_SHA256 secret");
         return NGX_ERROR;
@@ -5191,14 +5191,14 @@ ngx_http_var_do_hmac_sha384(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "HMAC_SHA384 src_string");
         return NGX_ERROR;
     }
 
     if (ngx_http_complex_value(r, &args[1], &secret_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "HMAC_SHA384 secret");
         return NGX_ERROR;
@@ -5237,14 +5237,14 @@ ngx_http_var_do_hmac_sha512(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "HMAC_SHA512 src_string");
         return NGX_ERROR;
     }
 
     if (ngx_http_complex_value(r, &args[1], &secret_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument for "
                       "HMAC_SHA512 secret");
         return NGX_ERROR;
@@ -5302,13 +5302,13 @@ ngx_http_var_do_if_time_range(ngx_http_request_t *r,
             if (ngx_http_var_parse_int_range(
                     (ngx_str_t){param_str.len - 5, param_str.data + 5},
                     &year_start, &year_end) != NGX_OK) {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                     "http_var: invalid year range value");
                 return NGX_ERROR;
             }
 
             if (year_start < 1970 || year_end < year_start) {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                     "http_var: invalid year range value");
                 return NGX_ERROR;
             }
@@ -5317,14 +5317,14 @@ ngx_http_var_do_if_time_range(ngx_http_request_t *r,
             if (ngx_http_var_parse_int_range(
                     (ngx_str_t){param_str.len - 6, param_str.data + 6},
                     &month_start, &month_end) != NGX_OK) {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                     "http_var: invalid month range value");
                 return NGX_ERROR;
             }
 
             if (month_start < 1 || month_start > 12
                 || month_end < month_start || month_end > 12) {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                     "http_var: invalid month range value");
                 return NGX_ERROR;
             }
@@ -5333,14 +5333,14 @@ ngx_http_var_do_if_time_range(ngx_http_request_t *r,
             if (ngx_http_var_parse_int_range(
                     (ngx_str_t){param_str.len - 4, param_str.data + 4},
                     &day_start, &day_end) != NGX_OK) {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                     "http_var: invalid day range value");
                 return NGX_ERROR;
             }
 
             if (day_start < 1 || day_start > 31
                 || day_end < day_start || day_end > 31) {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                     "http_var: invalid day range value");
                 return NGX_ERROR;
             }
@@ -5349,14 +5349,14 @@ ngx_http_var_do_if_time_range(ngx_http_request_t *r,
             if (ngx_http_var_parse_int_range(
                     (ngx_str_t){param_str.len - 5, param_str.data + 5},
                     &wday_start, &wday_end) != NGX_OK) {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                     "http_var: invalid wday range value");
                 return NGX_ERROR;
             }
 
             if (wday_start < 1 || wday_start > 7
                 || wday_end < wday_start || wday_end > 7) {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                     "http_var: invalid wday range value");
                 return NGX_ERROR;
             }
@@ -5365,14 +5365,14 @@ ngx_http_var_do_if_time_range(ngx_http_request_t *r,
             if (ngx_http_var_parse_int_range(
                     (ngx_str_t){param_str.len - 5, param_str.data + 5},
                     &hour_start, &hour_end) != NGX_OK) {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                     "http_var: invalid hour range value");
                 return NGX_ERROR;
             }
 
             if (hour_start < 0 || hour_start > 23
                 || hour_end < hour_start || hour_end > 23) {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                     "http_var: invalid hour range value");
                 return NGX_ERROR;
             }
@@ -5381,14 +5381,14 @@ ngx_http_var_do_if_time_range(ngx_http_request_t *r,
             if (ngx_http_var_parse_int_range(
                     (ngx_str_t){param_str.len - 4, param_str.data + 4},
                     &min_start, &min_end) != NGX_OK) {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                     "http_var: invalid minute range value");
                 return NGX_ERROR;
             }
 
             if (min_start < 0 || min_start > 59
                 || min_end < min_start || min_end > 59) {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                     "http_var: invalid minute range value");
                 return NGX_ERROR;
             }
@@ -5397,21 +5397,21 @@ ngx_http_var_do_if_time_range(ngx_http_request_t *r,
             if (ngx_http_var_parse_int_range(
                     (ngx_str_t){param_str.len - 4, param_str.data + 4},
                     &sec_start, &sec_end) != NGX_OK) {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                     "http_var: invalid second range value");
                 return NGX_ERROR;
             }
 
             if (sec_start < 0 || sec_start > 59
                 || sec_end < sec_start || sec_end > 59) {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                     "http_var: invalid second range value");
                 return NGX_ERROR;
             }
 
         } else if (ngx_strncmp(param_str.data, "timezone=", 9) == 0) {
             if (var->args->nelts == 1) {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                     "http_var: at least one time range "
                     "args must be present");
                 return NGX_ERROR;
@@ -5426,7 +5426,7 @@ ngx_http_var_do_if_time_range(ngx_http_request_t *r,
                     for (j = 13; j < 17; j++) {
                         if (param_str.data[j] < '0'
                             || param_str.data[j] > '9') {
-                            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                                 "http_var: invalid timezone offset value");
                             return NGX_ERROR;
                         }
@@ -5441,12 +5441,12 @@ ngx_http_var_do_if_time_range(ngx_http_request_t *r,
                         tz_offset = -tz_offset;
                     }
                 } else {
-                    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                         "http_var: invalid timezone offset value");
                     return NGX_ERROR;
                 }
             } else {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                     "http_var: invalid timezone format");
                 return NGX_ERROR;
             }
@@ -5507,31 +5507,31 @@ ngx_http_var_do_gmt_time(ngx_http_request_t *r,
     if (var->args->nelts == 2) {
         /* Two arguments: unix_time and date format */
         if (ngx_http_complex_value(r, &args[0], &ts_str) != NGX_OK) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: failed to compute argument for "
-                          "gmt_time unix_time");
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "http_var: failed to compute unixtime for "
+                          "\"gmt_time\"");
             return NGX_ERROR;
         }
 
         ts = ngx_atoi(ts_str.data, ts_str.len);
         if (ts == NGX_ERROR) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: invalid unix_time value for gmt_time");
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "http_var: invalid unix_time value for \"gmt_time\"");
             return NGX_ERROR;
         }
 
         if (ngx_http_complex_value(r, &args[1], &date_format) != NGX_OK) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "http_var: failed to compute argument for "
-                          "gmt_time date_format");
+                          "\"gmt_time\" date_format");
             return NGX_ERROR;
         }
     } else {
         /* One argument: date format, use current time */
         if (ngx_http_complex_value(r, &args[0], &date_format) != NGX_OK) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "http_var: failed to compute argument "
-                          "for gmt_time date_format");
+                          "for \"gmt_time\" date_format");
             return NGX_ERROR;
         }
 
@@ -5542,7 +5542,8 @@ ngx_http_var_do_gmt_time(ngx_http_request_t *r,
         p = ngx_pnalloc(r->pool, sizeof("Mon, 28 Sep 1970 06:00:00 GMT") - 1);
         if (p == NULL) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: memory allocation failed for gmt_time");
+                          "http_var: memory allocation failed for "
+                          "\"gmt_time\"");
             return NGX_ERROR;
         }
 
@@ -5556,7 +5557,7 @@ ngx_http_var_do_gmt_time(ngx_http_request_t *r,
         p = ngx_pnalloc(r->pool, sizeof("Thu, 18-Nov-10 11:27:35 GMT") - 1);
         if (p == NULL) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: memory allocation failed for gmt_time");
+                          "http_var: memory allocation failed");
             return NGX_ERROR;
         }
 
@@ -5572,7 +5573,7 @@ ngx_http_var_do_gmt_time(ngx_http_request_t *r,
     p = ngx_palloc(r->pool, 256);
     if (p == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for gmt_time");
+                      "http_var: memory allocation failed for \"gmt_time\"");
         return NGX_ERROR;
     }
 
@@ -5580,8 +5581,8 @@ ngx_http_var_do_gmt_time(ngx_http_request_t *r,
                       (char *) date_format.data, &tm);
 
     if (v->len == 0) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: strftime failed for gmt_time");
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: strftime failed for \"gmt_time\"");
         return NGX_ERROR;
     }
 
@@ -5606,32 +5607,32 @@ ngx_http_var_do_local_time(ngx_http_request_t *r,
     if (var->args->nelts == 2) {
         /* Two arguments: unix_time and date format */
         if (ngx_http_complex_value(r, &args[0], &ts_str) != NGX_OK) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: failed to compute argument for "
-                          "gmt_time unix_time");
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "http_var: failed to compute unixtime for "
+                          "\"local_time\" operator");
             return NGX_ERROR;
         }
 
         ts = ngx_atoi(ts_str.data, ts_str.len);
         if (ts == NGX_ERROR) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "http_var: invalid unix_time value "
-                          "for gmt_time");
+                          "for \"local_time\" operator");
             return NGX_ERROR;
         }
 
         if (ngx_http_complex_value(r, &args[1], &date_format) != NGX_OK) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "http_var: failed to compute argument for "
-                          "gmt_time date_format");
+                          "\"local_time\" operator date_format");
             return NGX_ERROR;
         }
     } else {
         /* One argument: date format, use current time */
         if (ngx_http_complex_value(r, &args[0], &date_format) != NGX_OK) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: failed to compute argument "
-                          "for gmt_time date_format");
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "http_var: failed to compute argument for"
+                          "\"local_time\" operator date_format");
             return NGX_ERROR;
         }
 
@@ -5644,15 +5645,15 @@ ngx_http_var_do_local_time(ngx_http_request_t *r,
     p = ngx_palloc(r->pool, 256);
     if (p == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for local_time");
+                      "http_var: memory allocation failed");
         return NGX_ERROR;
     }
 
     v->len = strftime((char *) p, 256,
                       (char *) date_format.data, &tm);
     if (v->len == 0) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: strftime failed for local_time");
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: strftime failed for \"local_time\" operator");
         return NGX_ERROR;
     }
 
@@ -5692,31 +5693,31 @@ ngx_http_var_do_unix_time(ngx_http_request_t *r,
     }
     
     if (var->args->nelts == 1) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: illegal number of parameters for unix_time");
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: illegal number of parameters for \"unix_time\"");
         return NGX_ERROR;
     }
 
     /* Two arguments: http date string, http_time */
     if (ngx_http_complex_value(r, &args[0], &date_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                     "http_var: failed to compute argument for "
-                    "unix_time date_string");
+                    "\"unix_time\" date_string");
         return NGX_ERROR;
     }
 
     if (ngx_http_complex_value(r, &args[1], &date_format) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                     "http_var: failed to compute argument for "
-                    "unix_time date_format");
+                    "\"unix_time\" date_format");
         return NGX_ERROR;
     }
 
     if (ngx_strcmp(date_format.data, "http_time") == 0) {
         unix_time = ngx_parse_http_time(date_str.data, date_str.len);
         if (unix_time == NGX_ERROR) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: failed to parse http_time for unix_time");
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "http_var: failed to parse http_time for \"unix_time\"");
             return NGX_ERROR;
         }
         goto set_unix_time;
@@ -5725,9 +5726,9 @@ ngx_http_var_do_unix_time(ngx_http_request_t *r,
     /* Third argument: timezone */
     if (var->args->nelts == 3) {
         if (ngx_http_complex_value(r, &args[2], &tz_str) != NGX_OK) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "http_var: failed to compute argument for "
-                          "unix_time timezone");
+                          "\"unix_time\" timezone");
             return NGX_ERROR;
         }
 
@@ -5739,7 +5740,7 @@ ngx_http_var_do_unix_time(ngx_http_request_t *r,
                 for (i = 4; i < 8; i++) {
                     if (tz_str.data[i] < '0'
                         || tz_str.data[i] > '9') {
-                        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                             "http_var: invalid timezone offset value");
                         return NGX_ERROR;
                     }
@@ -5754,13 +5755,13 @@ ngx_http_var_do_unix_time(ngx_http_request_t *r,
                     tz_offset = -tz_offset;
                 }
             } else {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                               "http_var: invalid timezone format for "
                               "\"unix_time\" operator");
                 return NGX_ERROR;
             }
         } else {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "http_var: invalid timezone format for "
                           "\"unix_time\" operator");
             return NGX_ERROR;
@@ -5771,7 +5772,7 @@ ngx_http_var_do_unix_time(ngx_http_request_t *r,
     ngx_memzero(&tm, sizeof(ngx_tm_t));
     if (strptime((char *) date_str.data,
         (char *) date_format.data, &tm) == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                         "http_var: failed to parse date string for "
                         "\"unix_time\" operator");
         return NGX_ERROR;
@@ -5817,7 +5818,7 @@ ngx_http_var_do_if_ip_range(ngx_http_request_t *r,
 
     /* Get the IP address to match */
     if (ngx_http_complex_value(r, &args[0], &ip_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute argument "
                       "for \"if_ip_range\" operator");
         return NGX_ERROR;
@@ -5848,7 +5849,7 @@ ngx_http_var_do_if_ip_range(ngx_http_request_t *r,
         }
 #endif
 
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: invalid IP address: \"%V\"", &ip_str);
         return NGX_ERROR;
 
@@ -5859,7 +5860,7 @@ ip_range_match_handler:
     /* Iterate over all IP ranges to find a match */
     for (i = 1; i < var->args->nelts; i++) {
         if (ngx_http_complex_value(r, &args[i], &range_str) != NGX_OK) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "http_var: failed to compute argument for "
                           "\"if_ip_range\" operator");
             return NGX_ERROR;
@@ -5935,7 +5936,7 @@ ip_range_match_handler:
     return NGX_OK;
 
 invalid_ip_range:
-    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+    ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                     "http_var: invalid IP or CIDR range: \"%V\"",
                     &range_str);
     return NGX_ERROR;
