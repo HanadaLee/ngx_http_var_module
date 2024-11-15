@@ -5735,6 +5735,8 @@ ngx_http_var_do_if_ip_range(ngx_http_request_t *r,
                 ipv4_addr += ipv6_addr.s6_addr[15];
                 ipv4_addr = htonl(ipv4_addr);
             }
+
+            goto cidr_handler;
         }
 #endif
 
@@ -5743,6 +5745,8 @@ ngx_http_var_do_if_ip_range(ngx_http_request_t *r,
         return NGX_ERROR;
 
     }
+
+cidr_handler:
 
     /* Iterate over all IP ranges to find a match */
     for (i = 1; i < var->args->nelts; i++) {
