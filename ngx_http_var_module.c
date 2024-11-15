@@ -1454,7 +1454,7 @@ static ngx_int_t
 ngx_http_var_auto_atofp3(ngx_str_t val1, ngx_str_t val2, ngx_str_t val3,
     ngx_int_t *int_val1, ngx_int_t *int_val2, ngx_int_t *int_val3)
 {
-    ngx_uint_t decimal_places1 = 0, decimal_places2 = 0, decimal_places2 = 3;
+    ngx_uint_t decimal_places1 = 0, decimal_places2 = 0, decimal_places3 = 0;
 
     for (ngx_uint_t i = 0; i < val1.len; i++) {
         if (val1.data[i] == '.') {
