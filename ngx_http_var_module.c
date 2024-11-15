@@ -5770,7 +5770,7 @@ ngx_http_var_do_if_ip_range(ngx_http_request_t *r,
             } else if (cidr.family == AF_INET6) {
                 ngx_uint_t n;
                 for (n = 0; n < 16; n++) {
-                    if ((p[n] & cidr.u.in6.mask.s6_addr[n])
+                    if ((ipv6_addr.s6_addr[n] & cidr.u.in6.mask.s6_addr[n])
                         != cidr.u.in6.addr.s6_addr[n]) {
                         goto next;
                     }
