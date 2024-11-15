@@ -105,6 +105,7 @@ var $bool_var if_lt num1 num2; # Check if less than, returns 1 or 0
 var $bool_var if_le num1 num2; # Check if less than or equal, returns 1 or 0
 var $bool_var if_gt num1 num2; # Check if greater than, returns 1 or 0
 var $bool_var if_ge num1 num2; # Check if greater than or equal, returns 1 or 0
+var $bool_var if_range num start_num-end_num; # Check if is within the start_num-end_num range, return 1 or 0
 
 # Mathematical Operations (returns empty if parameters are invalid)
 var $new_var abs num; # Absolute value (returns original format without negative sign)
@@ -119,7 +120,7 @@ var $new_var round src_num int; # Round to n significant digits
 var $new_var floor src_num; # Floor value, the largest integer less than or equal to the source
 var $new_var ceil src_num; # Ceiling value, the smallest integer greater than or equal to the source
 var $new_var rand; # Random large positive integer
-var $new_var rand_range start_int end_int; # Random positive integer in specified range
+var $new_var rand_range start_int-end_int; # Random positive integer in specified range
 
 # Encoding and Decoding
 var $new_var hex_encode src_str; # Convert binary to hexadecimal

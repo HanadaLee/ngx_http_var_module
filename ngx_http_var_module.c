@@ -55,6 +55,7 @@ typedef enum {
     NGX_HTTP_VAR_OP_IF_LE,
     NGX_HTTP_VAR_OP_IF_GT,
     NGX_HTTP_VAR_OP_IF_GE,
+    NGX_HTTP_VAR_OP_IF_RANGE,
 
     NGX_HTTP_VAR_OP_ABS,
     NGX_HTTP_VAR_OP_MAX,
@@ -190,6 +191,7 @@ static ngx_http_var_operator_enum_t ngx_http_var_operators[] = {
     { ngx_string("if_le"),           NGX_HTTP_VAR_OP_IF_LE,          0, 2, 2 },
     { ngx_string("if_gt"),           NGX_HTTP_VAR_OP_IF_GE,          0, 2, 2 },
     { ngx_string("if_ge"),           NGX_HTTP_VAR_OP_IF_GE,          0, 2, 2 },
+    { ngx_string("if_range"),        NGX_HTTP_VAR_OP_IF_RANGE,       0, 2, 2 },
 
     { ngx_string("abs"),             NGX_HTTP_VAR_OP_ABS,            0, 1, 1 },
     { ngx_string("max"),             NGX_HTTP_VAR_OP_MAX,            0, 2, 2 },
@@ -203,7 +205,7 @@ static ngx_http_var_operator_enum_t ngx_http_var_operators[] = {
     { ngx_string("floor"),           NGX_HTTP_VAR_OP_FLOOR,          0, 1, 1 },
     { ngx_string("ceil"),            NGX_HTTP_VAR_OP_CEIL,           0, 1, 1 },
     { ngx_string("rand"),            NGX_HTTP_VAR_OP_RAND,           0, 0, 0 },
-    { ngx_string("rand_range"),      NGX_HTTP_VAR_OP_RAND_RANGE,     0, 2, 2 },
+    { ngx_string("rand_range"),      NGX_HTTP_VAR_OP_RAND_RANGE,     0, 1, 1 },
 
     { ngx_string("hex_encode"),      NGX_HTTP_VAR_OP_HEX_ENCODE,     0, 1, 1 },
     { ngx_string("hex_decode"),      NGX_HTTP_VAR_OP_HEX_DECODE,     0, 1, 1 },
@@ -268,6 +270,9 @@ static ngx_int_t ngx_http_var_variable_handler(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_check_str_is_num(ngx_str_t num_str);
 static ngx_int_t ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
     ngx_int_t *int_val1, ngx_int_t *int_val2);
+static ngx_int_t ngx_http_var_auto_atofp3(ngx_str_t val1, ngx_str_t val2,
+    ngx_str_t val3, ngx_int_t *int_val1,
+    ngx_int_t *int_val2, ngx_int_t *int_val3)
 static ngx_int_t ngx_http_var_parse_int_range(ngx_str_t str,
     ngx_int_t *start, ngx_int_t *end);
 
@@ -341,6 +346,8 @@ static ngx_int_t ngx_http_var_do_if_le(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_do_if_gt(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_do_if_ge(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_do_if_range(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 static ngx_int_t ngx_http_var_do_abs(ngx_http_request_t *r,
@@ -1129,6 +1136,10 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_do_if_ge(r, v, var);
         break;
 
+    case NGX_HTTP_VAR_OP_IF_RANGE:
+        rc = ngx_http_var_do_if_range(r, v, var);
+        break;
+
     case NGX_HTTP_VAR_OP_ABS:
         rc = ngx_http_var_do_abs(r, v, var);
         break;
@@ -1412,6 +1423,7 @@ ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
             break;
         }
     }
+
     for (ngx_uint_t i = 0; i < val2.len; i++) {
         if (val2.data[i] == '.') {
             decimal_places2 = val2.len - i - 1;
@@ -1431,6 +1443,63 @@ ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
     }
 
     if (*int_val1 == NGX_ERROR || *int_val2 == NGX_ERROR) {
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_auto_atofp3(ngx_str_t val1, ngx_str_t val2, ngx_str_t val3,
+    ngx_int_t *int_val1, ngx_int_t *int_val2, ngx_int_t *int_val3)
+{
+    ngx_uint_t decimal_places1 = 0, decimal_places2 = 0, decimal_places2 = 3;
+
+    for (ngx_uint_t i = 0; i < val1.len; i++) {
+        if (val1.data[i] == '.') {
+            decimal_places1 = val1.len - i - 1;
+            break;
+        }
+    }
+
+    for (ngx_uint_t i = 0; i < val2.len; i++) {
+        if (val2.data[i] == '.') {
+            decimal_places2 = val2.len - i - 1;
+            break;
+        }
+    }
+
+    for (ngx_uint_t i = 0; i < val3.len; i++) {
+        if (val3.data[i] == '.') {
+            decimal_places2 = val3.len - i - 1;
+            break;
+        }
+    }
+
+    ngx_uint_t max_decimal_places = decimal_places1;
+
+    if (decimal_places2 > max_decimal_places) {
+        max_decimal_places = decimal_places2;
+    }
+
+    if (decimal_places3 > max_decimal_places) {
+        max_decimal_places = decimal_places3;
+    }
+
+    if (max_decimal_places == 0) {
+        *int_val1 = ngx_atoi(val1.data, val1.len);
+        *int_val2 = ngx_atoi(val2.data, val2.len);
+        *int_val3 = ngx_atoi(val3.data, val3.len);
+    } else {
+        *int_val1 = ngx_atofp(val1.data, val1.len, max_decimal_places);
+        *int_val2 = ngx_atofp(val2.data, val2.len, max_decimal_places);
+        *int_val3 = ngx_atofp(val3.data, val3.len, max_decimal_places);
+    }
+
+    if (*int_val1 == NGX_ERROR
+        || *int_val2 == NGX_ERROR
+        || *int_val3 == NGX_ERROR) {
         return NGX_ERROR;
     }
 
@@ -2985,6 +3054,89 @@ ngx_http_var_do_if_ge(ngx_http_request_t *r,
 
 
 static ngx_int_t
+ngx_http_var_do_if_range(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val, range_val;
+    ngx_int_t                  is_negative_val = 0
+    ngx_int_t                  is_negative_start = 0, is_negative_end = 0;
+    ngx_int_t                  src_val, start_val, end_val;
+    ngx_str_t                  start_str, end_str;
+    u_char                    *dash;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &range_val) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (val.len > 0 && val.data[0] == '-') {
+        is_negative_val = 1;
+        val.data++;
+        val.len--;
+    }
+
+    dash = ngx_strlchr(range_val.data, range_val.data + range_val.len, '-');
+    if (dash == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: \"if_range\" failed to "
+                      "parse range, missing '-'");
+        return NGX_ERROR;
+    }
+
+    start_str.data = range_val.data;
+    start_str.len = dash - range_val.data;
+
+    end_str.data = dash + 1;
+    end_str.len = range_val.data + range_val.len - (dash + 1);
+
+    if (start_str.len > 0 && start_str.data[0] == '-') {
+        is_negative_start = 1;
+        start_str.data++;
+        start_str.len--;
+    }
+
+    if (end_str.len > 0 && end_str.data[0] == '-') {
+        is_negative_end = 1;
+        end_str.data++;
+        end_str.len--;
+    }
+
+    if (ngx_http_var_auto_atofp3(val, start_str, end_str,
+        &src_val, &start_val, &end_val) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: \"if_range\" failed to convert "
+                      "values to fixed point");
+        return NGX_ERROR;
+    }
+
+    if (is_negative_val == 1) {
+        src_val = -src_val;
+    }
+
+    if (is_negative_start == 1) {
+        start_val = -start_val;
+    }
+
+    if (is_negative_end == 1) {
+        end_val = -end_val;
+    }
+
+    if (src_val >= start_val && src_val <= end_val) {
+        v->len = 1;
+        v->data = (u_char *) "1";
+    } else {
+        v->len = 1;
+        v->data = (u_char *) "0";
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_http_var_do_abs(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
@@ -3862,27 +4014,40 @@ ngx_http_var_do_rand_range(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  start_str, end_str;
+    ngx_str_t                  range_str, start_str, end_str;
     ngx_int_t                  start, end, result;
     u_char                    *p;
+    u_char                    *dash;
 
     args = var->args->elts;
 
     /* Compute the start and end values */
-    if (ngx_http_complex_value(r, &args[0], &start_str) != NGX_OK
-        || ngx_http_complex_value(r, &args[1], &end_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &range_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: failed to compute arguments for "
-                      "rand_range operator");
+                      "http_var: failed to compute argument "
+                      "for \"rand_range\" operator");
         return NGX_ERROR;
     }
+
+    dash = ngx_strlchr(range_str.data, range_str.data + range_str.len, '-');
+    if (dash == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: failed to parse range, missing '-'");
+        return NGX_ERROR;
+    }
+
+    start_str.data = range_str.data;
+    start_str.len = dash - range_str.data;
+
+    end_str.data = dash + 1;
+    end_str.len = range_str.data + range_str.len - (dash + 1);
 
     start = ngx_atoi(start_str.data, start_str.len);
     end = ngx_atoi(end_str.data, end_str.len);
 
     if (start == NGX_ERROR || end == NGX_ERROR || start > end) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: invalid start or end value for rand_range");
+                      "http_var: invalid start or end value for \"rand_range\"");
         return NGX_ERROR;
     }
 
@@ -3893,8 +4058,7 @@ ngx_http_var_do_rand_range(ngx_http_request_t *r,
     p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
     if (p == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for "
-                      "rand_range result");
+                      "http_var: memory allocation failed for \"rand_range\" result");
         return NGX_ERROR;
     }
 
