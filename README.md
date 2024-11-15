@@ -1,13 +1,10 @@
-# ngx_http_var_module
-
-## Name
+# Name
 
 `ngx_http_var_module` is a nginx module that dynamically assigns new variables through predefined functions.
 
 # Table of Content
 
-- [ngx\_http\_var\_module](#ngx_http_var_module)
-  - [Name](#name)
+- [Name](#name)
 - [Table of Content](#table-of-content)
 - [Status](#status)
 - [Synopsis](#synopsis)
@@ -130,6 +127,7 @@ var $new_var hex_to_dec hex; # Hexadecimal to decimal
 var $new_var escape_uri src_str; # Full URI encoding
 var $new_var escape_args src_str; # Argument encoding
 var $new_var escape_uri_component src_str; # URI component encoding
+var $new_var escape_html src_str; # HTML encoding
 var $new_var unescape_uri src_str; # URI decoding
 var $new_var base64_encode src_str; # Base64 encoding
 var $new_var base64url_encode src_str; # Base64url encoding
