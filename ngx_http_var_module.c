@@ -5723,7 +5723,6 @@ ngx_http_var_do_if_ip_range(ngx_http_request_t *r,
         /* If it's not IPv4, try to parse as IPv6 */
         if (ngx_inet6_addr(ip_str.data, ip_str.len, ipv6_buf) == NGX_OK) {
             /* IPv6 address */
-            addr_in6.sin6_family = AF_INET6;
             ngx_memcpy(&ipv6_addr, ipv6_buf,
                        sizeof(struct in6_addr));
 
