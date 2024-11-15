@@ -138,10 +138,10 @@ typedef struct {
     ngx_uint_t                     ignore_case; /* ignore case for regex */
     ngx_uint_t                     min_args;    /* min number of arguments */
     ngx_uint_t                     max_args;    /* max number of arguments */
-} ngx_http_var_operator_map_t;
+} ngx_http_var_operator_enum_t;
 
 
-static ngx_http_var_operator_map_t ngx_http_var_operators[] = {
+static ngx_http_var_operator_enum_t ngx_http_var_operators[] = {
     { ngx_string("and"),             NGX_HTTP_VAR_OP_AND,            0, 2, 9 },
     { ngx_string("or"),              NGX_HTTP_VAR_OP_OR,             0, 2, 9 },
     { ngx_string("not"),             NGX_HTTP_VAR_OP_NOT,            0, 1, 1 },
@@ -563,7 +563,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     /* Map operator string to enum and get argument counts */
     operators_count = sizeof(ngx_http_var_operators) / 
-                  sizeof(ngx_http_var_operator_map_t);
+                  sizeof(ngx_http_var_operator_enum_t);
     for (i = 0; i < operators_count; i++) {
         if (operator_str.len == ngx_http_var_operators[i].name.len
             && ngx_strncmp(operator_str.data,
