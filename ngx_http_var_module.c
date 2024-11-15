@@ -5701,8 +5701,8 @@ ngx_http_var_do_if_ip_range(ngx_http_request_t *r,
     in_addr_t                  ipv4_addr;
 
 #if (NGX_HAVE_INET6)
+    u_char                     ipv6_buf[16];
     struct in6_addr            ipv6_addr;
-    struct sockaddr_in6        addr_in6;
 #endif
 
     args = var->args->elts;
@@ -5721,20 +5721,19 @@ ngx_http_var_do_if_ip_range(ngx_http_request_t *r,
 
 #if (NGX_HAVE_INET6)
         /* If it's not IPv4, try to parse as IPv6 */
-        if (ngx_inet6_addr(ip_str.data, ip_str.len, &ipv6_addr) == NGX_OK) {
+        if (ngx_inet6_addr(ip_str.data, ip_str.len, ipv6_buf) == NGX_OK) {
             /* IPv6 address */
             addr_in6.sin6_family = AF_INET6;
-            ngx_memcpy(&addr_in6.sin6_addr, &ipv6_addr,
+            ngx_memcpy(&ipv6_addr, ipv6_buf,
                        sizeof(struct in6_addr));
 
             /* Check if the IPv6 address is an IPv4-mapped address */
             if (IN6_IS_ADDR_V4MAPPED(&ipv6_addr)) {
                 /* Extract the IPv4 address from the mapped IPv6 address */
-                u_char *p = ipv6_addr.s6_addr;
-                ipv4_addr = p[12] << 24;
-                ipv4_addr += p[13] << 16;
-                ipv4_addr += p[14] << 8;
-                ipv4_addr += p[15];
+                ipv4_addr = ipv6_addr.s6_addr[12] << 24;
+                ipv4_addr += ipv6_addr.s6_addr[13] << 16;
+                ipv4_addr += ipv6_addr.s6_addr[14] << 8;
+                ipv4_addr += ipv6_addr.s6_addr[15];
                 ipv4_addr = htonl(ipv4_addr);
             }
         }
