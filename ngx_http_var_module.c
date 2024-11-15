@@ -1306,8 +1306,8 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_do_unix_time(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_TIME_RANGE:
-        rc = ngx_http_var_do_if_time_range(r, v, var);
+    case NGX_HTTP_VAR_OP_IF_IP_RANGE:
+        rc = ngx_http_var_do_if_ip_range(r, v, var);
         break;
 
     default:
