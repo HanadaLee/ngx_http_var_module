@@ -5698,7 +5698,7 @@ ngx_http_var_do_if_ip_range(ngx_http_request_t *r,
     ngx_str_t                  ip_str, range_str;
     ngx_uint_t                 i;
     ngx_cidr_t                 cidr;
-    in_addr_t                  ipv4_addr;
+    in_addr_t                  ipv4_addr, start_addr, end_addr;
 
 #if (NGX_HAVE_INET6)
     u_char                     ipv6_buf[16];
@@ -5736,7 +5736,7 @@ ngx_http_var_do_if_ip_range(ngx_http_request_t *r,
                 ipv4_addr = htonl(ipv4_addr);
             }
 
-            goto cidr_handler;
+            goto ip_range_match_handler;
         }
 #endif
 
@@ -5746,7 +5746,7 @@ ngx_http_var_do_if_ip_range(ngx_http_request_t *r,
 
     }
 
-cidr_handler:
+ip_range_match_handler:
 
     /* Iterate over all IP ranges to find a match */
     for (i = 1; i < var->args->nelts; i++) {
@@ -5774,24 +5774,49 @@ cidr_handler:
                 for (n = 0; n < 16; n++) {
                     if ((ipv6_addr.s6_addr[n] & cidr.u.in6.mask.s6_addr[n])
                         != cidr.u.in6.addr.s6_addr[n]) {
-                        goto next;
+                        continue;
                     }
                 }
 
                 v->len = 1;
                 v->data = (u_char *) "1";
                 return NGX_OK;
-
-            next:
-                continue;
 #endif
+
+            }
+
+        } else if (ipv4_addr != INADDR_NONE) {
+            u_char *p = ngx_strlchr(range_str.data,
+                range_str.data + range_str.len, '-');
+            if (p == NULL) {
+                goto invalid_ip_range;
+            }
+
+            start_addr = ngx_inet_addr(range_str.data,
+                p - range_str.data);
+
+            p++;
+
+            end_addr = ngx_inet_addr(p,
+                range_str.data + range_str.len - p);
+
+            if (start_addr == INADDR_NONE || end_addr == INADDR_NONE) {
+                goto invalid_ip_range;
+            }
+
+            start_addr = ntohl(start_addr);
+            end_addr = ntohl(end_addr);
+            ipv4_addr = ntohl(ipv4_addr);
+
+            /* Check if IPv4 address is in the given range */
+            if (ipv4_addr >= start_addr && ipv4_addr <= end_addr) {
+                v->len = 1;
+                v->data = (u_char *) "1";
+                return NGX_OK;
             }
 
         } else {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: invalid IP or CIDR range: \"%V\"",
-                          &range_str);
-            return NGX_ERROR;
+            goto invalid_ip_range;
         }
     }
 
@@ -5800,4 +5825,10 @@ cidr_handler:
     v->data = (u_char *) "0";
 
     return NGX_OK;
+
+invalid_ip_range:
+    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "http_var: invalid IP or CIDR range: \"%V\"",
+                    &range_str);
+    return NGX_ERROR;
 }
