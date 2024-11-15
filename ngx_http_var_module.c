@@ -252,8 +252,7 @@ static char *ngx_http_var_merge_conf(ngx_conf_t *cf,
 static char *ngx_http_var_create_variable(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
 
-static ngx_http_var_ctx_t *ngx_http_var_get_lock_ctx(
-    ngx_http_request_t *r);
+static ngx_http_var_ctx_t *ngx_http_var_get_lock_ctx(ngx_http_request_t *r);
 static ngx_int_t ngx_http_variable_acquire_lock(ngx_http_request_t *r,
     ngx_str_t *var_name);
 static void ngx_http_variable_release_lock(ngx_http_request_t *r,
