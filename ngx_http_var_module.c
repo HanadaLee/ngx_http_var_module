@@ -3059,7 +3059,7 @@ ngx_http_var_do_if_range(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  val, range_val;
-    ngx_int_t                  is_negative_val = 0
+    ngx_int_t                  is_negative_val = 0;
     ngx_int_t                  is_negative_start = 0, is_negative_end = 0;
     ngx_int_t                  src_val, start_val, end_val;
     ngx_str_t                  start_str, end_str;
