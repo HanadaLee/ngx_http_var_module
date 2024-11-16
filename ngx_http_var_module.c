@@ -1065,7 +1065,7 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_do_if_str_eq(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_STR_EQ:
+    case NGX_HTTP_VAR_OP_IF_STR_NE:
         rc = ngx_http_var_do_if_str_ne(r, v, var);
         break;
 
