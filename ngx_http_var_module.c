@@ -279,7 +279,7 @@ static ngx_int_t ngx_http_var_variable_handler(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 
 static ngx_int_t ngx_http_var_check_str_is_num(ngx_str_t num_str);
-static ngx_int_t ngx_http_var_auto_aoti(ngx_str_t val, ngx_int_t *int_val);
+static ngx_int_t ngx_http_var_auto_atoi(ngx_str_t val, ngx_int_t *int_val);
 static ngx_int_t ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
     ngx_int_t *int_val1, ngx_int_t *int_val2);
 static ngx_int_t ngx_http_var_auto_atofp3(ngx_str_t val1, ngx_str_t val2,
