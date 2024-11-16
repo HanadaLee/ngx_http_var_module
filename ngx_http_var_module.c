@@ -24,6 +24,7 @@ typedef enum {
     NGX_HTTP_VAR_OP_IF_NOT_EMPTY,
     NGX_HTTP_VAR_OP_IF_IS_NUM,
     NGX_HTTP_VAR_OP_IF_STR_EQ,
+    NGX_HTTP_VAR_OP_IF_STR_NE,
     NGX_HTTP_VAR_OP_IF_HAS_PREFIX,
     NGX_HTTP_VAR_OP_IF_HAS_SUFFIX,
     NGX_HTTP_VAR_OP_IF_FIND,
@@ -156,6 +157,8 @@ static ngx_http_var_operator_enum_t ngx_http_var_operators[] = {
     { ngx_string("if_is_num"),       NGX_HTTP_VAR_OP_IF_IS_NUM,      0, 1, 1 },
     { ngx_string("if_str_eq"),       NGX_HTTP_VAR_OP_IF_STR_EQ,      0, 2, 2 },
     { ngx_string("if_str_eq_i"),     NGX_HTTP_VAR_OP_IF_STR_EQ,      1, 2, 2 },
+    { ngx_string("if_str_ne"),       NGX_HTTP_VAR_OP_IF_STR_NE,      0, 2, 2 },
+    { ngx_string("if_str_ne_i"),     NGX_HTTP_VAR_OP_IF_STR_NE,      1, 2, 2 },
     { ngx_string("if_has_prefix"),   NGX_HTTP_VAR_OP_IF_HAS_PREFIX,  0, 2, 2 },
     { ngx_string("if_has_prefix_i"), NGX_HTTP_VAR_OP_IF_HAS_PREFIX,  1, 2, 2 },
     { ngx_string("if_has_suffix"),   NGX_HTTP_VAR_OP_IF_HAS_SUFFIX,  0, 2, 2 },
@@ -276,6 +279,7 @@ static ngx_int_t ngx_http_var_variable_handler(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 
 static ngx_int_t ngx_http_var_check_str_is_num(ngx_str_t num_str);
+static ngx_int_t ngx_http_var_auto_aoti(ngx_str_t val, ngx_int_t *int_val);
 static ngx_int_t ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
     ngx_int_t *int_val1, ngx_int_t *int_val2);
 static ngx_int_t ngx_http_var_auto_atofp3(ngx_str_t val1, ngx_str_t val2,
@@ -283,6 +287,15 @@ static ngx_int_t ngx_http_var_auto_atofp3(ngx_str_t val1, ngx_str_t val2,
     ngx_int_t *int_val2, ngx_int_t *int_val3);
 static ngx_int_t ngx_http_var_parse_int_range(ngx_str_t str,
     ngx_int_t *start, ngx_int_t *end);
+static ngx_int_t ngx_http_var_escape_uri(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var,
+    ngx_uint_t type);
+
+#if (NGX_HTTP_SSL)
+static ngx_int_t ngx_http_var_set_hmac(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var,
+    const EVP_MD *evp_md);
+#endif
 
 static ngx_int_t ngx_http_var_do_and(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -298,6 +311,8 @@ static ngx_int_t ngx_http_var_do_if_not_empty(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_do_if_is_num(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_do_if_str_eq(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_do_if_str_ne(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_do_if_has_prefix(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -1050,6 +1065,10 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_do_if_str_eq(r, v, var);
         break;
 
+    case NGX_HTTP_VAR_OP_IF_STR_EQ:
+        rc = ngx_http_var_do_if_str_ne(r, v, var);
+        break;
+
     case NGX_HTTP_VAR_OP_IF_HAS_PREFIX:
         rc = ngx_http_var_do_if_has_prefix(r, v, var);
         break;
@@ -1440,10 +1459,46 @@ ngx_http_var_check_str_is_num(ngx_str_t num_str)
 
 
 static ngx_int_t
+ngx_http_var_auto_atoi(ngx_str_t val, ngx_int_t *int_val) {
+    ngx_int_t is_negative = 0;
+
+    if (val.len > 0 && val.data[0] == '-') {
+        *int_val = ngx_atoi(val.data + 1, val.len - 1);
+        is_negative = 1;
+    } else {
+        *int_val = ngx_atoi(val.data, val.len);
+    }
+
+    if (*int_val == NGX_ERROR) {
+        return NGX_ERROR;
+    }
+
+    if (is_negative) {
+        *int_val = -*int_val;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
     ngx_int_t *int_val1, ngx_int_t *int_val2)
 {
     ngx_uint_t decimal_places1 = 0, decimal_places2 = 0;
+    ngx_int_t is_negative1 = 0, is_negative2 = 0;
+
+    if (val1.len > 0 && val1.data[0] == '-') {
+        is_negative1 = 1;
+        val1.data++;
+        val1.len--;
+    }
+
+    if (val2.len > 0 && val2.data[0] == '-') {
+        is_negative2 = 1;
+        val2.data++;
+        val2.len--;
+    }
 
     for (ngx_uint_t i = 0; i < val1.len; i++) {
         if (val1.data[i] == '.') {
@@ -1474,6 +1529,14 @@ ngx_http_var_auto_atofp(ngx_str_t val1, ngx_str_t val2,
         return NGX_ERROR;
     }
 
+    if (is_negative1 == 1) {
+        *int_val1 = -*int_val1;
+    }
+
+    if (is_negative2 == 1) {
+        *int_val2 = -*int_val2;
+    }
+
     return NGX_OK;
 }
 
@@ -1483,6 +1546,25 @@ ngx_http_var_auto_atofp3(ngx_str_t val1, ngx_str_t val2, ngx_str_t val3,
     ngx_int_t *int_val1, ngx_int_t *int_val2, ngx_int_t *int_val3)
 {
     ngx_uint_t decimal_places1 = 0, decimal_places2 = 0, decimal_places3 = 0;
+    ngx_int_t is_negative1 = 0, is_negative2 = 0, is_negative3 = 0;
+
+    if (val1.len > 0 && val1.data[0] == '-') {
+        is_negative1 = 1;
+        val1.data++;
+        val1.len--;
+    }
+
+    if (val2.len > 0 && val2.data[0] == '-') {
+        is_negative2 = 1;
+        val2.data++;
+        val2.len--;
+    }
+
+    if (val3.len > 0 && val3.data[0] == '-') {
+        is_negative3 = 1;
+        val3.data++;
+        val3.len--;
+    }
 
     for (ngx_uint_t i = 0; i < val1.len; i++) {
         if (val1.data[i] == '.') {
@@ -1531,6 +1613,18 @@ ngx_http_var_auto_atofp3(ngx_str_t val1, ngx_str_t val2, ngx_str_t val3,
         return NGX_ERROR;
     }
 
+    if (is_negative1 == 1) {
+        *int_val1 = -*int_val1;
+    }
+
+    if (is_negative2 == 1) {
+        *int_val2 = -*int_val2;
+    }
+
+    if (is_negative3 == 1) {
+        *int_val3 = -*int_val3;
+    }
+
     return NGX_OK;
 }
 
@@ -1571,6 +1665,111 @@ ngx_http_var_parse_int_range(ngx_str_t str,
 
     return NGX_OK;
 }
+
+static ngx_int_t
+ngx_http_var_escape_uri(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var,
+    ngx_uint_t type)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, escaped_str;
+    size_t                     len;
+    uintptr_t                  escape;
+    u_char                    *src, *dst;
+
+    args = var->args->elts;
+
+    /* Compute the source string */
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: failed to compute argument "
+                      "for escape_uri");
+        return NGX_ERROR;
+    }
+
+    /* Handle empty source string */
+    if (src_str.len == 0) {
+        return NGX_ERROR;
+    }
+
+    src = src_str.data;
+
+    /* Calculate the escaped length */
+    escape = 2 * ngx_escape_uri(NULL, src, src_str.len, type);
+    len = src_str.len + escape;
+
+    dst = ngx_pnalloc(r->pool, len);
+    if (dst == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed");
+        return NGX_ERROR;
+    }
+
+    /* Perform the escaping */
+    if (escape == 0) {
+        ngx_memcpy(dst, src, src_str.len);
+    } else {
+        ngx_escape_uri(dst, src, src_str.len, type);
+    }
+
+    /* Set the escaped string */
+    escaped_str.data = dst;
+    escaped_str.len = len;
+
+    /* Set the variable value */
+    v->len = escaped_str.len;
+    v->data = escaped_str.data;
+
+    return NGX_OK;
+}
+
+
+#if (NGX_HTTP_SSL)
+static ngx_int_t
+ngx_http_var_set_hmac(ngx_http_request_t *r, ngx_http_variable_value_t *v,
+    ngx_http_var_variable_t *var, const EVP_MD *evp_md)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  src_str, secret_str;
+    unsigned int               md_len = 0;
+    unsigned char              md[EVP_MAX_MD_SIZE];
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "HMAC src_string");
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_complex_value(r, &args[1], &secret_str) != NGX_OK) {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http_var: failed to compute argument for "
+                      "HMAC secret");
+        return NGX_ERROR;
+    }
+
+    HMAC(evp_md, secret_str.data, secret_str.len,
+        src_str.data, src_str.len, md, &md_len);
+
+    if (md_len == 0 || md_len > EVP_MAX_MD_SIZE) {
+        return NGX_ERROR;
+    }
+
+    v->data = ngx_pnalloc(r->pool, md_len);
+    if (v->data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed for HMAC");
+        return NGX_ERROR;
+    }
+
+    ngx_memcpy(v->data, &md, md_len);
+    v->len = md_len;
+
+    return NGX_OK;
+}
+#endif
 
 
 static ngx_int_t
@@ -1779,6 +1978,25 @@ ngx_http_var_do_if_str_eq(ngx_http_request_t *r,
     }
 
     v->data = (u_char *) "0";
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_do_if_str_ne(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_int_t rc;
+
+    rc = ngx_http_var_do_if_str_eq(r, v, var);
+    if (rc != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    // 取相反结果
+    v->len = 1;
+    v->data = (v->data[0] == '0') ? (u_char *) "1" : (u_char *) "0";
+
     return NGX_OK;
 }
 
@@ -2757,7 +2975,6 @@ ngx_http_var_do_if_eq(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  val1, val2;
-    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
     ngx_int_t                  int_val1, int_val2;
 
     args = var->args->elts;
@@ -2767,31 +2984,11 @@ ngx_http_var_do_if_eq(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (val1.len > 0 && val1.data[0] == '-') {
-        is_negative1 = 1;
-        val1.data++;
-        val1.len--;
-    }
-
-    if (val2.len > 0 && val2.data[0] == '-') {
-        is_negative2 = 1;
-        val2.data++;
-        val2.len--;
-    }
-
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"if_eq\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
-    }
-
-    if (is_negative1 == 1) {
-        int_val1 = -int_val1;
-    }
-
-    if (is_negative2 == 1) {
-        int_val2 = -int_val2;
     }
 
     if (int_val1 == int_val2) {
@@ -2812,7 +3009,6 @@ ngx_http_var_do_if_ne(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  val1, val2;
-    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
     ngx_int_t                  int_val1, int_val2;
 
     args = var->args->elts;
@@ -2822,31 +3018,11 @@ ngx_http_var_do_if_ne(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (val1.len > 0 && val1.data[0] == '-') {
-        is_negative1 = 1;
-        val1.data++;
-        val1.len--;
-    }
-
-    if (val2.len > 0 && val2.data[0] == '-') {
-        is_negative2 = 1;
-        val2.data++;
-        val2.len--;
-    }
-
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"if_ne\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
-    }
-
-    if (is_negative1 == 1) {
-        int_val1 = -int_val1;
-    }
-
-    if (is_negative2 == 1) {
-        int_val2 = -int_val2;
     }
 
     if (int_val1 != int_val2) {
@@ -2867,7 +3043,6 @@ ngx_http_var_do_if_lt(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  val1, val2;
-    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
     ngx_int_t                  int_val1, int_val2;
 
     args = var->args->elts;
@@ -2877,31 +3052,11 @@ ngx_http_var_do_if_lt(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (val1.len > 0 && val1.data[0] == '-') {
-        is_negative1 = 1;
-        val1.data++;
-        val1.len--;
-    }
-
-    if (val2.len > 0 && val2.data[0] == '-') {
-        is_negative2 = 1;
-        val2.data++;
-        val2.len--;
-    }
-
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"if_lt\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
-    }
-
-    if (is_negative1 == 1) {
-        int_val1 = -int_val1;
-    }
-
-    if (is_negative2 == 1) {
-        int_val2 = -int_val2;
     }
 
     if (int_val1 < int_val2) {
@@ -2922,7 +3077,6 @@ ngx_http_var_do_if_le(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  val1, val2;
-    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
     ngx_int_t                  int_val1, int_val2;
 
     args = var->args->elts;
@@ -2932,31 +3086,11 @@ ngx_http_var_do_if_le(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (val1.len > 0 && val1.data[0] == '-') {
-        is_negative1 = 1;
-        val1.data++;
-        val1.len--;
-    }
-
-    if (val2.len > 0 && val2.data[0] == '-') {
-        is_negative2 = 1;
-        val2.data++;
-        val2.len--;
-    }
-
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"if_le\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
-    }
-
-    if (is_negative1 == 1) {
-        int_val1 = -int_val1;
-    }
-
-    if (is_negative2 == 1) {
-        int_val2 = -int_val2;
     }
 
     if (int_val1 <= int_val2) {
@@ -2977,7 +3111,6 @@ ngx_http_var_do_if_gt(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  val1, val2;
-    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
     ngx_int_t                  int_val1, int_val2;
 
     args = var->args->elts;
@@ -2987,31 +3120,11 @@ ngx_http_var_do_if_gt(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (val1.len > 0 && val1.data[0] == '-') {
-        is_negative1 = 1;
-        val1.data++;
-        val1.len--;
-    }
-
-    if (val2.len > 0 && val2.data[0] == '-') {
-        is_negative2 = 1;
-        val2.data++;
-        val2.len--;
-    }
-
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"if_gt\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
-    }
-
-    if (is_negative1 == 1) {
-        int_val1 = -int_val1;
-    }
-
-    if (is_negative2 == 1) {
-        int_val2 = -int_val2;
     }
 
     if (int_val1 > int_val2) {
@@ -3032,7 +3145,6 @@ ngx_http_var_do_if_ge(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  val1, val2;
-    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
     ngx_int_t                  int_val1, int_val2;
 
     args = var->args->elts;
@@ -3042,31 +3154,11 @@ ngx_http_var_do_if_ge(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (val1.len > 0 && val1.data[0] == '-') {
-        is_negative1 = 1;
-        val1.data++;
-        val1.len--;
-    }
-
-    if (val2.len > 0 && val2.data[0] == '-') {
-        is_negative2 = 1;
-        val2.data++;
-        val2.len--;
-    }
-
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"if_gt\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
-    }
-
-    if (is_negative1 == 1) {
-        int_val1 = -int_val1;
-    }
-
-    if (is_negative2 == 1) {
-        int_val2 = -int_val2;
     }
 
     if (int_val1 >= int_val2) {
@@ -3087,8 +3179,6 @@ ngx_http_var_do_if_range(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  val, range_val;
-    ngx_int_t                  is_negative_val = 0;
-    ngx_int_t                  is_negative_start = 0, is_negative_end = 0;
     ngx_int_t                  src_val, start_val, end_val;
     ngx_str_t                  start_str, end_str;
     u_char                    *dash;
@@ -3098,12 +3188,6 @@ ngx_http_var_do_if_range(ngx_http_request_t *r,
     if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK
         || ngx_http_complex_value(r, &args[1], &range_val) != NGX_OK) {
         return NGX_ERROR;
-    }
-
-    if (val.len > 0 && val.data[0] == '-') {
-        is_negative_val = 1;
-        val.data++;
-        val.len--;
     }
 
     dash = ngx_strlchr(range_val.data, range_val.data + range_val.len, '-');
@@ -3120,36 +3204,12 @@ ngx_http_var_do_if_range(ngx_http_request_t *r,
     end_str.data = dash + 1;
     end_str.len = range_val.data + range_val.len - (dash + 1);
 
-    if (start_str.len > 0 && start_str.data[0] == '-') {
-        is_negative_start = 1;
-        start_str.data++;
-        start_str.len--;
-    }
-
-    if (end_str.len > 0 && end_str.data[0] == '-') {
-        is_negative_end = 1;
-        end_str.data++;
-        end_str.len--;
-    }
-
     if (ngx_http_var_auto_atofp3(val, start_str, end_str,
         &src_val, &start_val, &end_val) != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"if_range\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
-    }
-
-    if (is_negative_val == 1) {
-        src_val = -src_val;
-    }
-
-    if (is_negative_start == 1) {
-        start_val = -start_val;
-    }
-
-    if (is_negative_end == 1) {
-        end_val = -end_val;
     }
 
     if (src_val >= start_val && src_val <= end_val) {
@@ -3207,7 +3267,6 @@ ngx_http_var_do_max(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     ngx_str_t                  int1_str, int2_str, val1, val2;
     ngx_int_t                  int_val1, int_val2;
-    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
 
     args = var->args->elts;
 
@@ -3228,32 +3287,11 @@ ngx_http_var_do_max(ngx_http_request_t *r,
     val1 = int1_str;
     val2 = int2_str;
 
-    /* Convert arguments to integers */
-    if (val1.len > 0 && val1.data[0] == '-') {
-        is_negative1 = 1;
-        val1.data++;
-        val1.len--;
-    }
-
-    if (val2.len > 0 && val2.data[0] == '-') {
-        is_negative2 = 1;
-        val2.data++;
-        val2.len--;
-    }
-
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"max\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
-    }
-
-    if (is_negative1 == 1) {
-        int_val1 = -int_val1;
-    }
-
-    if (is_negative2 == 1) {
-        int_val2 = -int_val2;
     }
 
     /* Compute max */
@@ -3276,7 +3314,6 @@ ngx_http_var_do_min(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     ngx_str_t                  int1_str, int2_str, val1, val2;
     ngx_int_t                  int_val1, int_val2;
-    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
 
     args = var->args->elts;
 
@@ -3297,32 +3334,11 @@ ngx_http_var_do_min(ngx_http_request_t *r,
     val1 = int1_str;
     val2 = int2_str;
 
-    /* Convert arguments to integers */
-    if (val1.len > 0 && val1.data[0] == '-') {
-        is_negative1 = 1;
-        val1.data++;
-        val1.len--;
-    }
-
-    if (val2.len > 0 && val2.data[0] == '-') {
-        is_negative2 = 1;
-        val2.data++;
-        val2.len--;
-    }
-
     if (ngx_http_var_auto_atofp(val1, val2, &int_val1, &int_val2) != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: \"min\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
-    }
-
-    if (is_negative1 == 1) {
-        int_val1 = -int_val1;
-    }
-
-    if (is_negative2 == 1) {
-        int_val2 = -int_val2;
     }
 
     /* Compute min */
@@ -3345,7 +3361,6 @@ ngx_http_var_do_add(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     ngx_str_t                  int1_str, int2_str;
     ngx_int_t                  int1, int2, result;
-    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
     u_char                    *p;
 
     args = var->args->elts;
@@ -3358,32 +3373,11 @@ ngx_http_var_do_add(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (int1_str.len > 0 && int1_str.data[0] == '-') {
-        int1 = ngx_atoi(int1_str.data + 1, int1_str.len - 1);
-        is_negative1 = 1;
-    } else {
-        int1 = ngx_atoi(int1_str.data, int1_str.len);
-    }
-
-    if (int2_str.len > 0 && int2_str.data[0] == '-') {
-        int2 = ngx_atoi(int2_str.data + 1, int2_str.len - 1);
-        is_negative2 = 1;
-    } else {
-        int2 = ngx_atoi(int2_str.data, int2_str.len);
-    }
-
-    if (int1 == NGX_ERROR || int2 == NGX_ERROR) {
+    if (ngx_http_var_auto_atoi(int1_str, &int1) != NGX_OK
+        || ngx_http_var_auto_atoi(int2_str, &int2) != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: invalid integer value for \"add\" operator");
         return NGX_ERROR;
-    }
-
-    if (is_negative1 == 1) {
-        int1 = -int1;
-    }
-
-    if (is_negative2 == 1) {
-        int2 = -int2;
     }
 
     result = int1 + int2;
@@ -3409,7 +3403,6 @@ ngx_http_var_do_sub(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     ngx_str_t                  int1_str, int2_str;
     ngx_int_t                  int1, int2, result;
-    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
     u_char                    *p;
 
     args = var->args->elts;
@@ -3422,32 +3415,11 @@ ngx_http_var_do_sub(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (int1_str.len > 0 && int1_str.data[0] == '-') {
-        int1 = ngx_atoi(int1_str.data + 1, int1_str.len - 1);
-        is_negative1 = 1;
-    } else {
-        int1 = ngx_atoi(int1_str.data, int1_str.len);
-    }
-
-    if (int2_str.len > 0 && int2_str.data[0] == '-') {
-        int2 = ngx_atoi(int2_str.data + 1, int2_str.len - 1);
-        is_negative2 = 1;
-    } else {
-        int2 = ngx_atoi(int2_str.data, int2_str.len);
-    }
-
-    if (int1 == NGX_ERROR || int2 == NGX_ERROR) {
+    if (ngx_http_var_auto_atoi(int1_str, &int1) != NGX_OK
+        || ngx_http_var_auto_atoi(int2_str, &int2) != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: invalid integer value for \"sub\" operator");
         return NGX_ERROR;
-    }
-
-    if (is_negative1 == 1) {
-        int1 = -int1;
-    }
-
-    if (is_negative2 == 1) {
-        int2 = -int2;
     }
 
     result = int1 - int2;
@@ -3473,7 +3445,6 @@ ngx_http_var_do_mul(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     ngx_str_t                  int1_str, int2_str;
     ngx_int_t                  int1, int2, result;
-    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
     u_char                    *p;
 
     args = var->args->elts;
@@ -3486,32 +3457,11 @@ ngx_http_var_do_mul(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (int1_str.len > 0 && int1_str.data[0] == '-') {
-        int1 = ngx_atoi(int1_str.data + 1, int1_str.len - 1);
-        is_negative1 = 1;
-    } else {
-        int1 = ngx_atoi(int1_str.data, int1_str.len);
-    }
-
-    if (int2_str.len > 0 && int2_str.data[0] == '-') {
-        int2 = ngx_atoi(int2_str.data + 1, int2_str.len - 1);
-        is_negative2 = 1;
-    } else {
-        int2 = ngx_atoi(int2_str.data, int2_str.len);
-    }
-
-    if (int1 == NGX_ERROR || int2 == NGX_ERROR) {
+    if (ngx_http_var_auto_atoi(int1_str, &int1) != NGX_OK
+        || ngx_http_var_auto_atoi(int2_str, &int2) != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: invalid integer value for \"mul\" operator");
         return NGX_ERROR;
-    }
-
-    if (is_negative1 == 1) {
-        int1 = -int1;
-    }
-
-    if (is_negative2 == 1) {
-        int2 = -int2;
     }
 
     result = int1 * int2;
@@ -3537,7 +3487,6 @@ ngx_http_var_do_div(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     ngx_str_t                  int1_str, int2_str;
     ngx_int_t                  int1, int2, result;
-    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
     u_char                    *p;
 
     args = var->args->elts;
@@ -3550,33 +3499,12 @@ ngx_http_var_do_div(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (int1_str.len > 0 && int1_str.data[0] == '-') {
-        int1 = ngx_atoi(int1_str.data + 1, int1_str.len - 1);
-        is_negative1 = 1;
-    } else {
-        int1 = ngx_atoi(int1_str.data, int1_str.len);
-    }
-
-    if (int2_str.len > 0 && int2_str.data[0] == '-') {
-        int2 = ngx_atoi(int2_str.data + 1, int2_str.len - 1);
-        is_negative2 = 1;
-    } else {
-        int2 = ngx_atoi(int2_str.data, int2_str.len);
-    }
-
-    if (int1 == NGX_ERROR || int2 == NGX_ERROR || int2 == 0) {
+    if (ngx_http_var_auto_atoi(int1_str, &int1) != NGX_OK
+        || ngx_http_var_auto_atoi(int2_str, &int2) != NGX_OK
+        || int2 == 0) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http_var: invalid integer value or division "
-                      "by zero for \"div\" operator");
+                      "http_var: invalid integer value for \"div\" operator");
         return NGX_ERROR;
-    }
-
-    if (is_negative1 == 1) {
-        int1 = -int1;
-    }
-
-    if (is_negative2 == 1) {
-        int2 = -int2;
     }
 
     result = int1 / int2;
@@ -3602,7 +3530,6 @@ ngx_http_var_do_mod(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     ngx_str_t                  int1_str, int2_str;
     ngx_int_t                  int1, int2, result;
-    ngx_int_t                  is_negative1 = 0, is_negative2 = 0;
     u_char                    *p;
 
     args = var->args->elts;
@@ -3615,33 +3542,12 @@ ngx_http_var_do_mod(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (int1_str.len > 0 && int1_str.data[0] == '-') {
-        int1 = ngx_atoi(int1_str.data + 1, int1_str.len - 1);
-        is_negative1 = 1;
-    } else {
-        int1 = ngx_atoi(int1_str.data, int1_str.len);
-    }
-
-    if (int2_str.len > 0 && int2_str.data[0] == '-') {
-        int2 = ngx_atoi(int2_str.data + 1, int2_str.len - 1);
-        is_negative2 = 1;
-    } else {
-        int2 = ngx_atoi(int2_str.data, int2_str.len);
-    }
-
-    if (int1 == NGX_ERROR || int2 == NGX_ERROR || int2 == 0) {
+    if (ngx_http_var_auto_atoi(int1_str, &int1) != NGX_OK
+        || ngx_http_var_auto_atoi(int2_str, &int2) != NGX_OK
+        || int2 == 0) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http_var: invalid integer value or "
-                      "division by zero for \"mod\" operator");
+                      "http_var: invalid integer value for \"mod\" operator");
         return NGX_ERROR;
-    }
-
-    if (is_negative1 == 1) {
-        int1 = -int1;
-    }
-
-    if (is_negative2 == 1) {
-        int2 = -int2;
     }
 
     result = int1 % int2;
@@ -3681,9 +3587,10 @@ ngx_http_var_do_round(ngx_http_request_t *r,
     }
 
     precision = ngx_atoi(precision_str.data, precision_str.len);
-    if (precision == NGX_ERROR || precision < 0) {
+    if (precision == NGX_ERROR) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http_var: invalid precision value for \"round\" operator");
+                      "http_var: invalid precision value for "
+                      "\"round\" operator");
         return NGX_ERROR;
     }
 
@@ -4294,56 +4201,7 @@ static ngx_int_t
 ngx_http_var_do_escape_uri(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, escaped_str;
-    size_t                     len;
-    uintptr_t                  escape;
-    u_char                    *src, *dst;
-
-    args = var->args->elts;
-
-    /* Compute the source string */
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http_var: failed to compute argument "
-                      "for \"escape_uri\" operator");
-        return NGX_ERROR;
-    }
-
-    /* Handle empty source string */
-    if (src_str.len == 0) {
-        return NGX_ERROR;
-    }
-
-    src = src_str.data;
-
-    /* Calculate the escaped length */
-    escape = 2 * ngx_escape_uri(NULL, src, src_str.len, NGX_ESCAPE_URI);
-    len = src_str.len + escape;
-
-    dst = ngx_pnalloc(r->pool, len);
-    if (dst == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for escape_uri");
-        return NGX_ERROR;
-    }
-
-    /* Perform the escaping */
-    if (escape == 0) {
-        ngx_memcpy(dst, src, src_str.len);
-    } else {
-        ngx_escape_uri(dst, src, src_str.len, NGX_ESCAPE_URI);
-    }
-
-    /* Set the escaped string */
-    escaped_str.data = dst;
-    escaped_str.len = len;
-
-    /* Set the variable value */
-    v->len = escaped_str.len;
-    v->data = escaped_str.data;
-
-    return NGX_OK;
+    return ngx_http_var_escape_uri(r, v, var, NGX_ESCAPE_URI);
 }
 
 
@@ -4351,56 +4209,7 @@ static ngx_int_t
 ngx_http_var_do_escape_args(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, escaped_str;
-    size_t                     len;
-    uintptr_t                  escape;
-    u_char                    *src, *dst;
-
-    args = var->args->elts;
-
-    /* Compute the source string */
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http_var: failed to compute argument "
-                      "for \"escape_args\" operator");
-        return NGX_ERROR;
-    }
-
-    /* Handle empty source string */
-    if (src_str.len == 0) {
-        return NGX_ERROR;
-    }
-
-    src = src_str.data;
-
-    /* Calculate the escaped length */
-    escape = 2 * ngx_escape_uri(NULL, src, src_str.len, NGX_ESCAPE_ARGS);
-    len = src_str.len + escape;
-
-    dst = ngx_pnalloc(r->pool, len);
-    if (dst == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for escape_args");
-        return NGX_ERROR;
-    }
-
-    /* Perform the escaping */
-    if (escape == 0) {
-        ngx_memcpy(dst, src, src_str.len);
-    } else {
-        ngx_escape_uri(dst, src, src_str.len, NGX_ESCAPE_ARGS);
-    }
-
-    /* Set the escaped string */
-    escaped_str.data = dst;
-    escaped_str.len = len;
-
-    /* Set the variable value */
-    v->len = escaped_str.len;
-    v->data = escaped_str.data;
-
-    return NGX_OK;
+    return ngx_http_var_escape_uri(r, v, var, NGX_ESCAPE_ARGS);
 }
 
 
@@ -4408,58 +4217,7 @@ static ngx_int_t
 ngx_http_var_do_escape_uri_component(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, escaped_str;
-    size_t                     len;
-    uintptr_t                  escape;
-    u_char                    *src, *dst;
-
-    args = var->args->elts;
-
-    /* Compute the source string */
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http_var: failed to compute argument "
-                      "for \"escape_uri_component\" operator");
-        return NGX_ERROR;
-    }
-
-    /* Handle empty source string */
-    if (src_str.len == 0) {
-        return NGX_ERROR;
-    }
-
-    src = src_str.data;
-
-    /* Calculate the escaped length */
-    escape = 2 * ngx_escape_uri(NULL, src, src_str.len,
-                                NGX_ESCAPE_URI_COMPONENT);
-    len = src_str.len + escape;
-
-    dst = ngx_pnalloc(r->pool, len);
-    if (dst == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for "
-                      "escape_uri_component");
-        return NGX_ERROR;
-    }
-
-    /* Perform the escaping */
-    if (escape == 0) {
-        ngx_memcpy(dst, src, src_str.len);
-    } else {
-        ngx_escape_uri(dst, src, src_str.len, NGX_ESCAPE_URI_COMPONENT);
-    }
-
-    /* Set the escaped string */
-    escaped_str.data = dst;
-    escaped_str.len = len;
-
-    /* Set the variable value */
-    v->len = escaped_str.len;
-    v->data = escaped_str.data;
-
-    return NGX_OK;
+    return ngx_http_var_escape_uri(r, v, var, NGX_ESCAPE_URI_COMPONENT);
 }
 
 
@@ -4467,58 +4225,7 @@ static ngx_int_t
 ngx_http_var_do_escape_html(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, escaped_str;
-    size_t                     len;
-    uintptr_t                  escape;
-    u_char                    *src, *dst;
-
-    args = var->args->elts;
-
-    /* Compute the source string */
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http_var: failed to compute argument "
-                      "for \"escape_uri_component\" operator");
-        return NGX_ERROR;
-    }
-
-    /* Handle empty source string */
-    if (src_str.len == 0) {
-        return NGX_ERROR;
-    }
-
-    src = src_str.data;
-
-    /* Calculate the escaped length */
-    escape = 2 * ngx_escape_uri(NULL, src, src_str.len,
-                                NGX_ESCAPE_HTML);
-    len = src_str.len + escape;
-
-    dst = ngx_pnalloc(r->pool, len);
-    if (dst == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for "
-                      "escape_html");
-        return NGX_ERROR;
-    }
-
-    /* Perform the escaping */
-    if (escape == 0) {
-        ngx_memcpy(dst, src, src_str.len);
-    } else {
-        ngx_escape_uri(dst, src, src_str.len, NGX_ESCAPE_HTML);
-    }
-
-    /* Set the escaped string */
-    escaped_str.data = dst;
-    escaped_str.len = len;
-
-    /* Set the variable value */
-    v->len = escaped_str.len;
-    v->data = escaped_str.data;
-
-    return NGX_OK;
+    return ngx_http_var_escape_uri(r, v, var, NGX_ESCAPE_HTML);
 }
 
 
@@ -5091,45 +4798,7 @@ static ngx_int_t
 ngx_http_var_do_hmac_sha1(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, secret_str;
-    unsigned int               md_len = 0;
-    unsigned char              md[EVP_MAX_MD_SIZE];
-
-    args = var->args->elts;
-
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http_var: failed to compute argument for "
-                      "HMAC_SHA1 src_string");
-        return NGX_ERROR;
-    }
-
-    if (ngx_http_complex_value(r, &args[1], &secret_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http_var: failed to compute argument for "
-                      "HMAC_SHA1 secret");
-        return NGX_ERROR;
-    }
-
-    HMAC(EVP_sha1(), secret_str.data, secret_str.len,
-        src_str.data, src_str.len, md, &md_len);
-
-    if (md_len == 0 || md_len > EVP_MAX_MD_SIZE) {
-        return NGX_ERROR;
-    }
-
-    v->data = ngx_pnalloc(r->pool, md_len);
-    if (v->data == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for HMAC_SHA1");
-        return NGX_ERROR;
-    }
-
-    ngx_memcpy(v->data, &md, md_len);
-    v->len = md_len;
-
-    return NGX_OK;
+    return ngx_http_var_set_hmac(r, v, var, EVP_sha1());
 }
 
 
@@ -5137,45 +4806,7 @@ static ngx_int_t
 ngx_http_var_do_hmac_sha256(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, secret_str;
-    unsigned int               md_len = 0;
-    unsigned char              md[EVP_MAX_MD_SIZE];
-
-    args = var->args->elts;
-
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http_var: failed to compute argument for "
-                      "HMAC_SHA256 src_string");
-        return NGX_ERROR;
-    }
-
-    if (ngx_http_complex_value(r, &args[1], &secret_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http_var: failed to compute argument for "
-                      "HMAC_SHA256 secret");
-        return NGX_ERROR;
-    }
-
-    HMAC(EVP_sha256(), secret_str.data, secret_str.len,
-         src_str.data, src_str.len, md, &md_len);
-
-    if (md_len == 0 || md_len > EVP_MAX_MD_SIZE) {
-        return NGX_ERROR;
-    }
-
-    v->data = ngx_pnalloc(r->pool, md_len);
-    if (v->data == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for HMAC_SHA256");
-        return NGX_ERROR;
-    }
-
-    ngx_memcpy(v->data, &md, md_len);
-    v->len = md_len;
-
-    return NGX_OK;
+    return ngx_http_var_set_hmac(r, v, var, EVP_sha256());
 }
 
 
@@ -5183,45 +4814,7 @@ static ngx_int_t
 ngx_http_var_do_hmac_sha384(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, secret_str;
-    unsigned int               md_len = 0;
-    unsigned char              md[EVP_MAX_MD_SIZE];
-
-    args = var->args->elts;
-
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http_var: failed to compute argument for "
-                      "HMAC_SHA384 src_string");
-        return NGX_ERROR;
-    }
-
-    if (ngx_http_complex_value(r, &args[1], &secret_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http_var: failed to compute argument for "
-                      "HMAC_SHA384 secret");
-        return NGX_ERROR;
-    }
-
-    HMAC(EVP_sha384(), secret_str.data, secret_str.len,
-         src_str.data, src_str.len, md, &md_len);
-
-    if (md_len == 0 || md_len > EVP_MAX_MD_SIZE) {
-        return NGX_ERROR;
-    }
-
-    v->data = ngx_pnalloc(r->pool, md_len);
-    if (v->data == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for HMAC_SHA384");
-        return NGX_ERROR;
-    }
-
-    ngx_memcpy(v->data, &md, md_len);
-    v->len = md_len;
-
-    return NGX_OK;
+    return ngx_http_var_set_hmac(r, v, var, EVP_sha384());
 }
 
 
@@ -5229,45 +4822,7 @@ static ngx_int_t
 ngx_http_var_do_hmac_sha512(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, secret_str;
-    unsigned int               md_len = 0;
-    unsigned char              md[EVP_MAX_MD_SIZE];
-
-    args = var->args->elts;
-
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http_var: failed to compute argument for "
-                      "HMAC_SHA512 src_string");
-        return NGX_ERROR;
-    }
-
-    if (ngx_http_complex_value(r, &args[1], &secret_str) != NGX_OK) {
-        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http_var: failed to compute argument for "
-                      "HMAC_SHA512 secret");
-        return NGX_ERROR;
-    }
-
-    HMAC(EVP_sha512(), secret_str.data, secret_str.len,
-         src_str.data, src_str.len, md, &md_len);
-
-    if (md_len == 0 || md_len > EVP_MAX_MD_SIZE) {
-        return NGX_ERROR;
-    }
-
-    v->data = ngx_pnalloc(r->pool, md_len);
-    if (v->data == NULL) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "http_var: memory allocation failed for HMAC_SHA512");
-        return NGX_ERROR;
-    }
-
-    ngx_memcpy(v->data, &md, md_len);
-    v->len = md_len;
-
-    return NGX_OK;
+    return ngx_http_var_set_hmac(r, v, var, EVP_sha512());
 }
 #endif
 
