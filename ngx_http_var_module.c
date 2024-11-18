@@ -879,7 +879,7 @@ ngx_http_var_get_lock_ctx(ngx_http_request_t *r)
         }
 
         /* Initialize the variable lock array, assuming a maximum number of variables */
-        ctx->count = 32;  /* Set initial variable count to 32 */
+        ctx->count = 128;  /* Set initial variable count to 128 */
         ctx->locked_vars = ngx_pcalloc(r->pool,
             ctx->count * sizeof(ngx_uint_t));
         if (ctx->locked_vars == NULL) {
