@@ -2182,10 +2182,10 @@ ngx_http_var_do_if_find(ngx_http_request_t *r,
 
     if (var->ignore_case == 1) {
         p = ngx_strlcasestrn(str.data, str.data + str.len,
-            (char *) sub_str.data, sub_str.len - 1);
+                sub_str.data, sub_str.len - 1);
     } else {
         p = ngx_http_var_strlstrn(str.data, str.data + str.len,
-            (char *) sub_str.data, sub_str.len - 1);
+                sub_str.data, sub_str.len - 1);
     }
 
     v->len = 1;
