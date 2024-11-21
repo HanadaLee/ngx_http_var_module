@@ -290,6 +290,7 @@ static ngx_int_t ngx_http_var_parse_int_range(ngx_str_t str,
 static ngx_int_t ngx_http_var_escape_uri(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var,
     ngx_uint_t type);
+static u_char * ngx_http_var_strlstrn(u_char *s1, char *s2, size_t n);
 
 #if (NGX_HTTP_SSL)
 static ngx_int_t ngx_http_var_set_hmac(ngx_http_request_t *r,
@@ -1724,6 +1725,38 @@ ngx_http_var_escape_uri(ngx_http_request_t *r,
 }
 
 
+/*
+ * Same as ngx_strlcasestrn(), but case-sensitive.
+ * ngx_http_var_strlstrn() is intended to search for static substring
+ * with known length in string until the argument last. The argument n
+ * must be length of the second substring - 1.
+ */
+
+static u_char *
+ngx_http_var_strlstrn(u_char *s1, u_char *last, char *s2, size_t n)
+{
+    ngx_uint_t  c1, c2;
+
+    c2 = (ngx_uint_t) *s2++;
+
+    last -= n;
+
+    do {
+        do {
+            if (s1 >= last) {
+                return NULL;
+            }
+
+            c1 = (ngx_uint_t) *s1++;
+
+        } while (c1 != c2);
+
+    } while (ngx_strncmp(s1, (u_char *) s2, n) != 0);
+
+    return --s1;
+}
+
+
 #if (NGX_HTTP_SSL)
 static ngx_int_t
 ngx_http_var_set_hmac(ngx_http_request_t *r, ngx_http_variable_value_t *v,
@@ -2024,6 +2057,12 @@ ngx_http_var_do_if_has_prefix(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    if (prefix.len == 0) {
+        v->len = 1;
+        v->data = (u_char *) "1";
+        return NGX_OK;
+    }
+
     v->len = 1;
 
     if (prefix.len > str.len) {
@@ -2068,6 +2107,12 @@ ngx_http_var_do_if_has_suffix(ngx_http_request_t *r,
                       "http_var: \"if_has_suffix\" "
                       "failed to evaluate the second argument");
         return NGX_ERROR;
+    }
+
+    if (suffix.len == 0) {
+        v->len = 1;
+        v->data = (u_char *) "1";
+        return NGX_OK;
     }
 
     v->len = 1;
@@ -2118,13 +2163,32 @@ ngx_http_var_do_if_find(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (var->ignore_case == 1) {
-        p = ngx_strcasestrn(str.data, (char *)sub_str.data, sub_str.len - 1);
-    } else {
-        p = ngx_strstrn(str.data, (char *)sub_str.data, sub_str.len - 1);
+    if (str.len == 0) {
+        if (sub_str.len == 0) {
+            v->len = 1;
+            v->data = (u_char *) "1";
+        } else {
+            v->len = 1;
+            v->data = (u_char *) "0";
+        }
+        return NGX_OK;
     }
-    v->len = 1;
 
+    if (sub_str.len == 0 || sub_str.len > str.len) {
+        v->len = 1;
+        v->data = (u_char *) "0";
+        return NGX_OK;
+    }
+
+    if (var->ignore_case == 1) {
+        p = ngx_strlcasestrn(str.data, str.data + str.len,
+            (char *) sub_str.data, sub_str.len - 1);
+    } else {
+        p = ngx_http_var_strlstrn(str.data, str.data + str.len,
+            (char *) sub_str.data, sub_str.len - 1);
+    }
+
+    v->len = 1;
     if (p != NULL) {
         v->data = (u_char *) "1";
     } else {
