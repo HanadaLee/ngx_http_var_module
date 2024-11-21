@@ -290,7 +290,7 @@ static ngx_int_t ngx_http_var_parse_int_range(ngx_str_t str,
 static ngx_int_t ngx_http_var_escape_uri(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var,
     ngx_uint_t type);
-static u_char * ngx_http_var_strlstrn(u_char *s1, u_char *last, char *s2, size_t n);
+static u_char * ngx_http_var_strlstrn(u_char *s1, u_char *last, u_char *s2, size_t n);
 
 #if (NGX_HTTP_SSL)
 static ngx_int_t ngx_http_var_set_hmac(ngx_http_request_t *r,
