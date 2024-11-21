@@ -1733,7 +1733,7 @@ ngx_http_var_escape_uri(ngx_http_request_t *r,
  */
 
 static u_char *
-ngx_http_var_strlstrn(u_char *s1, u_char *last, char *s2, size_t n)
+ngx_http_var_strlstrn(u_char *s1, u_char *last, u_char *s2, size_t n)
 {
     ngx_uint_t  c1, c2;
 
@@ -1751,7 +1751,7 @@ ngx_http_var_strlstrn(u_char *s1, u_char *last, char *s2, size_t n)
 
         } while (c1 != c2);
 
-    } while (ngx_strncmp(s1, (u_char *) s2, n) != 0);
+    } while (ngx_strncmp(s1, s2, n) != 0);
 
     return --s1;
 }
