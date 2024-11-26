@@ -127,7 +127,7 @@ var $new_var find src_str sub_str;
 var $new_var repeat src_str times;
 
 # Extract substring
-var $new_var substr src_str start len;
+var $new_var substr src_str start [len];
 
 # Replace keyword
 var $new_var replace src_str src dst; 

@@ -176,7 +176,7 @@ static ngx_http_var_operator_enum_t ngx_http_var_operators[] = {
     { ngx_string("reverse"),         NGX_HTTP_VAR_OP_REVERSE,        0, 1, 1 },
     { ngx_string("find"),            NGX_HTTP_VAR_OP_FIND,           0, 2, 2 },
     { ngx_string("repeat"),          NGX_HTTP_VAR_OP_REPEAT,         0, 2, 2 },
-    { ngx_string("substr"),          NGX_HTTP_VAR_OP_SUBSTR,         0, 3, 3 },
+    { ngx_string("substr"),          NGX_HTTP_VAR_OP_SUBSTR,         0, 2, 3 },
     { ngx_string("replace"),         NGX_HTTP_VAR_OP_REPLACE,        0, 3, 3 },
 
 #if (NGX_PCRE)
@@ -2600,21 +2600,18 @@ ngx_http_var_do_substr(ngx_http_request_t *r,
 
     /* Compute arguments */
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK
-        || ngx_http_complex_value(r, &args[1], &start_str) != NGX_OK
-        || ngx_http_complex_value(r, &args[2], &len_str) != NGX_OK) {
+        || ngx_http_complex_value(r, &args[1], &start_str) != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute arguments "
                       "for \"substr\" operator");
         return NGX_ERROR;
     }
 
-    /* Parse start and length values */
+    /* Parse start value */
     start = ngx_atoi(start_str.data, start_str.len);
-    len = ngx_atoi(len_str.data, len_str.len);
-
-    if (start == NGX_ERROR || len == NGX_ERROR || start < 0 || len < 0) {
+    if (start == NGX_ERROR) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http_var: invalid start or length in substr");
+                      "http_var: invalid start in substr");
         return NGX_ERROR;
     }
 
@@ -2623,23 +2620,38 @@ ngx_http_var_do_substr(ngx_http_request_t *r,
     /* Handle the case where start is beyond the string length */
     if ((ngx_uint_t)start >= src_len) {
         return NGX_ERROR;
-    } else {
+    }
+
+    /* Check if len is provided */
+    if (var->args->nelts = 3
+        && ngx_http_complex_value(r, &args[2], &len_str) == NGX_OK)
+    {
+        len = ngx_atoi(len_str.data, len_str.len);
+        if (len == NGX_ERROR) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "http_var: invalid length in substr");
+            return NGX_ERROR;
+        }
+
         /* Adjust len if it exceeds the string length */
         if ((ngx_uint_t)(start + len) > src_len) {
             len = src_len - start;
         }
-
-        /* Allocate memory for the substring */
-        v->len = len;
-        v->data = ngx_pnalloc(r->pool, v->len);
-        if (v->data == NULL) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http_var: memory allocation failed "
-                          "for \"substr\" result");
-            return NGX_ERROR;
-        }
-        ngx_memcpy(v->data, src_str.data + start, v->len);
+    } else {
+        /* Default len to the remaining string length */
+        len = src_len - start;
     }
+
+    /* Allocate memory for the substring */
+    v->len = len;
+    v->data = ngx_pnalloc(r->pool, v->len);
+    if (v->data == NULL) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "http_var: memory allocation failed "
+                      "for \"substr\" result");
+        return NGX_ERROR;
+    }
+    ngx_memcpy(v->data, src_str.data + start, v->len);
 
     return NGX_OK;
 }
