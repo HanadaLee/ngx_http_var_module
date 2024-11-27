@@ -2623,7 +2623,7 @@ ngx_http_var_do_substr(ngx_http_request_t *r,
     }
 
     /* Check if len is provided */
-    if (var->args->nelts = 3
+    if (var->args->nelts == 3
         && ngx_http_complex_value(r, &args[2], &len_str) == NGX_OK)
     {
         len = ngx_atoi(len_str.data, len_str.len);
