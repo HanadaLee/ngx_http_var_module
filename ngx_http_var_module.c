@@ -227,10 +227,10 @@ static ngx_http_var_operator_enum_t ngx_http_var_operators[] = {
     { ngx_string("sha256sum"),        NGX_HTTP_VAR_OP_SHA256SUM,        1, 1 },
     { ngx_string("sha384sum"),        NGX_HTTP_VAR_OP_SHA384SUM,        1, 1 },
     { ngx_string("sha512sum"),        NGX_HTTP_VAR_OP_SHA512SUM,        1, 1 },
-    { ngx_string("hmac_sha1"),        NGX_HTTP_VAR_OP_HMAC_SHA,         2, 2 },
+    { ngx_string("hmac_sha1"),        NGX_HTTP_VAR_OP_HMAC_SHA1,        2, 2 },
     { ngx_string("hmac_sha256"),      NGX_HTTP_VAR_OP_HMAC_SHA256,      2, 2 },
     { ngx_string("hmac_sha384"),      NGX_HTTP_VAR_OP_HMAC_SHA384,      2, 2 },
-    { ngx_string("hmac_sha512"),      NGX_HTTP_VAR_OP_HMAC_SHA51,       2, 2 },
+    { ngx_string("hmac_sha512"),      NGX_HTTP_VAR_OP_HMAC_SHA512,      2, 2 },
 #endif
 
     { ngx_string("if_time_range"),    NGX_HTTP_VAR_OP_IF_TIME_RANGE,    1, 8 },
