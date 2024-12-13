@@ -39,13 +39,13 @@ To use theses modules, configure your nginx branch with `--add-module=/path/to/n
 
 ## var
 
-**Syntax:** *var $new_variable operator args... \[if\=condition\]*
+**Syntax:** *var $new_variable operator \[-i\] args... \[if\=condition\]*
 
 **Default:** *-*
 
 **Context:** *http, server, location*
 
-Define a variable whose value is the result of function calculation. The variable value cannot be cached and is recalculated each time it is used. If the current level does not define a variable with the same variable name using this instruction, it can be inherited from the previous level.
+Define a variable whose value is the result of function calculation. The variable value cannot be cached and is recalculated each time it is used. If the current level does not define a variable with the same variable name using this instruction, it can be inherited from the previous level. The -i parameter is used to ignore case.
 
 The following functions are available:
 ```nginx
@@ -71,28 +71,19 @@ var $bool_var if_not_empty str;
 var $bool_var if_is_num str;
 
 # Checks if the strings are equal
-var $bool_var if_str_eq str1 str2;
+var $bool_var if_str_eq [-i] str1 str2;
 
-# Checks if the strings are equal (case-insensitive)
-var $bool_var if_str_eq_i str1 str2;
+# Checks if the strings are not equal
+var $bool_var if_str_ne [-i] str1 str2;
 
 # Checks if the string has the specified prefix, returns 1 or 0
-var $bool_var if_has_prefix str prefix;
-
-# Checks if the string has the specified prefix, returns 1 or 0 (case-insensitive)
-var $bool_var if_has_prefix_i str prefix;
+var $bool_var if_has_prefix [-i] str prefix;
 
 # Checks if the string has the specified suffix, returns 1 or 0
-var $bool_var if_has_suffix str suffix;
-
-# Checks if the string has the specified suffix, returns 1 or 0 (case-insensitive)
-var $bool_var if_has_suffix_i str suffix;
+var $bool_var if_has_suffix [-i] str suffix;
 
 # Checks if the substring is present, returns 1 or 0
-var $bool_var if_find str sub_str;
-
-# Checks if the substring is present, returns 1 or 0 (case-insensitive)
-var $bool_var if_find_i str sub_str; 
+var $bool_var if_find [-i] str sub_str;
 
 
 #### General String Operations ####
@@ -121,7 +112,7 @@ var $new_var rtrim src_str;
 var $new_var reverse src_str;
 
 # Get starting position of substring
-var $new_var find src_str sub_str;
+var $new_var find [-i] src_str sub_str;
 
 # Repeat the string a given number of times
 var $new_var repeat src_str times;
@@ -130,35 +121,23 @@ var $new_var repeat src_str times;
 var $new_var substr src_str start [len];
 
 # Replace keyword
-var $new_var replace src_str src dst; 
+var $new_var replace [-i] src_str src dst; 
 
 
 #### Regex Judgement ####
 # Check if regex matches, returns 1 or 0
-var $bool_var if_re_match src_str match_regex;
-
-# Check if regex matches, returns 1 or 0 (case-insensitive)
-var $bool_var if_re_match_i src_str match_regex;
+var $bool_var if_re_match [-i] src_str match_regex;
 
 
 #### Regex Operations ####
 # Capture regex
-var $new_var re_capture src_str capture_regex assign_value;
-
-# Capture regex (case-insensitive)
-var $new_var re_capture_i src_str capture_regex assign_value;
+var $new_var re_capture [-i] src_str capture_regex assign_value;
 
 # Substitute regex
-var $new_var re_sub src_str capture_regex assign_value;
-
-# Substitute regex (case-insensitive)
-var $new_var re_sub_i src_str capture_regex assign_value;
+var $new_var re_sub [-i] src_str capture_regex assign_value;
 
 # Global regex substitution
-var $new_var re_gsub src_str capture_regex assign_value;
-
-# Global regex substitution (case-insensitive)
-var $new_var re_gsub_i src_str capture_regex assign_value;
+var $new_var re_gsub [-i] src_str capture_regex assign_value;
 
 
 #### Mathematical Judgement ####

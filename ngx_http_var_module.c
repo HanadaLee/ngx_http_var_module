@@ -2510,7 +2510,14 @@ ngx_http_var_do_find(ngx_http_request_t *r,
         /* If sub_str is empty or src_str is empty, return 0 */
         pos = 0;
     } else {
-        p = ngx_strnstr(src_str.data, (char *)sub_str.data, src_str.len);
+        if (var->ignore_case == 1) {
+            p = ngx_strlcasestrn(src_str.data, src_str.data + src_str.len,
+                                 sub_str.data, sub_str.len - 1);
+        } else {
+            p = ngx_http_var_utils_strlstrn(src_str.data,
+                    src_str.data + src_str.len, sub_str.data, sub_str.len - 1);
+        }
+
         if (p) {
             /* Position starts from 1 */
             pos = (ngx_int_t)(p - src_str.data) + 1;
@@ -2519,7 +2526,7 @@ ngx_http_var_do_find(ngx_http_request_t *r,
         }
     }
 
-    /* Convert find to string */
+    /* Convert pos to string */
     u_char *buf = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
     if (buf == NULL) {
         return NGX_ERROR;
@@ -2670,12 +2677,14 @@ ngx_http_var_do_replace(ngx_http_request_t *r,
     u_char                    *p, *q;
     size_t                     count = 0, new_len;
     ngx_uint_t                 i;
+    ngx_int_t                  rc;
 
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK
         || ngx_http_complex_value(r, &args[1], &search_str) != NGX_OK
-        || ngx_http_complex_value(r, &args[2], &replace_str) != NGX_OK) {
+        || ngx_http_complex_value(r, &args[2], &replace_str) != NGX_OK)
+    {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: failed to compute arguments "
                       "for \"replace\" operator");
@@ -2692,7 +2701,13 @@ ngx_http_var_do_replace(ngx_http_request_t *r,
     /* Count occurrences */
     p = src_str.data;
     for (i = 0; i <= src_str.len - search_str.len;) {
-        if (ngx_strncmp(p + i, search_str.data, search_str.len) == 0) {
+        if (var->ignore_case) {
+            rc = ngx_strncasecmp(p + i, search_str.data, search_str.len);
+        } else {
+            rc = ngx_strncmp(p + i, search_str.data, search_str.len);
+        }
+
+        if (rc == 0) {
             count++;
             i += search_str.len;
         } else {
@@ -2700,7 +2715,7 @@ ngx_http_var_do_replace(ngx_http_request_t *r,
         }
     }
 
-    /* No replacements needed, just return the original string */
+    /* No replacements needed */
     if (count == 0) {
         v->len = src_str.len;
         v->data = src_str.data;
@@ -2727,14 +2742,24 @@ ngx_http_var_do_replace(ngx_http_request_t *r,
     i = 0;
 
     while (i < src_str.len) {
-        if (i <= src_str.len - search_str.len
-            && ngx_strncmp(p + i, search_str.data, search_str.len) == 0) {
-            ngx_memcpy(q, replace_str.data, replace_str.len);
-            q += replace_str.len;
-            i += search_str.len;
-        } else {
-            *q++ = p[i++];
+        if (i <= src_str.len - search_str.len) {
+            if (var->ignore_case) {
+                rc = ngx_strncasecmp(p + i, search_str.data, search_str.len);
+            } else {
+                rc = ngx_strncmp((const char *)(p + i),
+                                 (const char *)search_str.data,
+                                 search_str.len);
+            }
+
+            if (rc == 0) {
+                ngx_memcpy(q, replace_str.data, replace_str.len);
+                q += replace_str.len;
+                i += search_str.len;
+                continue;
+            }
         }
+
+        *q++ = p[i++];
     }
 
     result_str.len = q - result_str.data;
