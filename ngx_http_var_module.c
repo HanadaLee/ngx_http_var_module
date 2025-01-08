@@ -526,11 +526,12 @@ ngx_http_var_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_http_var_conf_t *prev = parent;
     ngx_http_var_conf_t *conf = child;
 
+    ngx_http_var_variable_t  *var;
+
     if (conf->vars == NULL) {
         conf->vars = prev->vars;
-    } else if (prev->vars) {
-        ngx_http_var_variable_t *var;
 
+    } else if (prev->vars) {
         var = ngx_array_push_n(conf->vars, prev->vars->nelts);
         if (var == NULL) {
             return NGX_CONF_ERROR;
@@ -907,6 +908,7 @@ ngx_http_variable_acquire_lock(ngx_http_request_t *r, ngx_str_t *var_name)
     /* Dynamically expand the lock array */
     if (var_index >= ctx->count) {
         new_count = ctx->count * 2;
+
         new_locked_vars = ngx_pcalloc(r->pool,
             new_count * sizeof(ngx_uint_t));
         if (new_locked_vars == NULL) {
@@ -914,8 +916,10 @@ ngx_http_variable_acquire_lock(ngx_http_request_t *r, ngx_str_t *var_name)
                 "http_var: failed to expand lock array");
             return NGX_ERROR;
         }
+
         ngx_memcpy(new_locked_vars, ctx->locked_vars,
             ctx->count * sizeof(ngx_uint_t));
+
         ctx->locked_vars = new_locked_vars;
         ctx->count = new_count;
     }
@@ -963,6 +967,7 @@ ngx_http_var_find_variable(ngx_http_request_t *r,
 {
     ngx_http_var_variable_t      *vars;
     ngx_uint_t                    i;
+    ngx_str_t                     val;
 
     if (vconf == NULL || vconf->vars == NULL || vconf->vars->nelts == 0) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
@@ -982,20 +987,17 @@ ngx_http_var_find_variable(ngx_http_request_t *r,
             && ngx_strncmp(vars[i].name.data,
                    var_name->data, var_name->len) == 0) {
             if (vars[i].filter) {
-                ngx_str_t  val;
                 if (ngx_http_complex_value(r, vars[i].filter, &val)
                         != NGX_OK) {
                     return NGX_ERROR;
                 }
 
-                if ((val.len == 0 || (val.len == 1 && val.data[0] == '0'))) {
+                if (val.len == 0 || (val.len == 1 && val.data[0] == '0')) {
                     if (!vars[i].negative) {
-                        /* Skip this variable due to filter*/
                         continue;
                     }
                 } else {
                     if (vars[i].negative) {
-                        /* Skip this variable due to negative filter*/
                         continue;
                     }
                 }
@@ -1022,7 +1024,7 @@ static ngx_int_t
 ngx_http_var_evaluate_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_int_t rc;
+    ngx_int_t  rc;
 
     /* Acquire lock for variable to avoid loopback exception */
     if (ngx_http_variable_acquire_lock(r, &var->name) != NGX_OK) {
@@ -1377,7 +1379,9 @@ ngx_http_var_variable_handler(ngx_http_request_t *r,
     ngx_str_t                     var_name;
     ngx_str_t                    *var_name_ptr;
     ngx_int_t                     rc;
-    ngx_http_var_variable_t      *found_var = NULL;
+    ngx_http_var_variable_t      *found_var;
+
+    found_var = NULL;
 
     /* Get variable name from data */
     var_name_ptr = (ngx_str_t *) data;
@@ -1422,16 +1426,20 @@ found:
 static ngx_int_t
 ngx_http_var_utils_check_str_is_num(ngx_str_t num_str)
 {
-    ngx_str_t  num_abs_str = num_str;
-    ngx_int_t  num;
-    ngx_uint_t decimal_places = 0;
+    ngx_str_t   num_abs_str;
+    ngx_int_t   num;
+    ngx_uint_t  decimal_places;
+    ngx_uint_t  i;
+
+    num_abs_str = num_str;
+    decimal_places = 0;
 
     if (num_abs_str.len > 0 && num_abs_str.data[0] == '-') {
         num_abs_str.data++;
         num_abs_str.len--;
     }
 
-    for (ngx_uint_t i = 0; i < num_abs_str.len; i++) {
+    for (i = 0; i < num_abs_str.len; i++) {
         if (num_abs_str.data[i] == '.') {
             decimal_places = num_abs_str.len - i - 1;
             break;
@@ -1455,7 +1463,9 @@ ngx_http_var_utils_check_str_is_num(ngx_str_t num_str)
 static ngx_int_t
 ngx_http_var_utils_auto_atoi(ngx_str_t val, ngx_int_t *int_val)
 {
-    ngx_int_t is_negative = 0;
+    ngx_int_t  is_negative;
+
+    is_negative = 0;
 
     if (val.len > 0 && val.data[0] == '-') {
         *int_val = ngx_atoi(val.data + 1, val.len - 1);
@@ -1480,8 +1490,15 @@ static ngx_int_t
 ngx_http_var_utils_auto_atofp(ngx_str_t val1, ngx_str_t val2,
     ngx_int_t *int_val1, ngx_int_t *int_val2)
 {
-    ngx_uint_t decimal_places1 = 0, decimal_places2 = 0;
-    ngx_int_t is_negative1 = 0, is_negative2 = 0;
+    ngx_uint_t  decimal_places1, decimal_places2;
+    ngx_int_t   is_negative1, is_negative2;
+    ngx_uint_t  max_decimal_places;
+    ngx_uint_t  i;
+
+    decimal_places1 = 0;
+    decimal_places2 = 0;
+    is_negative1 = 0;
+    is_negative2 = 0;
 
     if (val1.len > 0 && val1.data[0] == '-') {
         is_negative1 = 1;
@@ -1495,21 +1512,21 @@ ngx_http_var_utils_auto_atofp(ngx_str_t val1, ngx_str_t val2,
         val2.len--;
     }
 
-    for (ngx_uint_t i = 0; i < val1.len; i++) {
+    for (i = 0; i < val1.len; i++) {
         if (val1.data[i] == '.') {
             decimal_places1 = val1.len - i - 1;
             break;
         }
     }
 
-    for (ngx_uint_t i = 0; i < val2.len; i++) {
+    for (i = 0; i < val2.len; i++) {
         if (val2.data[i] == '.') {
             decimal_places2 = val2.len - i - 1;
             break;
         }
     }
 
-    ngx_uint_t max_decimal_places = (decimal_places1 > decimal_places2)
+    max_decimal_places = (decimal_places1 > decimal_places2)
         ? decimal_places1 : decimal_places2;
 
     if (max_decimal_places == 0) {
@@ -1540,8 +1557,17 @@ static ngx_int_t
 ngx_http_var_utils_auto_atofp3(ngx_str_t val1, ngx_str_t val2, ngx_str_t val3,
     ngx_int_t *int_val1, ngx_int_t *int_val2, ngx_int_t *int_val3)
 {
-    ngx_uint_t decimal_places1 = 0, decimal_places2 = 0, decimal_places3 = 0;
-    ngx_int_t is_negative1 = 0, is_negative2 = 0, is_negative3 = 0;
+    ngx_uint_t  decimal_places1, decimal_places2, decimal_places3;
+    ngx_int_t   is_negative1, is_negative2, is_negative3;
+    ngx_uint_t  max_decimal_places;
+    ngx_uint_t  i;
+
+    decimal_places1 = 0;
+    decimal_places2 = 0;
+    decimal_places3 = 0;
+    is_negative1 = 0;
+    is_negative2 = 0;
+    is_negative3 = 0;
 
     if (val1.len > 0 && val1.data[0] == '-') {
         is_negative1 = 1;
@@ -1561,28 +1587,28 @@ ngx_http_var_utils_auto_atofp3(ngx_str_t val1, ngx_str_t val2, ngx_str_t val3,
         val3.len--;
     }
 
-    for (ngx_uint_t i = 0; i < val1.len; i++) {
+    for (i = 0; i < val1.len; i++) {
         if (val1.data[i] == '.') {
             decimal_places1 = val1.len - i - 1;
             break;
         }
     }
 
-    for (ngx_uint_t i = 0; i < val2.len; i++) {
+    for (i = 0; i < val2.len; i++) {
         if (val2.data[i] == '.') {
             decimal_places2 = val2.len - i - 1;
             break;
         }
     }
 
-    for (ngx_uint_t i = 0; i < val3.len; i++) {
+    for (i = 0; i < val3.len; i++) {
         if (val3.data[i] == '.') {
             decimal_places2 = val3.len - i - 1;
             break;
         }
     }
 
-    ngx_uint_t max_decimal_places = decimal_places1;
+    max_decimal_places = decimal_places1;
 
     if (decimal_places2 > max_decimal_places) {
         max_decimal_places = decimal_places2;
@@ -1628,10 +1654,14 @@ static ngx_int_t
 ngx_http_var_utils_parse_int_range(ngx_str_t str,
     ngx_int_t *start, ngx_int_t *end)
 {
-    ngx_uint_t i = 0;
-    ngx_int_t temp_start = 0, temp_end = 0;
-    ngx_int_t is_range = 0;
+    ngx_uint_t i;
+    ngx_int_t temp_start, temp_end, is_range;
 
+    temp_start = 0;
+    temp_end = 0;
+    is_range = 0;
+
+    i = 0;
     while (i < str.len) {
         if (str.data[i] == '-') {
             is_range = 1;
@@ -1759,7 +1789,7 @@ ngx_http_var_utils_set_hmac(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  src_str, secret_str;
-    unsigned int               md_len = 0;
+    unsigned int               md_len;
     unsigned char              md[EVP_MAX_MD_SIZE];
 
     args = var->args->elts;
@@ -1778,6 +1808,7 @@ ngx_http_var_utils_set_hmac(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    md_len = 0;
     HMAC(evp_md, secret_str.data, secret_str.len,
         src_str.data, src_str.len, md, &md_len);
 
@@ -1807,7 +1838,6 @@ ngx_http_var_do_and(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     ngx_uint_t                 i;
     ngx_str_t                  val;
-
 
     args = var->args->elts;
 
@@ -1876,11 +1906,10 @@ ngx_http_var_do_not(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    v->len = 1;
     if (val.len == 0 || (val.len == 1 && val.data[0] == '0')) {
-        v->len = 1;
         v->data = (u_char *) "1";
     } else {
-        v->len = 1;
         v->data = (u_char *) "0";
     }
     return NGX_OK;
@@ -1903,11 +1932,10 @@ ngx_http_var_do_if_empty(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    v->len = 1;
     if (val.len == 0) {
-        v->len = 1;
         v->data = (u_char *) "1";
     } else {
-        v->len = 1;
         v->data = (u_char *) "0";
     }
 
@@ -1931,11 +1959,10 @@ ngx_http_var_do_if_not_empty(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    v->len = 1;
     if (val.len > 0) {
-        v->len = 1;
         v->data = (u_char *) "1";
     } else {
-        v->len = 1;
         v->data = (u_char *) "0";
     }
 
@@ -1960,7 +1987,6 @@ ngx_http_var_do_if_is_num(ngx_http_request_t *r,
     }
 
     v->len = 1;
-
     if (ngx_http_var_utils_check_str_is_num(val) != NGX_OK) {
         v->data = (u_char *) "0";
     } else {
@@ -2014,14 +2040,10 @@ static ngx_int_t
 ngx_http_var_do_if_str_ne(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_int_t rc;
-
-    rc = ngx_http_var_do_if_str_eq(r, v, var);
-    if (rc != NGX_OK) {
+    if (ngx_http_var_do_if_str_eq(r, v, var) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    // 取相反结果
     v->len = 1;
     v->data = (v->data[0] == '0') ? (u_char *) "1" : (u_char *) "0";
 
@@ -2087,6 +2109,7 @@ ngx_http_var_do_if_has_suffix(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  str, suffix;
+    u_char                    *str_end;
 
     args = var->args->elts;
 
@@ -2117,7 +2140,8 @@ ngx_http_var_do_if_has_suffix(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-    u_char *str_end = str.data + str.len - suffix.len;
+    str_end = str.data + str.len - suffix.len;
+
     if (var->ignore_case == 1) {
         if (ngx_strncasecmp(str_end, suffix.data, suffix.len) == 0) {
             v->data = (u_char *) "1";
@@ -2158,19 +2182,18 @@ ngx_http_var_do_if_find(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    v->len = 1;
+
     if (str.len == 0) {
         if (sub_str.len == 0) {
-            v->len = 1;
             v->data = (u_char *) "1";
         } else {
-            v->len = 1;
             v->data = (u_char *) "0";
         }
         return NGX_OK;
     }
 
     if (sub_str.len == 0 || sub_str.len > str.len) {
-        v->len = 1;
         v->data = (u_char *) "0";
         return NGX_OK;
     }
@@ -2183,7 +2206,6 @@ ngx_http_var_do_if_find(ngx_http_request_t *r,
                 sub_str.data, sub_str.len - 1);
     }
 
-    v->len = 1;
     if (p != NULL) {
         v->data = (u_char *) "1";
     } else {
@@ -2261,6 +2283,7 @@ ngx_http_var_do_upper(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  value_str;
+    ngx_uint_t                 i;
 
     args = var->args->elts;
 
@@ -2282,7 +2305,6 @@ ngx_http_var_do_upper(ngx_http_request_t *r,
     ngx_memcpy(v->data, value_str.data, v->len);
 
     /* Convert to uppercase */
-    ngx_uint_t i;
     for (i = 0; i < v->len; i++) {
         v->data[i] = ngx_toupper(v->data[i]);
     }
@@ -2297,6 +2319,7 @@ ngx_http_var_do_lower(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  value_str;
+    ngx_uint_t                 i;
 
     args = var->args->elts;
 
@@ -2318,7 +2341,6 @@ ngx_http_var_do_lower(ngx_http_request_t *r,
     ngx_memcpy(v->data, value_str.data, v->len);
 
     /* Convert to lowercase */
-    ngx_uint_t i;
     for (i = 0; i < v->len; i++) {
         v->data[i] = ngx_tolower(v->data[i]);
     }
@@ -2466,7 +2488,7 @@ ngx_http_var_do_reverse(ngx_http_request_t *r,
     p = reversed_str.data;
     q = src_str.data + src_str.len - 1;
 
-    for (; q >= src_str.data; q--) {
+    for ( /* void */ ; q >= src_str.data; q--) {
         *p++ = *q;
     }
 
@@ -2485,7 +2507,8 @@ ngx_http_var_do_find(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     ngx_str_t                  src_str, sub_str;
     u_char                    *p;
-    ngx_int_t                  pos = 0;
+    ngx_int_t                  pos;
+    u_char                    *buf;
 
     args = var->args->elts;
 
@@ -2518,7 +2541,7 @@ ngx_http_var_do_find(ngx_http_request_t *r,
     }
 
     /* Convert pos to string */
-    u_char *buf = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    buf = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
     if (buf == NULL) {
         return NGX_ERROR;
     }
@@ -2666,7 +2689,7 @@ ngx_http_var_do_replace(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     ngx_str_t                  src_str, search_str, replace_str, result_str;
     u_char                    *p, *q;
-    size_t                     count = 0, new_len;
+    size_t                     count, new_len;
     ngx_uint_t                 i;
     ngx_int_t                  rc;
 
@@ -2690,8 +2713,9 @@ ngx_http_var_do_replace(ngx_http_request_t *r,
     }
 
     /* Count occurrences */
+    count = 0;
     p = src_str.data;
-    for (i = 0; i <= src_str.len - search_str.len;) {
+    for (i = 0; i <= src_str.len - search_str.len; /* void */ ) {
         if (var->ignore_case) {
             rc = ngx_strncasecmp(p + i, search_str.data, search_str.len);
         } else {
@@ -2768,10 +2792,11 @@ static ngx_int_t
 ngx_http_var_do_if_re_match(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
+    ngx_http_complex_value_t    *args;
     ngx_str_t                    subject;
     ngx_int_t                    rc;
 
-    ngx_http_complex_value_t    *args = var->args->elts;
+    args = var->args->elts;
 
     /* Calculate the value of src_string */
     if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
@@ -2782,9 +2807,11 @@ ngx_http_var_do_if_re_match(ngx_http_request_t *r,
 
     /* Perform regex match */
     rc = ngx_http_regex_exec(r, var->regex, &subject);
+
     if (rc == NGX_DECLINED) {
         v->data = (u_char *) "0";
         return NGX_OK;
+
     } else if (rc != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: regex match failed");
@@ -2792,6 +2819,7 @@ ngx_http_var_do_if_re_match(ngx_http_request_t *r,
     }
 
     v->data = (u_char *) "1";
+
     return NGX_OK;
 }
 
@@ -2800,10 +2828,11 @@ static ngx_int_t
 ngx_http_var_do_re_capture(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
+    ngx_http_complex_value_t    *args;
     ngx_str_t                    subject, assign_value;
     ngx_int_t                    rc;
 
-    ngx_http_complex_value_t    *args = var->args->elts;
+    args = var->args->elts;
 
     /* Calculate the value of src_string */
     if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
@@ -2842,12 +2871,13 @@ static ngx_int_t
 ngx_http_var_do_re_sub(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
+    ngx_http_complex_value_t    *args;
     ngx_str_t                    subject, replacement, result;
     ngx_int_t                    rc;
     u_char                      *p;
     ngx_uint_t                   start, end, len;
 
-    ngx_http_complex_value_t    *args = var->args->elts;
+    args = var->args->elts;
 
     /* Calculate the value of src_string */
     if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
@@ -2856,6 +2886,7 @@ ngx_http_var_do_re_sub(ngx_http_request_t *r,
 
     /* Perform regex match */
     rc = ngx_http_regex_exec(r, var->regex, &subject);
+
     if (rc == NGX_DECLINED) {
         /* No match, return the original string */
         v->len = subject.len;
@@ -2865,6 +2896,7 @@ ngx_http_var_do_re_sub(ngx_http_request_t *r,
         }
         ngx_memcpy(v->data, subject.data, v->len);
         return NGX_OK;
+
     } else if (rc != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http_var: regex substitution failed");
@@ -2923,13 +2955,19 @@ ngx_http_var_do_re_gsub(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_str_t                    subject, replacement, result;
-    ngx_http_complex_value_t    *args = var->args->elts;
-    ngx_uint_t                   offset = 0;
+    ngx_http_complex_value_t    *args;
+    ngx_uint_t                   offset;
     u_char                      *p;
     ngx_int_t                    rc;
     int                         *captures;
     ngx_uint_t                   allocated;
     ngx_uint_t                   required;
+    ngx_str_t                    sub;
+    u_char                      *new_data;
+    int                          match_start, match_end;
+    ngx_str_t                    replaced;
+
+    args = var->args->elts;
 
     /* Calculate the value of src_string */
     if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
@@ -2943,10 +2981,12 @@ ngx_http_var_do_re_gsub(ngx_http_request_t *r,
 
     /* Initialize the result string, initially allocate 2 times the original length */
     allocated = subject.len * 2;
+
     /* Set a smaller initial buffer limit to avoid excessive allocation for very small strings */
     if (allocated < 256) {  
         allocated = 256;
     }
+
     result.len = 0;
     result.data = ngx_pnalloc(r->pool, allocated);
     if (result.data == NULL) {
@@ -2955,8 +2995,8 @@ ngx_http_var_do_re_gsub(ngx_http_request_t *r,
 
     p = result.data;
 
+    offset = 0;
     while (offset < subject.len) {
-        ngx_str_t       sub;
         sub.len = subject.len - offset;
         sub.data = subject.data + offset;
 
@@ -2971,7 +3011,7 @@ ngx_http_var_do_re_gsub(ngx_http_request_t *r,
                 while (required > allocated) {
                     allocated *= 2;
                 }
-                u_char *new_data = ngx_pnalloc(r->pool, allocated);
+                new_data = ngx_pnalloc(r->pool, allocated);
                 if (new_data == NULL) {
                     return NGX_ERROR;
                 }
@@ -2983,6 +3023,7 @@ ngx_http_var_do_re_gsub(ngx_http_request_t *r,
             p += sub.len;
             result.len += sub.len;
             break;
+
         } else if (rc != NGX_OK) {
             ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "http_var: regex substitution failed");
@@ -2991,9 +3032,10 @@ ngx_http_var_do_re_gsub(ngx_http_request_t *r,
 
         /* Retrieve capture group information */
         captures = r->captures;
+
         /* captures is an array of ints, representing the start and end positions of the capture groups */
-        int match_start = captures[0];
-        int match_end = captures[1];
+        match_start = captures[0];
+        match_end = captures[1];
 
         /* Copy the part before the match */
         if (match_start > 0) {
@@ -3017,7 +3059,6 @@ ngx_http_var_do_re_gsub(ngx_http_request_t *r,
         }
 
         /* Compute the replacement string, handling $n */
-        ngx_str_t replaced;
         if (ngx_http_complex_value(r, &args[1], &replaced) != NGX_OK) {
             return NGX_ERROR;
         }
@@ -3089,11 +3130,10 @@ ngx_http_var_do_if_eq(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    v->len = 1;
     if (int_val1 == int_val2) {
-        v->len = 1;
         v->data = (u_char *) "1";
     } else {
-        v->len = 1;
         v->data = (u_char *) "0";
     }
 
@@ -3125,11 +3165,10 @@ ngx_http_var_do_if_ne(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    v->len = 1;
     if (int_val1 != int_val2) {
-        v->len = 1;
         v->data = (u_char *) "1";
     } else {
-        v->len = 1;
         v->data = (u_char *) "0";
     }
 
@@ -3161,11 +3200,10 @@ ngx_http_var_do_if_lt(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    v->len = 1;
     if (int_val1 < int_val2) {
-        v->len = 1;
         v->data = (u_char *) "1";
     } else {
-        v->len = 1;
         v->data = (u_char *) "0";
     }
 
@@ -3197,11 +3235,10 @@ ngx_http_var_do_if_le(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    v->len = 1;
     if (int_val1 <= int_val2) {
-        v->len = 1;
         v->data = (u_char *) "1";
     } else {
-        v->len = 1;
         v->data = (u_char *) "0";
     }
 
@@ -3233,11 +3270,10 @@ ngx_http_var_do_if_gt(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    v->len = 1;
     if (int_val1 > int_val2) {
-        v->len = 1;
         v->data = (u_char *) "1";
     } else {
-        v->len = 1;
         v->data = (u_char *) "0";
     }
 
@@ -3269,11 +3305,10 @@ ngx_http_var_do_if_ge(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    v->len = 1;
     if (int_val1 >= int_val2) {
-        v->len = 1;
         v->data = (u_char *) "1";
     } else {
-        v->len = 1;
         v->data = (u_char *) "0";
     }
 
@@ -3320,11 +3355,10 @@ ngx_http_var_do_if_range(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    v->len = 1;
     if (src_val >= start_val && src_val <= end_val) {
-        v->len = 1;
         v->data = (u_char *) "1";
     } else {
-        v->len = 1;
         v->data = (u_char *) "0";
     }
 
@@ -3684,9 +3718,10 @@ ngx_http_var_do_round(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  num_str, precision_str;
-    ngx_int_t                  precision, i, j, decimal_point = -1, len;
+    ngx_int_t                  precision, i, j, decimal_point, len;
     u_char                    *num_data, *result;
     size_t                     num_len;
+    u_char                    *new_result;
 
     args = var->args->elts;
 
@@ -3717,6 +3752,7 @@ ngx_http_var_do_round(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    decimal_point = -1;
     for (i = 0; i < (ngx_int_t)num_len; i++) {
         if (i == 0 && num_data[i] == '-') {
             continue;
@@ -3782,7 +3818,7 @@ ngx_http_var_do_round(ngx_http_request_t *r,
             } else {
                 result[j] = '0';
                 if (j == 0) {
-                    u_char *new_result = ngx_palloc(r->pool, len + 2);
+                    new_result = ngx_palloc(r->pool, len + 2);
                     if (new_result == NULL) {
                         return NGX_ERROR;
                     }
@@ -3820,7 +3856,7 @@ ngx_http_var_do_floor(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  num_str;
-    ngx_int_t                  i, decimal_point = -1;
+    ngx_int_t                  i, decimal_point;
     u_char                    *num_data, *result;
     size_t                     num_len;
 
@@ -3844,6 +3880,7 @@ ngx_http_var_do_floor(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    decimal_point = -1;
     for (i = 0; i < (ngx_int_t)num_len; i++) {
         if (i == 0 && num_data[i] == '-') {
             continue;
@@ -3928,9 +3965,10 @@ ngx_http_var_do_ceil(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  num_str;
-    ngx_int_t                  i, decimal_point = -1;
+    ngx_int_t                  i, decimal_point;
     u_char                    *num_data, *result;
     size_t                     num_len;
+    u_char                    *new_result;
 
     args = var->args->elts;
 
@@ -3952,6 +3990,7 @@ ngx_http_var_do_ceil(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    decimal_point = -1;
     for (i = 0; i < (ngx_int_t)num_len; i++) {
         if (i == 0 && num_data[i] == '-') {
             continue;
@@ -4009,8 +4048,7 @@ ngx_http_var_do_ceil(ngx_http_request_t *r,
                 } else {
                     result[i] = '0';
                     if (i == 0) {
-                        u_char *new_result = ngx_palloc(r->pool,
-                            decimal_point + 2);
+                        new_result = ngx_palloc(r->pool, decimal_point + 2);
                         if (new_result == NULL) {
                             return NGX_ERROR;
                         }
@@ -4037,11 +4075,7 @@ static ngx_int_t
 ngx_http_var_do_rand(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    /* Generate a random number */
-    ngx_uint_t rand_num = ngx_random();
-
-    /* Convert to string */
-    u_char *p;
+    u_char  *p;
     p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
     if (p == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -4049,7 +4083,7 @@ ngx_http_var_do_rand(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    v->len = ngx_sprintf(p, "%ui", rand_num) - p;
+    v->len = ngx_sprintf(p, "%ui", ngx_random()) - p;
     v->data = p;
 
     return NGX_OK;
@@ -4217,7 +4251,7 @@ ngx_http_var_do_dec_to_hex(ngx_http_request_t *r,
     ngx_str_t                  dec_str;
     ngx_int_t                  dec_value;
     u_char                    *p;
-    ngx_flag_t                 negative = 0;
+    ngx_flag_t                 negative;
 
     args = var->args->elts;
 
@@ -4230,6 +4264,8 @@ ngx_http_var_do_dec_to_hex(ngx_http_request_t *r,
     /* Validate if the input is a number */
     if (dec_str.data[0] == '-') {
         negative = 1;
+    } else {
+        negative = 0;
     }
 
     dec_value = ngx_atoi(dec_str.data + (negative ? 1 : 0),
@@ -4265,9 +4301,9 @@ ngx_http_var_do_hex_to_dec(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  hex_str;
-    ngx_int_t                  dec_value = 0;
+    ngx_int_t                  dec_value;
     u_char                    *p;
-    ngx_flag_t                 negative = 0;
+    ngx_flag_t                 negative;
 
     args = var->args->elts;
 
@@ -4280,6 +4316,8 @@ ngx_http_var_do_hex_to_dec(ngx_http_request_t *r,
     /* Check if the input is negative */
     if (hex_str.data[0] == '-') {
         negative = 1;
+    } else {
+        negative = 0;
     }
 
     dec_value = ngx_hextoi(hex_str.data + (negative ? 1 : 0),
@@ -4563,6 +4601,7 @@ ngx_http_var_do_crc32_short(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     ngx_str_t                  src_str;
     ngx_uint_t                 crc;
+    u_char                    *p;
 
     args = var->args->elts;
 
@@ -4578,7 +4617,6 @@ ngx_http_var_do_crc32_short(ngx_http_request_t *r,
     crc = ngx_crc32_short(src_str.data, src_str.len);
 
     /* Allocate buffer for CRC32 result */
-    u_char *p;
     p = ngx_pnalloc(r->pool, 9);
     if (p == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -4588,7 +4626,6 @@ ngx_http_var_do_crc32_short(ngx_http_request_t *r,
 
     /* Convert CRC32 result to string */
     v->len = ngx_sprintf(p, "%08xD", crc) - p;
-
     v->data = p;
 
     return NGX_OK;
@@ -4602,6 +4639,7 @@ ngx_http_var_do_crc32_long(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     ngx_str_t                  src_str;
     ngx_uint_t                 crc;
+    u_char                    *p;
 
     args = var->args->elts;
 
@@ -4617,7 +4655,6 @@ ngx_http_var_do_crc32_long(ngx_http_request_t *r,
     crc = ngx_crc32_long(src_str.data, src_str.len);
 
     /* Allocate buffer for CRC32 result */
-    u_char *p;
     p = ngx_pnalloc(r->pool, 9);
     if (p == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -4715,6 +4752,7 @@ ngx_http_var_do_sha1sum(ngx_http_request_t *r,
 
     return NGX_OK;
 }
+
 
 #if (NGX_HTTP_SSL)
 static ngx_int_t
@@ -4945,19 +4983,35 @@ ngx_http_var_do_if_time_range(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  param_str;
-    ngx_int_t                  year_start = -1, year_end = -1;
-    ngx_int_t                  month_start = -1, month_end = -1;
-    ngx_int_t                  day_start = -1, day_end = -1;
-    ngx_int_t                  wday_start = -1, wday_end = -1;
-    ngx_int_t                  hour_start = -1, hour_end = -1;
-    ngx_int_t                  min_start = -1, min_end = -1;
-    ngx_int_t                  sec_start = -1, sec_end = -1;
-    ngx_int_t                  tz_offset = 0;
+    ngx_int_t                  year_start, year_end;
+    ngx_int_t                  month_start, month_end;
+    ngx_int_t                  day_start, day_end;
+    ngx_int_t                  wday_start, wday_end;
+    ngx_int_t                  hour_start, hour_end;
+    ngx_int_t                  min_start, min_end;
+    ngx_int_t                  sec_start, sec_end;
+    ngx_int_t                  tz_offset;
     ngx_uint_t                 i, j;
     time_t                     raw_time;
     struct tm                  tm_copy;
 
     args = var->args->elts;
+
+    year_start = -1;
+    year_end = -1;
+    month_start = -1;
+    month_end = -1;
+    day_start = -1;
+    day_end = -1;
+    wday_start = -1;
+    wday_end = -1;
+    hour_start = -1;
+    hour_end = -1;
+    min_start = -1;
+    min_end = -1;
+    sec_start = -1;
+    sec_end = -1;
+    tz_offset = 0;
 
     /* parse time range */
     for (i = 0; i < var->args->nelts; i++) {
@@ -5475,10 +5529,12 @@ ngx_http_var_do_if_ip_range(ngx_http_request_t *r,
     ngx_uint_t                 i;
     ngx_cidr_t                 cidr;
     in_addr_t                  ipv4_addr, start_addr, end_addr;
+    u_char                    *p;
 
 #if (NGX_HAVE_INET6)
     u_char                     ipv6_buf[16];
     struct in6_addr            ipv6_addr;
+    ngx_uint_t                 n;
 #endif
 
     args = var->args->elts;
@@ -5546,7 +5602,6 @@ ip_range_match_handler:
 
 #if (NGX_HAVE_INET6)
             } else if (cidr.family == AF_INET6) {
-                ngx_uint_t n;
                 for (n = 0; n < 16; n++) {
                     if ((ipv6_addr.s6_addr[n] & cidr.u.in6.mask.s6_addr[n])
                         != cidr.u.in6.addr.s6_addr[n]) {
@@ -5562,7 +5617,7 @@ ip_range_match_handler:
             }
 
         } else if (ipv4_addr != INADDR_NONE) {
-            u_char *p = ngx_strlchr(range_str.data,
+            p = ngx_strlchr(range_str.data,
                 range_str.data + range_str.len, '-');
             if (p == NULL) {
                 goto invalid_ip_range;
