@@ -583,8 +583,6 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     filter = NULL;
     negative = 0;
 
-    ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
-
     value = cf->args->elts;
     last = cf->args->nelts - 1;
 
