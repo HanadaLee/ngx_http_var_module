@@ -577,9 +577,6 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     op = NGX_HTTP_VAR_OP_UNKNOWN;
     ignore_case = 0;
-    min_args = 0;
-    max_args = 0;
-    ops_count = 0;
     filter = NULL;
     negative = 0;
 
