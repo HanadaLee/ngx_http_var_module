@@ -591,21 +591,24 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    var_name = value[1];
-    op_name = value[2];
-
-    if (var_name.len == 0 || var_name.data[0] != '$') {
+    if (value[1].len == 0 || value[1].data == NULL || value[1].data[0] != '$') {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "http var: invalid variable name \"%V\"",
-                           &var_name);
+                           &value[1]);
         return NGX_CONF_ERROR;
     }
+
+    var_name.len = value[1].len;
+    ngx_strlow(var_name.data, value[1].data, value[1].len);
 
     /* Remove the leading '$' from variable name */
     var_name.len--;
     var_name.data++;
 
     /* Map operator string to enum and get argument counts */
+    ngx_strlow(op_name.data, value[2].data, value[2].len);
+    op_name.len = value[2].len;
+
     ops_count = sizeof(ngx_http_var_operators) /
                   sizeof(ngx_http_var_operator_enum_t);
 
