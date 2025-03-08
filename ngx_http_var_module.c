@@ -1604,7 +1604,7 @@ ngx_http_var_utils_auto_atofp3(ngx_str_t val1, ngx_str_t val2, ngx_str_t val3,
 
     for (i = 0; i < val3.len; i++) {
         if (val3.data[i] == '.') {
-            decimal_places2 = val3.len - i - 1;
+            decimal_places3 = val3.len - i - 1;
             break;
         }
     }
