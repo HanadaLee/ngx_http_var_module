@@ -120,11 +120,12 @@ typedef struct {
 
 typedef struct {
     ngx_str_t                      name;        /* variable name */
+    ngx_int_t                      index;       /* variable index */
     ngx_http_var_operator_e        operator;    /* operator type */
     ngx_uint_t                     ignore_case; /* ignore case sensitivity */
     ngx_array_t                   *args;        /* operator extra args */
-    ngx_http_complex_value_t      *filter;
-    ngx_uint_t                     negative;
+    ngx_http_complex_value_t      *filter;      /* filter complex value */
+    ngx_uint_t                     negative;    /* negative filter */
 
 #if (NGX_PCRE)
     ngx_http_regex_t              *regex;       /* compiled regex */
@@ -258,8 +259,8 @@ static ngx_int_t ngx_http_variable_acquire_lock(ngx_http_request_t *r,
 static void ngx_http_variable_release_lock(ngx_http_request_t *r,
     ngx_str_t *var_name);
 static ngx_int_t ngx_http_var_find_variable(ngx_http_request_t *r,
-    ngx_str_t *var_name, ngx_http_var_conf_t *vconf,
-    ngx_http_var_variable_t **found_var);
+    ngx_int_t index, ngx_http_var_conf_t *vconf,
+    ngx_http_var_variable_t **var);
 static ngx_int_t ngx_http_var_evaluate_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_variable_handler(ngx_http_request_t *r,
@@ -694,12 +695,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    var->name.len = value[1].len;
-    var->name.data = ngx_pstrdup(cf->pool, &value[1]);
-    if (var->name.data == NULL) {
-        return NGX_CONF_ERROR;
-    }
-
+    var->name = value[1];
     var->operator = op;
     var->ignore_case = ignore_case;
     var->filter = filter;
@@ -843,14 +839,17 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (v->get_handler && v->get_handler != ngx_http_var_variable_handler) {
         ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
-                           "http var: variable $%V already has a handler",
+                           "http var: variable \"%V\" already has a handler",
                            &value[1]);
         return NGX_CONF_ERROR;
     }
 
-    /* Set variable name and handler */
+    /* Save variable index to data */
+    var->index = ngx_http_get_variable_index(cf, &value[1]);
+    v->data = (uintptr_t) var->index;
+
+    /* Set variable handler */
     v->get_handler = ngx_http_var_variable_handler;
-    v->data = (uintptr_t) &var->name;
 
     return NGX_CONF_OK;
 }
@@ -928,7 +927,7 @@ ngx_http_variable_acquire_lock(ngx_http_request_t *r, ngx_str_t *var_name)
     if (ctx->locked_vars[var_index]) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http var: circular reference detected "
-                      "for variable $%V", var_name);
+                      "for variable \"%V\"", var_name);
         return NGX_ERROR;
     }
 
@@ -962,30 +961,18 @@ ngx_http_variable_release_lock(ngx_http_request_t *r, ngx_str_t *var_name)
 /* Helper function to find variable */
 static ngx_int_t
 ngx_http_var_find_variable(ngx_http_request_t *r,
-    ngx_str_t *var_name, ngx_http_var_conf_t *vconf,
-    ngx_http_var_variable_t **found_var)
+    ngx_int_t index, ngx_http_var_conf_t *vconf,
+    ngx_http_var_variable_t **var)
 {
-    ngx_http_var_variable_t      *vars;
-    ngx_uint_t                    i;
-    ngx_str_t                     val;
-
-    if (vconf == NULL || vconf->vars == NULL || vconf->vars->nelts == 0) {
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                "http var: not variable defined by http var module");
-        return NGX_DECLINED;
-    }
-
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http var: searching variable $%V in var module config",
-                   var_name);
+    ngx_http_var_variable_t    *vars;
+    ngx_uint_t                  i;
+    ngx_str_t                   val;
 
     vars = vconf->vars->elts;
 
     /* Linear search */
     for (i = 0; i < vconf->vars->nelts; i++) {
-        if (vars[i].name.len == var_name->len
-            && ngx_strncmp(vars[i].name.data,
-                   var_name->data, var_name->len) == 0) {
+        if (vars[i].index == index) {
             if (vars[i].filter) {
                 if (ngx_http_complex_value(r, vars[i].filter, &val)
                         != NGX_OK) {
@@ -996,6 +983,7 @@ ngx_http_var_find_variable(ngx_http_request_t *r,
                     if (!vars[i].negative) {
                         continue;
                     }
+
                 } else {
                     if (vars[i].negative) {
                         continue;
@@ -1005,11 +993,11 @@ ngx_http_var_find_variable(ngx_http_request_t *r,
 
             /* Found the variable */
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                           "http var: variable $%V found in conf",
-                           var_name);
+                           "http var: variable \"%V\" definition found",
+                           vars[i].name);
 
             /* Return the found variable */
-            *found_var = &vars[i];
+            *var = &vars[i];
 
             return NGX_OK;
         }
@@ -1363,7 +1351,7 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
     v->not_found = 0;
 
     ngx_log_debug4(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http var: evaluated variable $%V, "
+                   "http var: evaluated variable \"%V\", "
                    "length: %uz, value: \"%*s\"",
                    &var->name, v->len, v->len, v->data);
 
@@ -1377,33 +1365,32 @@ ngx_http_var_variable_handler(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data)
 {
     ngx_http_var_conf_t          *vconf;
-    ngx_str_t                     var_name;
-    ngx_str_t                    *var_name_ptr;
+    ngx_http_var_variable_t      *var;
+    ngx_int_t                     index;
     ngx_int_t                     rc;
-    ngx_http_var_variable_t      *found_var;
 
-    found_var = NULL;
-
-    /* Get variable name from data */
-    var_name_ptr = (ngx_str_t *) data;
-    var_name.len = var_name_ptr->len;
-    var_name.data = var_name_ptr->data;
-
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http var: handling variable $%V", &var_name);
-
-    /* Search in conf */
     vconf = ngx_http_get_module_loc_conf(r, ngx_http_var_module);
-    rc = ngx_http_var_find_variable(r, &var_name, vconf, &found_var);
+
+    if (vconf == NULL || vconf->vars == NULL || vconf->vars->nelts == 0) {
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                "http var: not variable defined by http var module");
+        return NGX_DECLINED;
+    }
+
+    index = (ngx_int_t) data;
+
+    /* Search */
+    rc = ngx_http_var_find_variable(r, index, vconf, &var);
     if (rc == NGX_OK) {
         goto found;
+
     } else if (rc == NGX_ERROR) {
         return NGX_ERROR;
     }
 
     /* Variable not found */
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http var: variable $%V not found", &var_name);
+                   "http var: variable \"%V\" not found", &var_name);
 
     v->not_found = 1;
     return NGX_OK;
@@ -1411,11 +1398,11 @@ ngx_http_var_variable_handler(ngx_http_request_t *r,
 found:
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http var: evaluating the expression of variable $%V",
+                   "http var: evaluating the expression of variable \"%V\"",
                    &var_name);
 
     /* Evaluate the variable expression */
-    rc = ngx_http_var_evaluate_variable(r, v, found_var);
+    rc = ngx_http_var_evaluate_variable(r, v, var);
     if (rc != NGX_OK) {
         return NGX_ERROR;
     }
