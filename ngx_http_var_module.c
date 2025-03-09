@@ -1389,9 +1389,6 @@ ngx_http_var_variable_handler(ngx_http_request_t *r,
     }
 
     /* Variable not found */
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "http var: variable \"%V\" not found", &var_name);
-
     v->not_found = 1;
     return NGX_OK;
 
@@ -1399,7 +1396,7 @@ found:
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http var: evaluating the expression of variable \"%V\"",
-                   &var_name);
+                   &var->name);
 
     /* Evaluate the variable expression */
     rc = ngx_http_var_evaluate_variable(r, v, var);
