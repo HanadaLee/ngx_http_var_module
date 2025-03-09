@@ -553,7 +553,6 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     ngx_str_t                   *value;
     ngx_uint_t                   cur, last;
-    ngx_str_t                    var_name, op_name;
     ngx_str_t                    s;
     ngx_http_variable_t         *v;
     ngx_http_var_variable_t     *var;
@@ -598,24 +597,22 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    var_name.len = value[1].len;
-    ngx_strlow(var_name.data, value[1].data, value[1].len);
+    /* Remove the leading '$' and convert to lowercase */
+    ngx_strlow(value[1].data, value[1].data, value[1].len);
+    value[1].len--;
+    value[1].data++;
 
-    /* Remove the leading '$' from variable name */
-    var_name.len--;
-    var_name.data++;
+    /* Convert to lowercase */
+    ngx_strlow(value[2].data, value[2].data, value[2].len);
 
     /* Map operator string to enum and get argument counts */
-    ngx_strlow(op_name.data, value[2].data, value[2].len);
-    op_name.len = value[2].len;
-
     ops_count = sizeof(ngx_http_var_operators) /
                   sizeof(ngx_http_var_operator_enum_t);
 
     for (i = 0; i < ops_count; i++) {
-        if (op_name.len == ngx_http_var_operators[i].name.len
-            && ngx_strncmp(op_name.data,
-                ngx_http_var_operators[i].name.data, op_name.len) == 0)
+        if (value[2].len == ngx_http_var_operators[i].name.len
+            && ngx_strncmp(value[2].data,
+                ngx_http_var_operators[i].name.data, value[2].len) == 0)
         {
             op = ngx_http_var_operators[i].op;
             min_args = ngx_http_var_operators[i].min_args;
@@ -627,7 +624,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     if (op == NGX_HTTP_VAR_OP_UNKNOWN) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "http var: unsupported operator \"%V\"",
-                           &op_name);
+                           &value[2]);
         return NGX_CONF_ERROR;
     }
 
@@ -678,7 +675,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     if (args_count < min_args || args_count > max_args) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "http var: invalid number of arguments "
-                           "for operator \"%V\"", &op_name);
+                           "for operator \"%V\"", &value[2]);
         return NGX_CONF_ERROR;
     }
 
@@ -697,8 +694,8 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    var->name.len = var_name.len;
-    var->name.data = ngx_pstrdup(cf->pool, &var_name);
+    var->name.len = value[1].len;
+    var->name.data = ngx_pstrdup(cf->pool, &value[1]);
     if (var->name.data == NULL) {
         return NGX_CONF_ERROR;
     }
@@ -839,7 +836,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     /* Add variable to Nginx */
     flags = NGX_HTTP_VAR_CHANGEABLE | NGX_HTTP_VAR_NOCACHEABLE;
 
-    v = ngx_http_add_variable(cf, &var_name, flags);
+    v = ngx_http_add_variable(cf, &value[1], flags);
     if (v == NULL) {
         return NGX_CONF_ERROR;
     }
@@ -847,7 +844,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     if (v->get_handler && v->get_handler != ngx_http_var_variable_handler) {
         ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
                            "http var: variable $%V already has a handler",
-                           &var_name);
+                           &value[1]);
         return NGX_CONF_ERROR;
     }
 
