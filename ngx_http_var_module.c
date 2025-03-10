@@ -846,7 +846,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     /* Save variable index to data */
     var->index = ngx_http_get_variable_index(cf, &value[1]);
-    v->data = (uintptr_t) var->index;
+    v->data = (uintptr_t) &var->index;
 
     /* Set variable handler */
     v->get_handler = ngx_http_var_variable_handler;
@@ -994,7 +994,7 @@ ngx_http_var_find_variable(ngx_http_request_t *r,
             /* Found the variable */
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                            "http var: variable \"%V\" definition found",
-                           vars[i].name);
+                           &vars[i].name);
 
             /* Return the found variable */
             *var = &vars[i];
@@ -1377,7 +1377,7 @@ ngx_http_var_variable_handler(ngx_http_request_t *r,
         return NGX_DECLINED;
     }
 
-    index = (ngx_int_t) data;
+    index = *(ngx_int_t *) v->data;
 
     /* Search */
     rc = ngx_http_var_find_variable(r, index, vconf, &var);
