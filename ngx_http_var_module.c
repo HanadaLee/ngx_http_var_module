@@ -1348,7 +1348,7 @@ ngx_http_var_variable_handler(ngx_http_request_t *r,
         return NGX_DECLINED;
     }
 
-    index = *(ngx_int_t *) v->data;
+    index = *(ngx_int_t *) data;
 
     /* Search */
     rc = ngx_http_var_find_variable(r, index, vconf, &var);
