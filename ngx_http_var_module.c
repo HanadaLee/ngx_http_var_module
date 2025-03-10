@@ -907,7 +907,7 @@ ngx_http_variable_acquire_lock(ngx_http_request_t *r, ngx_int_t index)
     }
 
     /* Mark the variable as locked */
-    ctx->locked_vars[var_index] = 1;
+    ctx->locked_vars[index] = 1;
 
     return NGX_OK;
 }
@@ -925,7 +925,7 @@ ngx_http_variable_release_lock(ngx_http_request_t *r, ngx_int_t index)
     }
 
     /* Clear the lock mark */
-    ctx->locked_vars[var_index] = 0;
+    ctx->locked_vars[index] = 0;
 }
 
 
