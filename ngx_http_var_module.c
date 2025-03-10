@@ -960,9 +960,8 @@ ngx_http_variable_release_lock(ngx_http_request_t *r, ngx_str_t *var_name)
 
 /* Helper function to find variable */
 static ngx_int_t
-ngx_http_var_find_variable(ngx_http_request_t *r,
-    ngx_int_t index, ngx_http_var_conf_t *vconf,
-    ngx_http_var_variable_t **var)
+ngx_http_var_find_variable(ngx_http_request_t *r, ngx_int_t index,
+    ngx_http_var_conf_t *vconf, ngx_http_var_variable_t **var)
 {
     ngx_http_var_variable_t    *vars;
     ngx_uint_t                  i;
