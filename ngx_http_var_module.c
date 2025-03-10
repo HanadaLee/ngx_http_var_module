@@ -135,7 +135,6 @@ typedef struct {
 
 typedef struct {
     ngx_uint_t                    *locked_vars;
-    ngx_uint_t                     count;
 } ngx_http_var_ctx_t;
 
 
@@ -186,7 +185,7 @@ static ngx_http_var_operator_enum_t ngx_http_var_operators[] = {
     { ngx_string("if_ne"),            NGX_HTTP_VAR_OP_IF_NE,            2, 2 },
     { ngx_string("if_lt"),            NGX_HTTP_VAR_OP_IF_LT,            2, 2 },
     { ngx_string("if_le"),            NGX_HTTP_VAR_OP_IF_LE,            2, 2 },
-    { ngx_string("if_gt"),            NGX_HTTP_VAR_OP_IF_GE,            2, 2 },
+    { ngx_string("if_gt"),            NGX_HTTP_VAR_OP_IF_GT,            2, 2 },
     { ngx_string("if_ge"),            NGX_HTTP_VAR_OP_IF_GE,            2, 2 },
     { ngx_string("if_range"),         NGX_HTTP_VAR_OP_IF_RANGE,         2, 2 },
 
@@ -255,9 +254,9 @@ static char *ngx_http_var_create_variable(ngx_conf_t *cf,
 
 static ngx_http_var_ctx_t *ngx_http_var_get_lock_ctx(ngx_http_request_t *r);
 static ngx_int_t ngx_http_variable_acquire_lock(ngx_http_request_t *r,
-    ngx_str_t *var_name);
+    ngx_int_t index);
 static void ngx_http_variable_release_lock(ngx_http_request_t *r,
-    ngx_str_t *var_name);
+    ngx_int_t index);
 static ngx_int_t ngx_http_var_find_variable(ngx_http_request_t *r,
     ngx_int_t index, ngx_http_var_conf_t *vconf,
     ngx_http_var_variable_t **var);
@@ -858,42 +857,40 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 static ngx_http_var_ctx_t *
 ngx_http_var_get_lock_ctx(ngx_http_request_t *r)
 {
+    ngx_http_core_main_conf_t  *cmcf;
+
     ngx_http_var_ctx_t  *ctx;
 
     /* Attempt to get the current request context */
     ctx = ngx_http_get_module_ctx(r, ngx_http_var_module);
-
-    /* If the context does not exist, create and attach it to the request */
-    if (ctx == NULL) {
-        ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_var_ctx_t));
-        if (ctx == NULL) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                          "http var: failed to create lock context");
-            return NULL;
-        }
-
-        /* Initialize the variable lock array, assuming a maximum number of variables */
-        ctx->count = 128;  /* Set initial variable count to 128 */
-        ctx->locked_vars = ngx_pcalloc(r->pool,
-            ctx->count * sizeof(ngx_uint_t));
-        if (ctx->locked_vars == NULL) {
-            return NULL;
-        }
-
-        ngx_http_set_ctx(r, ctx, ngx_http_var_module);
+    if (ctx != NULL) {
+        return ctx;
     }
 
+    /* If the context does not exist, create and attach it to the request */
+    ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_var_ctx_t));
+    if (ctx == NULL) {
+        return NULL;
+    }
+
+    /* Initialize the variable lock array, assuming a maximum number of variables */
+    cmcf = ngx_http_get_module_main_conf(r, ngx_http_core_module);
+
+    ctx->locked_vars = ngx_pcalloc(r->pool,
+        cmcf->variables.nelts * sizeof(ngx_uint_t));
+    if (ctx->locked_vars == NULL) {
+        return NULL;
+    }
+
+    ngx_http_set_ctx(r, ctx, ngx_http_var_module);
     return ctx;
 }
 
 
 static ngx_int_t
-ngx_http_variable_acquire_lock(ngx_http_request_t *r, ngx_str_t *var_name)
+ngx_http_variable_acquire_lock(ngx_http_request_t *r, ngx_int_t index)
 {
     ngx_http_var_ctx_t       *ctx;
-    ngx_uint_t                var_index;
-    ngx_uint_t                new_count;
-    ngx_uint_t               *new_locked_vars;
 
     /* Get or create the context */
     ctx = ngx_http_var_get_lock_ctx(r);
@@ -901,33 +898,11 @@ ngx_http_variable_acquire_lock(ngx_http_request_t *r, ngx_str_t *var_name)
         return NGX_ERROR; /* Context creation failed */
     }
 
-    /* Calculate the variable index */
-    var_index = ngx_hash_key(var_name->data, var_name->len) % ctx->count;
-
-    /* Dynamically expand the lock array */
-    if (var_index >= ctx->count) {
-        new_count = ctx->count * 2;
-
-        new_locked_vars = ngx_pcalloc(r->pool,
-            new_count * sizeof(ngx_uint_t));
-        if (new_locked_vars == NULL) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                "http var: failed to expand lock array");
-            return NGX_ERROR;
-        }
-
-        ngx_memcpy(new_locked_vars, ctx->locked_vars,
-            ctx->count * sizeof(ngx_uint_t));
-
-        ctx->locked_vars = new_locked_vars;
-        ctx->count = new_count;
-    }
-
     /* Check if it is already locked */
-    if (ctx->locked_vars[var_index]) {
+    if (ctx->locked_vars[index] == 1) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http var: circular reference detected "
-                      "for variable \"%V\"", var_name);
+                      "for variable index %ui", index);
         return NGX_ERROR;
     }
 
@@ -939,19 +914,15 @@ ngx_http_variable_acquire_lock(ngx_http_request_t *r, ngx_str_t *var_name)
 
 
 static void
-ngx_http_variable_release_lock(ngx_http_request_t *r, ngx_str_t *var_name)
+ngx_http_variable_release_lock(ngx_http_request_t *r, ngx_int_t index)
 {
     ngx_http_var_ctx_t       *ctx;
-    ngx_uint_t                var_index;
 
     /* Get the current request context */
     ctx = ngx_http_get_module_ctx(r, ngx_http_var_module);
     if (ctx == NULL) {
         return;
     }
-
-    /* Calculate the variable index */
-    var_index = ngx_hash_key(var_name->data, var_name->len) % ctx->count;
 
     /* Clear the lock mark */
     ctx->locked_vars[var_index] = 0;
@@ -974,7 +945,8 @@ ngx_http_var_find_variable(ngx_http_request_t *r, ngx_int_t index,
         if (vars[i].index == index) {
             if (vars[i].filter) {
                 if (ngx_http_complex_value(r, vars[i].filter, &val)
-                        != NGX_OK) {
+                        != NGX_OK) 
+                {
                     return NGX_ERROR;
                 }
 
@@ -1014,7 +986,7 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
     ngx_int_t  rc;
 
     /* Acquire lock for variable to avoid loopback exception */
-    if (ngx_http_variable_acquire_lock(r, &var->name) != NGX_OK) {
+    if (ngx_http_variable_acquire_lock(r, var->index) != NGX_OK) {
         v->not_found = 1;
         return NGX_ERROR;
     }
@@ -1332,13 +1304,13 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
     default:
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "http var: unknown operator");
-        ngx_http_variable_release_lock(r, &var->name);
+        ngx_http_variable_release_lock(r, var->index);
         v->not_found = 1;
         return NGX_ERROR;
     }
 
     /* Evaluation is complete, release the lock */
-    ngx_http_variable_release_lock(r, &var->name);
+    ngx_http_variable_release_lock(r, var->index);
 
     if (rc != NGX_OK) {
         v->not_found = 1;
