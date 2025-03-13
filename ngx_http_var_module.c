@@ -25,8 +25,8 @@ typedef enum {
     NGX_HTTP_VAR_OP_IF_IS_NUM,
     NGX_HTTP_VAR_OP_IF_STR_EQ,
     NGX_HTTP_VAR_OP_IF_STR_NE,
-    NGX_HTTP_VAR_OP_IF_HAS_PREFIX,
-    NGX_HTTP_VAR_OP_IF_HAS_SUFFIX,
+    NGX_HTTP_VAR_OP_IF_STARTS_WITH,
+    NGX_HTTP_VAR_OP_IF_ENDS_WITH,
     NGX_HTTP_VAR_OP_IF_FIND,
 
     NGX_HTTP_VAR_OP_COPY,
@@ -156,8 +156,8 @@ static ngx_http_var_operator_enum_t ngx_http_var_operators[] = {
     { ngx_string("if_is_num"),        NGX_HTTP_VAR_OP_IF_IS_NUM,        1, 1 },
     { ngx_string("if_str_eq"),        NGX_HTTP_VAR_OP_IF_STR_EQ,        2, 2 },
     { ngx_string("if_str_ne"),        NGX_HTTP_VAR_OP_IF_STR_NE,        2, 2 },
-    { ngx_string("if_has_prefix"),    NGX_HTTP_VAR_OP_IF_HAS_PREFIX,    2, 2 },
-    { ngx_string("if_has_suffix"),    NGX_HTTP_VAR_OP_IF_HAS_SUFFIX,    2, 2 },
+    { ngx_string("if_starts_with"),   NGX_HTTP_VAR_OP_IF_STARTS_WITH,   2, 2 },
+    { ngx_string("if_ends_with"),     NGX_HTTP_VAR_OP_IF_ENDS_WITH,     2, 2 },
     { ngx_string("if_find"),          NGX_HTTP_VAR_OP_IF_FIND,          2, 2 },
 
     { ngx_string("copy"),             NGX_HTTP_VAR_OP_COPY,             1, 1 },
@@ -304,9 +304,9 @@ static ngx_int_t ngx_http_var_do_if_str_eq(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_do_if_str_ne(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_do_if_has_prefix(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_do_if_starts_with(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_do_if_has_suffix(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_do_if_ends_with(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_do_if_find(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -1025,12 +1025,12 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_do_if_str_ne(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_HAS_PREFIX:
-        rc = ngx_http_var_do_if_has_prefix(r, v, var);
+    case NGX_HTTP_VAR_OP_IF_STARTS_WITH:
+        rc = ngx_http_var_do_if_starts_with(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_HAS_SUFFIX:
-        rc = ngx_http_var_do_if_has_suffix(r, v, var);
+    case NGX_HTTP_VAR_OP_IF_ENDS_WITH:
+        rc = ngx_http_var_do_if_ends_with(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_IF_FIND:
@@ -2004,7 +2004,7 @@ ngx_http_var_do_if_str_ne(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_do_if_has_prefix(ngx_http_request_t *r,
+ngx_http_var_do_if_starts_with(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -2014,14 +2014,14 @@ ngx_http_var_do_if_has_prefix(ngx_http_request_t *r,
 
     if (ngx_http_complex_value(r, &args[0], &str) != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http var: \"if_has_prefix\" "
+                      "http var: \"if_starts_with\" "
                       "failed to evaluate the first argument");
         return NGX_ERROR;
     }
 
     if (ngx_http_complex_value(r, &args[1], &prefix) != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http var: \"if_has_prefix\" "
+                      "http var: \"if_starts_with\" "
                       "failed to evaluate the second argument");
         return NGX_ERROR;
     }
@@ -2056,7 +2056,7 @@ ngx_http_var_do_if_has_prefix(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_do_if_has_suffix(ngx_http_request_t *r,
+ngx_http_var_do_if_ends_with(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -2067,14 +2067,14 @@ ngx_http_var_do_if_has_suffix(ngx_http_request_t *r,
 
     if (ngx_http_complex_value(r, &args[0], &str) != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http var: \"if_has_suffix\" "
+                      "http var: \"if_ends_with\" "
                       "failed to evaluate the first argument");
         return NGX_ERROR;
     }
 
     if (ngx_http_complex_value(r, &args[1], &suffix) != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http var: \"if_has_suffix\" "
+                      "http var: \"if_ends_with\" "
                       "failed to evaluate the second argument");
         return NGX_ERROR;
     }
