@@ -3397,7 +3397,8 @@ ngx_http_var_do_if_in(ngx_http_request_t *r,
             ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "http var: \"if_in\" failed to convert "
                           "values to fixed point");
-            return NGX_ERROR;
+            /* continue to check the next number */
+            continue;
         }
 
         if (int_val1 == int_val2) {
