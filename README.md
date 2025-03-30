@@ -70,21 +70,23 @@ var $bool_var if_not_empty str;
 # Checks if the string is a number, returns 1 or 0
 var $bool_var if_is_num str;
 
-# Checks if the strings are equal
+# Checks if the strings are equal, returns 1 or 0
 var $bool_var if_str_eq [-i] str1 str2;
 
-# Checks if the strings are not equal
+# Checks if the strings are not equal, returns 1 or 0
 var $bool_var if_str_ne [-i] str1 str2;
 
 # Checks if the string has the specified prefix, returns 1 or 0
-var $bool_var if_has_prefix [-i] str prefix;
+var $bool_var if_starts_with [-i] str prefix;
 
 # Checks if the string has the specified suffix, returns 1 or 0
-var $bool_var if_has_suffix [-i] str suffix;
+var $bool_var if_ends_with [-i] str suffix;
 
 # Checks if the substring is present, returns 1 or 0
 var $bool_var if_find [-i] str sub_str;
 
+# Checks if the str1 is one of str2 .. strn, returns 1 or 0
+var $bool_var if_str_in [-i] str1 str2 str3 .. strn;
 
 #### General String Operations ####
 # Copy the value of the variable
@@ -162,6 +164,8 @@ var $bool_var if_ge num1 num2;
 # Check if is within the start_num-end_num range, return 1 or 0
 var $bool_var if_range num start_num-end_num;
 
+# Check if number is one of num2 .. numn, returns 1 or 0
+var $bool_var if_in num1 num2 .. numn;
 
 ### Mathematical Operations ####
 # Absolute value (returns original format without negative sign)
@@ -277,7 +281,7 @@ var $new_var hmac_sha256 src_str secret;
 # Determine if the current time meets the given time range, requires at least one parameter.
 # Returns 1 if all conditions are met, otherwise returns 0.
 # The day of the week is represented by 1-7, where Sunday is 7, and timezone format is gmt+0800
-var $bool_var time_range [year=year_range] [month=month_range] [day=day_range] [wday=wday_range(1-7)] [hour=hour_range] [min=min_range] [sec=sec_range] [timezone];
+var $bool_var if_time_range [year=year_range] [month=month_range] [day=day_range] [wday=wday_range(1-7)] [hour=hour_range] [min=min_range] [sec=sec_range] [timezone];
 
 
 #### Time Format ####
