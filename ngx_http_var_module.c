@@ -5534,4 +5534,6 @@ ngx_http_var_exec_get_cookie(ngx_http_request_t *r,
 
     v->len = value.len;
     v->data = value.data;
+
+    return NGX_OK;
 }
