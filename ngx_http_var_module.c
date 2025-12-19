@@ -291,7 +291,7 @@ static u_char *ngx_http_var_utils_strlstrn(u_char *s1, u_char *last,
     u_char *s2, size_t n);
 
 #if (NGX_HTTP_SSL)
-static ngx_int_t ngx_http_var_utils_set_hmac(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_utils_hmac(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var,
     const EVP_MD *evp_md);
 #endif
@@ -1764,7 +1764,7 @@ ngx_http_var_utils_strlstrn(u_char *s1, u_char *last, u_char *s2, size_t n)
 
 #if (NGX_HTTP_SSL)
 static ngx_int_t
-ngx_http_var_utils_set_hmac(ngx_http_request_t *r,
+ngx_http_var_utils_hmac(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var,
     const EVP_MD *evp_md)
 {
@@ -4819,7 +4819,7 @@ static ngx_int_t
 ngx_http_var_exec_hmac_sha1(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    return ngx_http_var_utils_set_hmac(r, v, var, EVP_sha1());
+    return ngx_http_var_utils_hmac(r, v, var, EVP_sha1());
 }
 
 
@@ -4827,7 +4827,7 @@ static ngx_int_t
 ngx_http_var_exec_hmac_sha256(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    return ngx_http_var_utils_set_hmac(r, v, var, EVP_sha256());
+    return ngx_http_var_utils_hmac(r, v, var, EVP_sha256());
 }
 
 
@@ -4835,7 +4835,7 @@ static ngx_int_t
 ngx_http_var_exec_hmac_sha384(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    return ngx_http_var_utils_set_hmac(r, v, var, EVP_sha384());
+    return ngx_http_var_utils_hmac(r, v, var, EVP_sha384());
 }
 
 
@@ -4843,7 +4843,7 @@ static ngx_int_t
 ngx_http_var_exec_hmac_sha512(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    return ngx_http_var_utils_set_hmac(r, v, var, EVP_sha512());
+    return ngx_http_var_utils_hmac(r, v, var, EVP_sha512());
 }
 #endif
 
@@ -5516,22 +5516,22 @@ ngx_http_var_exec_get_cookie(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  cookie_name, cookie_value;
+    ngx_str_t                  name, value;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &cookie_name) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &name) != NGX_OK) {
         return NGX_ERROR;
     }
 
     if (ngx_http_parse_multi_header_lines(r, r->headers_in.cookie,
-                                          &cookie_name, &cookie_value)
+                                          &name, &value)
         == NULL)
     {
         v->not_found = 1;
         return NGX_OK;
     }
 
-    v->len = cookie_value.len;
-    v->data = cookie_value.data;
+    v->len = value.len;
+    v->data = value.data;
 }
