@@ -112,6 +112,8 @@ typedef enum {
 
     NGX_HTTP_VAR_OP_IF_IP_RANGE,
 
+    NGX_HTTP_VAR_OP_GET_COOKIE,
+
     NGX_HTTP_VAR_OP_UNKNOWN
 } ngx_http_var_operator_e;
 
@@ -245,6 +247,8 @@ static ngx_http_var_operator_enum_t ngx_http_var_operators[] = {
     { ngx_string("unix_time"),        NGX_HTTP_VAR_OP_UNIX_TIME,        0, 3  },
 
     { ngx_string("if_ip_range"),      NGX_HTTP_VAR_OP_IF_IP_RANGE,      2, 99 },
+
+    { ngx_string("get_cookie"),       NGX_HTTP_VAR_OP_GET_COOKIE,       1, 1  },
 
     { ngx_null_string,                NGX_HTTP_VAR_OP_UNKNOWN,          0, 0  }
 };
@@ -464,6 +468,9 @@ static ngx_int_t ngx_http_var_exec_unix_time(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 static ngx_int_t ngx_http_var_exec_if_ip_range(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+
+static ngx_int_t ngx_http_var_exec_get_cookie(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 
@@ -1316,6 +1323,10 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
 
     case NGX_HTTP_VAR_OP_IF_IP_RANGE:
         rc = ngx_http_var_exec_if_ip_range(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_GET_COOKIE:
+        rc = ngx_http_var_exec_get_cookie(r, v, var);
         break;
 
     default:
@@ -5497,4 +5508,30 @@ invalid_ip_range:
                     "http var: invalid IP or CIDR range: \"%V\"",
                     &range_str);
     return NGX_ERROR;
+}
+
+
+static ngx_int_t
+ngx_http_var_exec_get_cookie(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  cookie_name, cookie_value;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &cookie_name) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_parse_multi_header_lines(r, r->headers_in.cookie,
+                                          &cookie_name, &cookie_value)
+        == NULL)
+    {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+
+    v->len = cookie_value.len;
+    v->data = cookie_value.data;
 }
