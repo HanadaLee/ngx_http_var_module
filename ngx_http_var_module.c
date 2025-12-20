@@ -112,7 +112,9 @@ typedef enum {
 
     NGX_HTTP_VAR_OP_IF_IP_RANGE,
 
+    NGX_HTTP_VAR_OP_GET_ARG,
     NGX_HTTP_VAR_OP_GET_COOKIE,
+    NGX_HTTP_VAR_OP_GET_UPSTREAM_COOKIE,
 
     NGX_HTTP_VAR_OP_UNKNOWN
 } ngx_http_var_operator_e;
@@ -248,7 +250,10 @@ static ngx_http_var_operator_enum_t ngx_http_var_operators[] = {
 
     { ngx_string("if_ip_range"),      NGX_HTTP_VAR_OP_IF_IP_RANGE,      2, 99 },
 
+    { ngx_string("get_arg"),          NGX_HTTP_VAR_OP_GET_ARG,          1, 1  },
     { ngx_string("get_cookie"),       NGX_HTTP_VAR_OP_GET_COOKIE,       1, 1  },
+    { ngx_string("get_upstream_cookie"),
+                                   NGX_HTTP_VAR_OP_GET_UPSTREAM_COOKIE, 1, 1  },
 
     { ngx_null_string,                NGX_HTTP_VAR_OP_UNKNOWN,          0, 0  }
 };
@@ -470,9 +475,12 @@ static ngx_int_t ngx_http_var_exec_unix_time(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_exec_if_ip_range(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
+static ngx_int_t ngx_http_var_exec_get_arg(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_exec_get_cookie(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-
+static ngx_int_t ngx_http_var_exec_get_upstream_cookie(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 static ngx_command_t ngx_http_var_commands[] = {
 
@@ -1325,8 +1333,16 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_exec_if_ip_range(r, v, var);
         break;
 
+    case NGX_HTTP_VAR_OP_GET_ARG:
+        rc = ngx_http_var_exec_get_arg(r, v, var);
+        break;
+
     case NGX_HTTP_VAR_OP_GET_COOKIE:
         rc = ngx_http_var_exec_get_cookie(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_GET_UPSTREAM_COOKIE:
+        rc = ngx_http_var_exec_get_upstream_cookie(r, v, var);
         break;
 
     default:
@@ -5512,6 +5528,33 @@ invalid_ip_range:
 
 
 static ngx_int_t
+ngx_http_var_exec_get_arg(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  name, value;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &name) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (name.len == 0
+        || ngx_http_arg(r, name.data, name.len, &value) != NGX_OK)
+    {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+
+    v->len = value.len;
+    v->data = value.data;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_http_var_exec_get_cookie(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
@@ -5526,6 +5569,34 @@ ngx_http_var_exec_get_cookie(ngx_http_request_t *r,
 
     if (ngx_http_parse_multi_header_lines(r, r->headers_in.cookie,
                                           &name, &value)
+        == NULL)
+    {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+
+    v->len = value.len;
+    v->data = value.data;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_exec_get_upstream_cookie(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  name, value;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &name) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_parse_set_cookie_lines(r, r->upstream->headers_in.set_cookie,
+                                        &name, &value)
         == NULL)
     {
         v->not_found = 1;

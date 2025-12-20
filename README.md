@@ -310,6 +310,17 @@ var $new_var unixtime src_time date_format timezone;
 #### IP range judgment ####
 # Determine whether the IP address is within the IP range, if yes, return 1, otherwise return 0
 var $bool_var if_ip_range ip_str ip_range_str1 ip_range_str2...;
+
+
+#### HTTP Information ####
+# Get the value of the specified request arg, arg_name can include '-' and is case-insensitive.
+var $new_var get_arg argname;
+
+# Get the value of the specified request cookie name, cookie_name can include '-' or '.' and is case-insensitive.
+var $new_var get_cookie cookie_name;
+
+# Get the value of the specified upstream Set-Cookie name, cookie_name can include '-' or '.' and is case-insensitive.
+var $new_var get_upstream_cookie cookie_name;
 ```
 
 All parameters except regular expressions can contain variables. However, incorrect parameter values ​​will cause the function calculation result to be empty.
