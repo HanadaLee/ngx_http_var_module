@@ -168,8 +168,8 @@ var $bool_var if_gt num1 num2;
 # Check if greater than or equal, returns 1 or 0
 var $bool_var if_ge num1 num2;
 
-# Check if is within the start_num-end_num range, return 1 or 0
-var $bool_var if_range num start_num-end_num;
+# Check if is within the start_num end_num range, if end_num is not specified, the range is [0, start_num], return 1 or 0
+var $bool_var if_range num start_num [end_num];
 
 # Check if number is one of num2 .. numn, returns 1 or 0
 var $bool_var if_in num1 num2 .. numn;

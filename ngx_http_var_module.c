@@ -197,7 +197,7 @@ static ngx_http_var_operator_enum_t ngx_http_var_operators[] = {
     { ngx_string("if_le"),            NGX_HTTP_VAR_OP_IF_LE,            2, 2  },
     { ngx_string("if_gt"),            NGX_HTTP_VAR_OP_IF_GT,            2, 2  },
     { ngx_string("if_ge"),            NGX_HTTP_VAR_OP_IF_GE,            2, 2  },
-    { ngx_string("if_range"),         NGX_HTTP_VAR_OP_IF_RANGE,         2, 2  },
+    { ngx_string("if_range"),         NGX_HTTP_VAR_OP_IF_RANGE,         2, 3  },
     { ngx_string("if_in"),            NGX_HTTP_VAR_OP_IF_IN,            3, 99 },
 
     { ngx_string("abs"),              NGX_HTTP_VAR_OP_ABS,              1, 1  },
@@ -3421,35 +3421,48 @@ ngx_http_var_exec_if_range(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  val, range_val;
-    ngx_int_t                  src_val, start_val, end_val;
-    ngx_str_t                  start_str, end_str;
-    u_char                    *dash;
+    ngx_str_t                  src_str, start_str, end_str;
+    ngx_int_t                  src, start, end;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK
-        || ngx_http_complex_value(r, &args[1], &range_val) != NGX_OK)
+    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (var->args->nelts == 2) {
+        if (ngx_http_complex_value(r, &args[1], &end_str) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        if (ngx_http_var_utils_auto_atofp(src_str, end_str, &src, &end)
+            != NGX_OK)
+        {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                        "http var: \"if_range\" failed to convert "
+                        "values to fixed point");
+            return NGX_ERROR;
+        }
+
+        v->len = 1;
+        if (src >= 0 && src <= end) {
+            v->data = (u_char *) "1";
+            return NGX_OK;
+        }
+
+        v->data = (u_char *) "0";
+        return NGX_OK;
+    }
+
+    if (ngx_http_complex_value(r, &args[1], &start_str) != NGX_OK
+        || ngx_http_complex_value(r, &args[2], &end_str) != NGX_OK)
     {
         return NGX_ERROR;
     }
 
-    dash = ngx_strlchr(range_val.data, range_val.data + range_val.len, '-');
-    if (dash == NULL) {
-        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http var: \"if_range\" failed to "
-                      "parse range, missing '-'");
-        return NGX_ERROR;
-    }
-
-    start_str.data = range_val.data;
-    start_str.len = dash - range_val.data;
-
-    end_str.data = dash + 1;
-    end_str.len = range_val.data + range_val.len - (dash + 1);
-
-    if (ngx_http_var_utils_auto_atofp3(val, start_str, end_str,
-        &src_val, &start_val, &end_val) != NGX_OK) {
+    if (ngx_http_var_utils_auto_atofp3(src_str, start_str, end_str,
+                                       &src, &start, &end) != NGX_OK)
+    {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http var: \"if_range\" failed to convert "
                       "values to fixed point");
@@ -3457,11 +3470,12 @@ ngx_http_var_exec_if_range(ngx_http_request_t *r,
     }
 
     v->len = 1;
-    if (src_val >= start_val && src_val <= end_val) {
+    if (src >= start && src <= end) {
         v->data = (u_char *) "1";
-    } else {
-        v->data = (u_char *) "0";
+        return NGX_OK;
     }
+
+    v->data = (u_char *) "0";
 
     return NGX_OK;
 }
