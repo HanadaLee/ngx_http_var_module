@@ -112,9 +112,7 @@ typedef enum {
 
     NGX_HTTP_VAR_OP_IF_IP_RANGE,
 
-    NGX_HTTP_VAR_OP_GET_ARG,
-    NGX_HTTP_VAR_OP_GET_COOKIE,
-    NGX_HTTP_VAR_OP_GET_UPSTREAM_COOKIE,
+    NGX_HTTP_VAR_OP_EXTRA_PARAM,
 
     NGX_HTTP_VAR_OP_UNKNOWN
 } ngx_http_var_operator_e;
@@ -250,10 +248,7 @@ static ngx_http_var_operator_enum_t ngx_http_var_operators[] = {
 
     { ngx_string("if_ip_range"),      NGX_HTTP_VAR_OP_IF_IP_RANGE,      2, 99 },
 
-    { ngx_string("get_arg"),          NGX_HTTP_VAR_OP_GET_ARG,          1, 1  },
-    { ngx_string("get_cookie"),       NGX_HTTP_VAR_OP_GET_COOKIE,       1, 1  },
-    { ngx_string("get_upstream_cookie"),
-                                   NGX_HTTP_VAR_OP_GET_UPSTREAM_COOKIE, 1, 1  },
+    { ngx_string("extra_param"),      NGX_HTTP_VAR_OP_EXTRA_PARAM,      2, 4  },
 
     { ngx_null_string,                NGX_HTTP_VAR_OP_UNKNOWN,          0, 0  }
 };
@@ -475,11 +470,7 @@ static ngx_int_t ngx_http_var_exec_unix_time(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_exec_if_ip_range(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
-static ngx_int_t ngx_http_var_exec_get_arg(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_get_cookie(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_get_upstream_cookie(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_extra_param(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 static ngx_command_t ngx_http_var_commands[] = {
@@ -738,7 +729,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
         args_count--;
 
-        /* Compile src_string (complex variable) */
+        /* Compile src_str (complex variable) */
         var->args = ngx_array_create(cf->pool, args_count ? args_count : 1,
             sizeof(ngx_http_complex_value_t));
         if (var->args == NULL) {
@@ -1333,16 +1324,8 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_exec_if_ip_range(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_GET_ARG:
-        rc = ngx_http_var_exec_get_arg(r, v, var);
-        break;
-
-    case NGX_HTTP_VAR_OP_GET_COOKIE:
-        rc = ngx_http_var_exec_get_cookie(r, v, var);
-        break;
-
-    case NGX_HTTP_VAR_OP_GET_UPSTREAM_COOKIE:
-        rc = ngx_http_var_exec_get_upstream_cookie(r, v, var);
+    case NGX_HTTP_VAR_OP_EXTRA_PARAM:
+        rc = ngx_http_var_exec_extra_param(r, v, var);
         break;
 
     default:
@@ -2758,7 +2741,7 @@ ngx_http_var_exec_if_re_match(ngx_http_request_t *r,
 
     args = var->args->elts;
 
-    /* Calculate the value of src_string */
+    /* Calculate the value of src_str */
     if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
         return NGX_ERROR;
     }
@@ -2794,7 +2777,7 @@ ngx_http_var_exec_re_capture(ngx_http_request_t *r,
 
     args = var->args->elts;
 
-    /* Calculate the value of src_string */
+    /* Calculate the value of src_str */
     if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
         return NGX_ERROR;
     }
@@ -2839,7 +2822,7 @@ ngx_http_var_exec_re_sub(ngx_http_request_t *r,
 
     args = var->args->elts;
 
-    /* Calculate the value of src_string */
+    /* Calculate the value of src_str */
     if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
         return NGX_ERROR;
     }
@@ -2929,7 +2912,7 @@ ngx_http_var_exec_re_gsub(ngx_http_request_t *r,
 
     args = var->args->elts;
 
-    /* Calculate the value of src_string */
+    /* Calculate the value of src_str */
     if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
         return NGX_ERROR;
     }
@@ -5528,11 +5511,12 @@ invalid_ip_range:
 
 
 static ngx_int_t
-ngx_http_var_exec_get_arg(ngx_http_request_t *r,
+ngx_http_var_exec_extra_param(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  name, value;
+    ngx_str_t                  name, src_str, separator, delimiter, value;
+    u_char                    *p, *last, sep, del;
 
     args = var->args->elts;
 
@@ -5540,71 +5524,84 @@ ngx_http_var_exec_get_arg(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    if (name.len == 0
-        || ngx_http_arg(r, name.data, name.len, &value) != NGX_OK)
-    {
+    if (name.len == 0) {
         v->not_found = 1;
         return NGX_OK;
     }
 
-    v->len = value.len;
-    v->data = value.data;
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_http_var_exec_get_cookie(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
-{
-    ngx_http_complex_value_t  *args;
-    ngx_str_t                  name, value;
-
-    args = var->args->elts;
-
-    if (ngx_http_complex_value(r, &args[0], &name) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[1], &src_str) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    if (ngx_http_parse_multi_header_lines(r, r->headers_in.cookie,
-                                          &name, &value)
-        == NULL)
-    {
+    if (src_str.len == 0) {
         v->not_found = 1;
         return NGX_OK;
     }
 
-    v->len = value.len;
-    v->data = value.data;
+    if (var->args->nelts > 2) {
+        if (ngx_http_complex_value(r, &args[2], &separator) != NGX_OK) {
+            return NGX_ERROR;
+        }
 
-    return NGX_OK;
-}
+        if (separator.len != 1) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "http var: invalid separator: \"%V\"",
+                          &separator);
+            ngx_str_set(&separator, "&");
+        }
 
-
-static ngx_int_t
-ngx_http_var_exec_get_upstream_cookie(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
-{
-    ngx_http_complex_value_t  *args;
-    ngx_str_t                  name, value;
-
-    args = var->args->elts;
-
-    if (ngx_http_complex_value(r, &args[0], &name) != NGX_OK) {
-        return NGX_ERROR;
+    } else {
+        ngx_str_set(&separator, "&");
     }
 
-    if (ngx_http_parse_set_cookie_lines(r, r->upstream->headers_in.set_cookie,
-                                        &name, &value)
-        == NULL)
-    {
-        v->not_found = 1;
-        return NGX_OK;
+    if (var->args->nelts == 4) {
+        if (ngx_http_complex_value(r, &args[3], &delimiter) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        if (delimiter.len != 1) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "http var: invalid delimiter: \"%V\"",
+                          &delimiter);
+            ngx_str_set(&delimiter, "=");
+        }
+
+    } else {
+        ngx_str_set(&delimiter, "=");
     }
 
-    v->len = value.len;
-    v->data = value.data;
+    p = src_str.data;
+    last = p + src_str.len;
+    sep = separator.data[0];
+    del = delimiter.data[0];
 
+    for ( /* void */ ; p < last; p++) {
+
+        /* we need separator after name, so drop one char from last */
+
+        p = ngx_strlcasestrn(p, last - 1, name.data, name.len - 1);
+
+        if (p == NULL) {
+            v->not_found = 1;
+            return NGX_OK;
+        }
+
+        if ((p == src_str.data || *(p - 1) == sep) && *(p + name.len) == del) {
+
+            v->data = p + name.len + 1;
+
+            p = ngx_strlchr(p, last, sep);
+
+            if (p == NULL) {
+                p = src_str.data + src_str.len;
+            }
+
+            v->len = p - v->data;
+
+            return NGX_OK;
+        }
+    }
+
+    v->not_found = 1;
     return NGX_OK;
 }

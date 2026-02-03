@@ -123,7 +123,14 @@ var $new_var repeat src_str times;
 var $new_var substr src_str start [len];
 
 # Replace keyword
-var $new_var replace [-i] src_str src dst; 
+var $new_var replace [-i] src_str src dst;
+
+# Extract parameters
+# Extract a value from a list of parameters. A use case for this is to extract query parameters without having to write a regular expression, but it can be used to look up values in any name/value pair list. If several occurrences of the parameter exist, only the first one is returned. the variable gets a blank value. The delimiter between the name and the value of a parameter is '=' by default, and the parameter separator is '&' by default.
+var $new_var extra_param [-i] param_name src_string [separator] [delimiter];
+
+# example: a query "foo=123&bar=456&baz=789". If the parameter name is bar and the Separator is &, then the resulting variable value will be 456.
+# var $extraed_arg_bar extra_param bar "foo=123&bar=456&baz=789" & =;
 
 
 #### Regex Judgement ####
@@ -311,17 +318,6 @@ var $new_var unixtime src_time date_format timezone;
 # Determine whether the IP address is within the IP range, if yes, return 1, otherwise return 0
 var $bool_var if_ip_range ip_str ip_range_str1 ip_range_str2...;
 
-
-#### HTTP Information ####
-# Get the value of the specified request arg, arg_name can include '-' and is case-insensitive.
-var $new_var get_arg argname;
-
-# Get the value of the specified request cookie name, cookie_name can include '-' or '.' and is case-insensitive.
-var $new_var get_cookie cookie_name;
-
-# Get the value of the specified upstream Set-Cookie name, cookie_name can include '-' or '.' and is case-insensitive.
-var $new_var get_upstream_cookie cookie_name;
-```
 
 All parameters except regular expressions can contain variables. However, incorrect parameter values ​​will cause the function calculation result to be empty.
 
