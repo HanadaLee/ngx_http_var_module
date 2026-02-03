@@ -208,11 +208,11 @@ var $new_var floor src_num;
 # Ceiling value, the smallest integer greater than or equal to the source
 var $new_var ceil src_num;
 
-# Random large positive integer
-var $new_var rand;
+# Random positive integer, the range is [start_int, end_int], if end_int is not specified, the range is [0, start_int]
+var $new_var rand [start_int] [end_int];
 
-# Random positive integer in specified range
-var $new_var rand_range start_int-end_int;
+# Random hex sequence in specified. number_of_bytes must be 1-32, default is 32
+var $new_var hexrand [number_of_bytes];
 
 
 #### Encoding and Decoding ####

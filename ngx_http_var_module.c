@@ -47,6 +47,7 @@ typedef enum {
     NGX_HTTP_VAR_OP_REPEAT,
     NGX_HTTP_VAR_OP_SUBSTR,
     NGX_HTTP_VAR_OP_REPLACE,
+    NGX_HTTP_VAR_OP_EXTRACT_PARAM,
 
 #if (NGX_PCRE)
     NGX_HTTP_VAR_OP_IF_RE_MATCH,
@@ -77,7 +78,7 @@ typedef enum {
     NGX_HTTP_VAR_OP_FLOOR,
     NGX_HTTP_VAR_OP_CEIL,
     NGX_HTTP_VAR_OP_RAND,
-    NGX_HTTP_VAR_OP_RAND_RANGE,
+    NGX_HTTP_VAR_OP_HEXRAND,
 
     NGX_HTTP_VAR_OP_HEX_ENCODE,
     NGX_HTTP_VAR_OP_HEX_DECODE,
@@ -115,8 +116,6 @@ typedef enum {
     NGX_HTTP_VAR_OP_UNIX_TIME,
 
     NGX_HTTP_VAR_OP_IF_IP_RANGE,
-
-    NGX_HTTP_VAR_OP_EXTRACT_PARAM,
 
     NGX_HTTP_VAR_OP_UNKNOWN
 } ngx_http_var_operator_e;
@@ -182,6 +181,7 @@ static ngx_http_var_operator_enum_t ngx_http_var_operators[] = {
     { ngx_string("repeat"),           NGX_HTTP_VAR_OP_REPEAT,           2, 2  },
     { ngx_string("substr"),           NGX_HTTP_VAR_OP_SUBSTR,           2, 3  },
     { ngx_string("replace"),          NGX_HTTP_VAR_OP_REPLACE,          3, 3  },
+    { ngx_string("extract_param"),    NGX_HTTP_VAR_OP_EXTRACT_PARAM,  2, 4  },
 
 #if (NGX_PCRE)
     { ngx_string("if_re_match"),      NGX_HTTP_VAR_OP_IF_RE_MATCH,      2, 2  },
@@ -211,8 +211,8 @@ static ngx_http_var_operator_enum_t ngx_http_var_operators[] = {
     { ngx_string("round"),            NGX_HTTP_VAR_OP_ROUND,            2, 2  },
     { ngx_string("floor"),            NGX_HTTP_VAR_OP_FLOOR,            1, 1  },
     { ngx_string("ceil"),             NGX_HTTP_VAR_OP_CEIL,             1, 1  },
-    { ngx_string("rand"),             NGX_HTTP_VAR_OP_RAND,             0, 0  },
-    { ngx_string("rand_range"),       NGX_HTTP_VAR_OP_RAND_RANGE,       1, 1  },
+    { ngx_string("rand"),             NGX_HTTP_VAR_OP_RAND,             0, 2  },
+    { ngx_string("hexrand"),          NGX_HTTP_VAR_OP_HEXRAND,          0, 1  },
 
     { ngx_string("hex_encode"),       NGX_HTTP_VAR_OP_HEX_ENCODE,       1, 1  },
     { ngx_string("hex_decode"),       NGX_HTTP_VAR_OP_HEX_DECODE,       1, 1  },
@@ -251,8 +251,6 @@ static ngx_http_var_operator_enum_t ngx_http_var_operators[] = {
     { ngx_string("unix_time"),        NGX_HTTP_VAR_OP_UNIX_TIME,        0, 3  },
 
     { ngx_string("if_ip_range"),      NGX_HTTP_VAR_OP_IF_IP_RANGE,      2, 99 },
-
-    { ngx_string("extract_param"),      NGX_HTTP_VAR_OP_EXTRACT_PARAM,  2, 4  },
 
     { ngx_null_string,                NGX_HTTP_VAR_OP_UNKNOWN,          0, 0  }
 };
@@ -350,6 +348,8 @@ static ngx_int_t ngx_http_var_exec_substr(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_exec_replace(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_exec_extract_param(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 #if (NGX_PCRE)
 static ngx_int_t ngx_http_var_exec_if_re_match(ngx_http_request_t *r,
@@ -404,7 +404,7 @@ static ngx_int_t ngx_http_var_exec_ceil(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_exec_rand(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_rand_range(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_hexrand(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 static ngx_int_t ngx_http_var_exec_hex_encode(ngx_http_request_t *r,
@@ -472,9 +472,6 @@ static ngx_int_t ngx_http_var_exec_unix_time(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 static ngx_int_t ngx_http_var_exec_if_ip_range(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-
-static ngx_int_t ngx_http_var_exec_extract_param(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 static ngx_command_t ngx_http_var_commands[] = {
@@ -1206,8 +1203,8 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_exec_rand(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_RAND_RANGE:
-        rc = ngx_http_var_exec_rand_range(r, v, var);
+    case NGX_HTTP_VAR_OP_HEXRAND:
+        rc = ngx_http_var_exec_hexrand(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_HEX_ENCODE:
@@ -2738,7 +2735,152 @@ ngx_http_var_exec_replace(ngx_http_request_t *r,
 }
 
 
+static ngx_int_t
+ngx_http_var_exec_extract_param(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  name, src_str, separator, delimiter;
+    u_char                    *p, *back, *last, sep, del;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &name) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    while (name.len && ngx_http_var_isspace(name.data[0])) {
+        name.data++;
+        name.len--;
+    }
+
+    while (name.len && ngx_http_var_isspace(name.data[name.len - 1])) {
+        name.len--;
+    }
+
+    if (name.len == 0) {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+
+    if (ngx_http_complex_value(r, &args[1], &src_str) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    while (src_str.len && ngx_http_var_isspace(src_str.data[0])) {
+        src_str.data++;
+        src_str.len--;
+    }
+
+    while (src_str.len && ngx_http_var_isspace(src_str.data[src_str.len - 1]))
+    {
+        src_str.len--;
+    }
+
+    if (src_str.len == 0) {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+
+    if (var->args->nelts > 2) {
+        if (ngx_http_complex_value(r, &args[2], &separator) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        if (separator.len != 1) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "http var: invalid separator: \"%V\"",
+                          &separator);
+            ngx_str_set(&separator, "&");
+        }
+
+    } else {
+        ngx_str_set(&separator, "&");
+    }
+
+    if (var->args->nelts == 4) {
+        if (ngx_http_complex_value(r, &args[3], &delimiter) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        if (delimiter.len != 1) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "http var: invalid delimiter: \"%V\"",
+                          &delimiter);
+            ngx_str_set(&delimiter, "=");
+        }
+
+    } else {
+        ngx_str_set(&delimiter, "=");
+    }
+
+    sep = separator.data[0];
+    del = delimiter.data[0];
+
+    p = src_str.data;
+    last = p + src_str.len;
+
+    for ( /* void */ ; p < last; p++) {
+
+        /* we need separator after name, so drop one char from last */
+
+        if (var->ignore_case) {
+            p = ngx_strlcasestrn(p, last - 1, name.data, name.len - 1);
+
+        } else {
+            p = ngx_http_var_utils_strlstrn(p, last - 1, name.data, name.len - 1);
+        }
+
+        if (p == NULL) {
+            v->not_found = 1;
+            return NGX_OK;
+        }
+
+        if (*(p + name.len) != del) {
+            continue;
+        }
+
+        if (p > src_str.data) {
+            back = p - 1;
+
+            while (back > src_str.data && *back == ' ') {
+                back--;
+            }
+
+            if (*back != sep) {
+                continue;
+            }
+        }
+
+        p += name.len + 1;
+
+        back = ngx_strlchr(p, last, sep);
+
+        if (back) {
+            last = back;
+        }
+
+        while (p < last && *p == ' ') {
+            p++;
+        }
+
+        while (last > p && *(last - 1) == ' ') {
+            last--;
+        }
+
+        v->data = p;
+        v->len = last - p;
+
+        return NGX_OK;
+    }
+
+    v->not_found = 1;
+    return NGX_OK;
+}
+
+
 #if (NGX_PCRE)
+
 static ngx_int_t
 ngx_http_var_exec_if_re_match(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
@@ -3054,6 +3196,7 @@ ngx_http_var_exec_re_gsub(ngx_http_request_t *r,
 
     return NGX_OK;
 }
+
 #endif
 
 
@@ -4046,56 +4189,73 @@ static ngx_int_t
 ngx_http_var_exec_rand(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    u_char  *p;
-    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
-    if (p == NULL) {
-        return NGX_ERROR;
-    }
-
-    v->len = ngx_sprintf(p, "%ui", ngx_random()) - p;
-    v->data = p;
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_http_var_exec_rand_range(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
-{
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  range_str, start_str, end_str;
+    ngx_str_t                  s;
     ngx_int_t                  start, end, result;
     u_char                    *p;
-    u_char                    *dash;
+
+    if (var->args->nelts == 0) {
+        p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+        if (p == NULL) {
+            return NGX_ERROR;
+        }
+
+        v->len = ngx_sprintf(p, "%ui", ngx_random()) - p;
+        v->data = p;
+        
+        return NGX_OK;
+    }
 
     args = var->args->elts;
 
     /* Compute the start and end values */
-    if (ngx_http_complex_value(r, &args[0], &range_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &s) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    dash = ngx_strlchr(range_str.data, range_str.data + range_str.len, '-');
-    if (dash == NULL) {
+    if (s.len == 0) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http var: failed to parse range, missing '-'");
+                      "http var: empty argument for \"rand\"");
         return NGX_ERROR;
     }
 
-    start_str.data = range_str.data;
-    start_str.len = dash - range_str.data;
+    start = ngx_atoi(s.data, s.len);
 
-    end_str.data = dash + 1;
-    end_str.len = range_str.data + range_str.len - (dash + 1);
-
-    start = ngx_atoi(start_str.data, start_str.len);
-    end = ngx_atoi(end_str.data, end_str.len);
-
-    if (start == NGX_ERROR || end == NGX_ERROR || start > end) {
+    if (start == NGX_ERROR) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http var: invalid start or end value for \"rand_range\"");
+                      "http var: invalid start value for \"rand\"");
         return NGX_ERROR;
+    }
+
+    if (var->args->nelts == 2) {
+
+        if (ngx_http_complex_value(r, &args[1], &s) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        if (s.len == 0) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                        "http var: empty argument for \"rand\"");
+            return NGX_ERROR;
+        }
+
+        end = ngx_atoi(s.data, s.len);
+
+        if (end == NGX_ERROR || start > end) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                        "http var: invalid end value for \"rand\"");
+            return NGX_ERROR;
+        }
+
+    } else {
+        end = start;
+        start = 0;
+    }
+
+    if (start == end) {
+        v->len = 1;
+        v->data = (u_char *) "0";
+        return NGX_OK;
     }
 
     /* Generate a random number between start and end (inclusive) */
@@ -4109,6 +4269,70 @@ ngx_http_var_exec_rand_range(ngx_http_request_t *r,
 
     v->len = ngx_sprintf(p, "%i", result) - p;
     v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_exec_hexrand(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    u_char                    *p;
+    ngx_str_t                  s;
+    size_t                     len;
+
+#if (NGX_OPENSSL)
+    u_char                     random_bytes[16];
+#endif
+
+    if (var->args->nelts == 0) {
+        len = 32;
+
+    } else {
+        args = var->args->elts;
+
+        if (ngx_http_complex_value(r, &args[0], &s) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        if (s.len == 0) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "http var: empty argument for \"hexrand\"");
+            return NGX_ERROR;
+        }
+
+        len = ngx_atoi(s.data, s.len);
+        if (len == NGX_ERROR || len == 0 || len > 32) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "http var: invalid length value for \"hexrand\"");
+            return NGX_ERROR;
+        }
+    }
+
+    p = ngx_pnalloc(r->pool, 32);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    v->len = len;
+    v->data = p;
+
+#if (NGX_OPENSSL)
+
+    if (RAND_bytes(random_bytes, 16) == 1) {
+        ngx_hex_dump(p, random_bytes, 16);
+        return NGX_OK;
+    }
+
+    ngx_ssl_error(NGX_LOG_ERR, r->connection->log, 0, "RAND_bytes() failed");
+
+#endif
+
+    ngx_sprintf(p, "%08xD%08xD%08xD%08xD",
+                (uint32_t) ngx_random(), (uint32_t) ngx_random(),
+                (uint32_t) ngx_random(), (uint32_t) ngx_random());
 
     return NGX_OK;
 }
@@ -5515,148 +5739,4 @@ invalid_ip_range:
                     "http var: invalid IP or CIDR range: \"%V\"",
                     &range_str);
     return NGX_ERROR;
-}
-
-
-static ngx_int_t
-ngx_http_var_exec_extract_param(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
-{
-    ngx_http_complex_value_t  *args;
-    ngx_str_t                  name, src_str, separator, delimiter;
-    u_char                    *p, *back, *last, sep, del;
-
-    args = var->args->elts;
-
-    if (ngx_http_complex_value(r, &args[0], &name) != NGX_OK) {
-        return NGX_ERROR;
-    }
-
-    while (name.len && ngx_http_var_isspace(name.data[0])) {
-        name.data++;
-        name.len--;
-    }
-
-    while (name.len && ngx_http_var_isspace(name.data[name.len - 1])) {
-        name.len--;
-    }
-
-    if (name.len == 0) {
-        v->not_found = 1;
-        return NGX_OK;
-    }
-
-    if (ngx_http_complex_value(r, &args[1], &src_str) != NGX_OK) {
-        return NGX_ERROR;
-    }
-
-    while (src_str.len && ngx_http_var_isspace(src_str.data[0])) {
-        src_str.data++;
-        src_str.len--;
-    }
-
-    while (src_str.len && ngx_http_var_isspace(src_str.data[src_str.len - 1]))
-    {
-        src_str.len--;
-    }
-
-    if (src_str.len == 0) {
-        v->not_found = 1;
-        return NGX_OK;
-    }
-
-    if (var->args->nelts > 2) {
-        if (ngx_http_complex_value(r, &args[2], &separator) != NGX_OK) {
-            return NGX_ERROR;
-        }
-
-        if (separator.len != 1) {
-            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                          "http var: invalid separator: \"%V\"",
-                          &separator);
-            ngx_str_set(&separator, "&");
-        }
-
-    } else {
-        ngx_str_set(&separator, "&");
-    }
-
-    if (var->args->nelts == 4) {
-        if (ngx_http_complex_value(r, &args[3], &delimiter) != NGX_OK) {
-            return NGX_ERROR;
-        }
-
-        if (delimiter.len != 1) {
-            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                          "http var: invalid delimiter: \"%V\"",
-                          &delimiter);
-            ngx_str_set(&delimiter, "=");
-        }
-
-    } else {
-        ngx_str_set(&delimiter, "=");
-    }
-
-    sep = separator.data[0];
-    del = delimiter.data[0];
-
-    p = src_str.data;
-    last = p + src_str.len;
-
-    for ( /* void */ ; p < last; p++) {
-
-        /* we need separator after name, so drop one char from last */
-
-        if (var->ignore_case) {
-            p = ngx_strlcasestrn(p, last - 1, name.data, name.len - 1);
-
-        } else {
-            p = ngx_http_var_utils_strlstrn(p, last - 1, name.data, name.len - 1);
-        }
-
-        if (p == NULL) {
-            v->not_found = 1;
-            return NGX_OK;
-        }
-
-        if (*(p + name.len) != del) {
-            continue;
-        }
-
-        if (p > src_str.data) {
-            back = p - 1;
-
-            while (back > src_str.data && *back == ' ') {
-                back--;
-            }
-
-            if (*back != sep) {
-                continue;
-            }
-        }
-
-        p += name.len + 1;
-
-        back = ngx_strlchr(p, last, sep);
-
-        if (back) {
-            last = back;
-        }
-
-        while (p < last && *p == ' ') {
-            p++;
-        }
-
-        while (last > p && *(last - 1) == ' ') {
-            last--;
-        }
-
-        v->data = p;
-        v->len = last - p;
-
-        return NGX_OK;
-    }
-
-    v->not_found = 1;
-    return NGX_OK;
 }
