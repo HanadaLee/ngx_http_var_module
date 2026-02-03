@@ -5524,7 +5524,7 @@ ngx_http_var_exec_extract_param(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  name, src_str, separator, delimiter;
-    u_char                    *p, *before, *last, sep, del;
+    u_char                    *p, *back, *last, sep, del;
 
     args = var->args->elts;
 
@@ -5624,33 +5624,35 @@ ngx_http_var_exec_extract_param(ngx_http_request_t *r,
         }
 
         if (p > src_str.data) {
-            before = p - 1;
+            back = p - 1;
 
-            while (before > src_str.data && *before == ' ') {
-                before--;
+            while (back > src_str.data && *back == ' ') {
+                back--;
             }
 
-            if (*before != sep) {
+            if (*back != sep) {
                 continue;
             }
         }
 
-        v->data = p + name.len + 1;
+        p += name.len + 1;
 
-        p = ngx_strlchr(p, last, sep);
+        back = ngx_strlchr(p, last, sep);
 
-        if (p == NULL) {
-            p = last;
+        if (back) {
+            last = back;
         }
 
-        v->len = p - v->data;
+        while (p < last && *p == ' ') {
+            p++;
+        }
 
-        last = v->data + v->len;
-
-        while (last > v->data && *(last - 1) == ' ') {
+        while (last > p && *(last - 1) == ' ') {
             last--;
-            v->len--;
         }
+
+        v->data = p;
+        v->len = last - p;
 
         return NGX_OK;
     }
