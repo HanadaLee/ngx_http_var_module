@@ -1976,7 +1976,7 @@ ngx_http_var_exec_if_str_eq(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-    if (var->ignore_case == 1) {
+    if (var->ignore_case) {
         if (ngx_strncasecmp(val1.data,
                 val2.data, val1.len) == 0) {
             v->data = (u_char *) "1";
@@ -2039,7 +2039,7 @@ ngx_http_var_exec_if_starts_with(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-    if (var->ignore_case == 1) {
+    if (var->ignore_case) {
         if (ngx_strncasecmp(str.data, prefix.data, prefix.len) == 0) {
             v->data = (u_char *) "1";
             return NGX_OK;
@@ -2088,7 +2088,7 @@ ngx_http_var_exec_if_ends_with(ngx_http_request_t *r,
 
     str_end = str.data + str.len - suffix.len;
 
-    if (var->ignore_case == 1) {
+    if (var->ignore_case) {
         if (ngx_strncasecmp(str_end, suffix.data, suffix.len) == 0) {
             v->data = (u_char *) "1";
             return NGX_OK;
@@ -2138,7 +2138,7 @@ ngx_http_var_exec_if_find(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-    if (var->ignore_case == 1) {
+    if (var->ignore_case) {
         p = ngx_strlcasestrn(str.data, str.data + str.len,
                 sub_str.data, sub_str.len - 1);
     } else {
@@ -2180,7 +2180,7 @@ ngx_http_var_exec_if_str_in(ngx_http_request_t *r,
             continue;
         }
 
-        if (var->ignore_case == 1) {
+        if (var->ignore_case) {
             if (ngx_strncasecmp(val1.data, val2.data, val1.len) == 0) {
                 v->data = (u_char *) "1";
                 v->len = 1;
@@ -2478,10 +2478,13 @@ ngx_http_var_exec_find(ngx_http_request_t *r,
     if (sub_str.len == 0 || src_str.len == 0) {
         /* If sub_str is empty or src_str is empty, return 0 */
         pos = 0;
+
     } else {
-        if (var->ignore_case == 1) {
+
+        if (var->ignore_case) {
             p = ngx_strlcasestrn(src_str.data, src_str.data + src_str.len,
                                  sub_str.data, sub_str.len - 1);
+
         } else {
             p = ngx_http_var_utils_strlstrn(src_str.data,
                     src_str.data + src_str.len, sub_str.data, sub_str.len - 1);
@@ -2490,6 +2493,7 @@ ngx_http_var_exec_find(ngx_http_request_t *r,
         if (p) {
             /* Position starts from 1 */
             pos = (ngx_int_t)(p - src_str.data) + 1;
+
         } else {
             pos = 0;
         }
@@ -5579,7 +5583,12 @@ ngx_http_var_exec_extra_param(ngx_http_request_t *r,
 
         /* we need separator after name, so drop one char from last */
 
-        p = ngx_strlcasestrn(p, last - 1, name.data, name.len - 1);
+        if (var->ignore_case) {
+            p = ngx_strlcasestrn(p, last - 1, name.data, name.len - 1);
+
+        } else {
+            p = ngx_http_var_utils_strlstrn(p, last - 1, name.data, name.len - 1);
+        }
 
         if (p == NULL) {
             v->not_found = 1;
