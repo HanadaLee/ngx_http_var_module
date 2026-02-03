@@ -127,10 +127,10 @@ var $new_var replace [-i] src_str src dst;
 
 # Extract parameters
 # Extract a value from a list of parameters. A use case for this is to extract query parameters without having to write a regular expression, but it can be used to look up values in any name/value pair list. If several occurrences of the parameter exist, only the first one is returned. the variable gets a blank value. The delimiter between the name and the value of a parameter is '=' by default, and the parameter separator is '&' by default.
-var $new_var extra_param [-i] param_name src_string [separator] [delimiter];
+var $new_var extract_param [-i] param_name src_string [separator] [delimiter];
 
 # example: a query "foo=123&bar=456&baz=789". If the parameter name is bar and the Separator is &, then the resulting variable value will be 456.
-# var $extraed_arg_bar extra_param bar "foo=123&bar=456&baz=789" & =;
+# var $extraed_arg_bar extract_param bar "foo=123&bar=456&baz=789" & =;
 
 
 #### Regex Judgement ####

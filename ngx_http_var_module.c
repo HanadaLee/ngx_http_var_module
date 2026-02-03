@@ -116,7 +116,7 @@ typedef enum {
 
     NGX_HTTP_VAR_OP_IF_IP_RANGE,
 
-    NGX_HTTP_VAR_OP_EXTRA_PARAM,
+    NGX_HTTP_VAR_OP_EXTRACT_PARAM,
 
     NGX_HTTP_VAR_OP_UNKNOWN
 } ngx_http_var_operator_e;
@@ -252,7 +252,7 @@ static ngx_http_var_operator_enum_t ngx_http_var_operators[] = {
 
     { ngx_string("if_ip_range"),      NGX_HTTP_VAR_OP_IF_IP_RANGE,      2, 99 },
 
-    { ngx_string("extra_param"),      NGX_HTTP_VAR_OP_EXTRA_PARAM,      2, 4  },
+    { ngx_string("extract_param"),      NGX_HTTP_VAR_OP_EXTRACT_PARAM,  2, 4  },
 
     { ngx_null_string,                NGX_HTTP_VAR_OP_UNKNOWN,          0, 0  }
 };
@@ -474,7 +474,7 @@ static ngx_int_t ngx_http_var_exec_unix_time(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_exec_if_ip_range(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
-static ngx_int_t ngx_http_var_exec_extra_param(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_extract_param(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 static ngx_command_t ngx_http_var_commands[] = {
@@ -1328,8 +1328,8 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_exec_if_ip_range(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_EXTRA_PARAM:
-        rc = ngx_http_var_exec_extra_param(r, v, var);
+    case NGX_HTTP_VAR_OP_EXTRACT_PARAM:
+        rc = ngx_http_var_exec_extract_param(r, v, var);
         break;
 
     default:
@@ -5519,7 +5519,7 @@ invalid_ip_range:
 
 
 static ngx_int_t
-ngx_http_var_exec_extra_param(ngx_http_request_t *r,
+ngx_http_var_exec_extract_param(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
