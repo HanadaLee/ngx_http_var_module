@@ -140,13 +140,13 @@ var $bool_var if_re_match [-i] src_str match_regex;
 
 #### Regex Operations ####
 # Capture regex
-var $new_var re_capture [-i] src_str capture_regex assign_value;
+var $new_var re_capture [-i] src_str regex assign_value;
 
 # Substitute regex
-var $new_var re_sub [-i] src_str capture_regex assign_value;
+var $new_var re_sub [-i] src_str regex replacement;
 
 # Global regex substitution
-var $new_var re_gsub [-i] src_str capture_regex assign_value;
+var $new_var re_gsub [-i] src_str regex replacement;
 
 
 #### Mathematical Judgement ####
