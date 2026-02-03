@@ -16,8 +16,8 @@
 #endif
 
 
-#define ngx_http_var_isspace(c)                                                \
-    ((c) == ' ' || (c) == '\t' || (c) == CR || (c) == LF)                      \
+#define ngx_http_var_isspace(c)                                               \
+    ((c) == ' ' || (c) == '\t' || (c) == CR || (c) == LF)                     \
 
 
 typedef enum {
@@ -152,108 +152,6 @@ typedef struct {
     ngx_uint_t                     min_args;    /* min number of arguments */
     ngx_uint_t                     max_args;    /* max number of arguments */
 } ngx_http_var_operator_enum_t;
-
-
-static ngx_http_var_operator_enum_t ngx_http_var_operators[] = {
-    { ngx_string("and"),              NGX_HTTP_VAR_OP_AND,              2, 99 },
-    { ngx_string("or"),               NGX_HTTP_VAR_OP_OR,               2, 99 },
-    { ngx_string("not"),              NGX_HTTP_VAR_OP_NOT,              1, 1  },
-
-    { ngx_string("if_empty"),         NGX_HTTP_VAR_OP_IF_EMPTY,         1, 1  },
-    { ngx_string("if_not_empty"),     NGX_HTTP_VAR_OP_IF_NOT_EMPTY,     1, 1  },
-    { ngx_string("if_is_num"),        NGX_HTTP_VAR_OP_IF_IS_NUM,        1, 1  },
-    { ngx_string("if_str_eq"),        NGX_HTTP_VAR_OP_IF_STR_EQ,        2, 2  },
-    { ngx_string("if_str_ne"),        NGX_HTTP_VAR_OP_IF_STR_NE,        2, 2  },
-    { ngx_string("if_starts_with"),   NGX_HTTP_VAR_OP_IF_STARTS_WITH,   2, 2  },
-    { ngx_string("if_ends_with"),     NGX_HTTP_VAR_OP_IF_ENDS_WITH,     2, 2  },
-    { ngx_string("if_find"),          NGX_HTTP_VAR_OP_IF_FIND,          2, 2  },
-    { ngx_string("if_str_in"),        NGX_HTTP_VAR_OP_IF_STR_IN,        3, 99 },
-
-    { ngx_string("copy"),             NGX_HTTP_VAR_OP_COPY,             1, 1  },
-    { ngx_string("len"),              NGX_HTTP_VAR_OP_LEN,              1, 1  },
-    { ngx_string("upper"),            NGX_HTTP_VAR_OP_UPPER,            1, 1  },
-    { ngx_string("lower"),            NGX_HTTP_VAR_OP_LOWER,            1, 1  },
-    { ngx_string("trim"),             NGX_HTTP_VAR_OP_TRIM,             1, 1  },
-    { ngx_string("ltrim"),            NGX_HTTP_VAR_OP_LTRIM,            1, 1  },
-    { ngx_string("rtrim"),            NGX_HTTP_VAR_OP_RTRIM,            1, 1  },
-    { ngx_string("reverse"),          NGX_HTTP_VAR_OP_REVERSE,          1, 1  },
-    { ngx_string("find"),             NGX_HTTP_VAR_OP_FIND,             2, 2  },
-    { ngx_string("repeat"),           NGX_HTTP_VAR_OP_REPEAT,           2, 2  },
-    { ngx_string("substr"),           NGX_HTTP_VAR_OP_SUBSTR,           2, 3  },
-    { ngx_string("replace"),          NGX_HTTP_VAR_OP_REPLACE,          3, 3  },
-    { ngx_string("extract_param"),    NGX_HTTP_VAR_OP_EXTRACT_PARAM,  2, 4  },
-
-#if (NGX_PCRE)
-    { ngx_string("if_re_match"),      NGX_HTTP_VAR_OP_IF_RE_MATCH,      2, 2  },
-
-    { ngx_string("re_capture"),       NGX_HTTP_VAR_OP_RE_CAPTURE,       3, 3  },
-    { ngx_string("re_sub"),           NGX_HTTP_VAR_OP_RE_SUB,           3, 3  },
-    { ngx_string("re_gsub"),          NGX_HTTP_VAR_OP_RE_GSUB,          3, 3  },
-#endif
-
-    { ngx_string("if_eq"),            NGX_HTTP_VAR_OP_IF_EQ,            2, 2  },
-    { ngx_string("if_ne"),            NGX_HTTP_VAR_OP_IF_NE,            2, 2  },
-    { ngx_string("if_lt"),            NGX_HTTP_VAR_OP_IF_LT,            2, 2  },
-    { ngx_string("if_le"),            NGX_HTTP_VAR_OP_IF_LE,            2, 2  },
-    { ngx_string("if_gt"),            NGX_HTTP_VAR_OP_IF_GT,            2, 2  },
-    { ngx_string("if_ge"),            NGX_HTTP_VAR_OP_IF_GE,            2, 2  },
-    { ngx_string("if_range"),         NGX_HTTP_VAR_OP_IF_RANGE,         2, 3  },
-    { ngx_string("if_in"),            NGX_HTTP_VAR_OP_IF_IN,            3, 99 },
-
-    { ngx_string("abs"),              NGX_HTTP_VAR_OP_ABS,              1, 1  },
-    { ngx_string("max"),              NGX_HTTP_VAR_OP_MAX,              2, 2  },
-    { ngx_string("min"),              NGX_HTTP_VAR_OP_MIN,              2, 2  },
-    { ngx_string("add"),              NGX_HTTP_VAR_OP_ADD,              2, 2  },
-    { ngx_string("sub"),              NGX_HTTP_VAR_OP_SUB,              2, 2  },
-    { ngx_string("mul"),              NGX_HTTP_VAR_OP_MUL,              2, 2  },
-    { ngx_string("div"),              NGX_HTTP_VAR_OP_DIV,              2, 2  },
-    { ngx_string("mod"),              NGX_HTTP_VAR_OP_MOD,              2, 2  },
-    { ngx_string("round"),            NGX_HTTP_VAR_OP_ROUND,            2, 2  },
-    { ngx_string("floor"),            NGX_HTTP_VAR_OP_FLOOR,            1, 1  },
-    { ngx_string("ceil"),             NGX_HTTP_VAR_OP_CEIL,             1, 1  },
-    { ngx_string("rand"),             NGX_HTTP_VAR_OP_RAND,             0, 2  },
-    { ngx_string("hexrand"),          NGX_HTTP_VAR_OP_HEXRAND,          0, 1  },
-
-    { ngx_string("hex_encode"),       NGX_HTTP_VAR_OP_HEX_ENCODE,       1, 1  },
-    { ngx_string("hex_decode"),       NGX_HTTP_VAR_OP_HEX_DECODE,       1, 1  },
-    { ngx_string("dec_to_hex"),       NGX_HTTP_VAR_OP_DEC_TO_HEX,       1, 1  },
-    { ngx_string("hex_to_dec"),       NGX_HTTP_VAR_OP_HEX_TO_DEC,       1, 1  },
-    { ngx_string("escape_uri"),       NGX_HTTP_VAR_OP_ESCAPE_URI,       1, 1  },
-    { ngx_string("escape_args"),      NGX_HTTP_VAR_OP_ESCAPE_ARGS,      1, 1  },
-    { ngx_string("escape_uri_component"),
-                                NGX_HTTP_VAR_OP_ESCAPE_URI_COMPONENT,   1, 1  },
-    { ngx_string("escape_html"),      NGX_HTTP_VAR_OP_ESCAPE_HTML,      1, 1  },
-    { ngx_string("unescape_uri"),     NGX_HTTP_VAR_OP_UNESCAPE_URI,     1, 1  },
-    { ngx_string("base64_encode"),    NGX_HTTP_VAR_OP_BASE64_ENCODE,    1, 1  },
-    { ngx_string("base64url_encode"), NGX_HTTP_VAR_OP_BASE64URL_ENCODE, 1, 1  },
-    { ngx_string("base64_decode"),    NGX_HTTP_VAR_OP_BASE64_DECODE,    1, 1  },
-    { ngx_string("base64url_decode"), NGX_HTTP_VAR_OP_BASE64URL_DECODE, 1, 1  },
-
-    { ngx_string("crc32_short"),      NGX_HTTP_VAR_OP_CRC32_SHORT,      1, 1  },
-    { ngx_string("crc32_long"),       NGX_HTTP_VAR_OP_CRC32_LONG,       1, 1  },
-    { ngx_string("md5sum"),           NGX_HTTP_VAR_OP_MD5SUM,           1, 1  },
-    { ngx_string("sha1sum"),          NGX_HTTP_VAR_OP_SHA1SUM,          1, 1  },
-
-#if (NGX_HTTP_SSL)
-    { ngx_string("sha256sum"),        NGX_HTTP_VAR_OP_SHA256SUM,        1, 1  },
-    { ngx_string("sha384sum"),        NGX_HTTP_VAR_OP_SHA384SUM,        1, 1  },
-    { ngx_string("sha512sum"),        NGX_HTTP_VAR_OP_SHA512SUM,        1, 1  },
-    { ngx_string("hmac_sha1"),        NGX_HTTP_VAR_OP_HMAC_SHA1,        2, 2  },
-    { ngx_string("hmac_sha256"),      NGX_HTTP_VAR_OP_HMAC_SHA256,      2, 2  },
-    { ngx_string("hmac_sha384"),      NGX_HTTP_VAR_OP_HMAC_SHA384,      2, 2  },
-    { ngx_string("hmac_sha512"),      NGX_HTTP_VAR_OP_HMAC_SHA512,      2, 2  },
-#endif
-
-    { ngx_string("if_time_range"),    NGX_HTTP_VAR_OP_IF_TIME_RANGE,    1, 8  },
-
-    { ngx_string("gmt_time"),         NGX_HTTP_VAR_OP_GMT_TIME,         1, 2  },
-    { ngx_string("local_time"),       NGX_HTTP_VAR_OP_LOCAL_TIME,       1, 2  },
-    { ngx_string("unix_time"),        NGX_HTTP_VAR_OP_UNIX_TIME,        0, 3  },
-
-    { ngx_string("if_ip_range"),      NGX_HTTP_VAR_OP_IF_IP_RANGE,      2, 99 },
-
-    { ngx_null_string,                NGX_HTTP_VAR_OP_UNKNOWN,          0, 0  }
-};
 
 
 static void *ngx_http_var_create_loc_conf(ngx_conf_t *cf);
@@ -474,7 +372,110 @@ static ngx_int_t ngx_http_var_exec_unix_time(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_exec_if_ip_range(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
-static ngx_command_t ngx_http_var_commands[] = {
+
+static ngx_http_var_operator_enum_t  ngx_http_var_operators[] = {
+    { ngx_string("and"),              NGX_HTTP_VAR_OP_AND,              2, 99 },
+    { ngx_string("or"),               NGX_HTTP_VAR_OP_OR,               2, 99 },
+    { ngx_string("not"),              NGX_HTTP_VAR_OP_NOT,              1, 1  },
+
+    { ngx_string("if_empty"),         NGX_HTTP_VAR_OP_IF_EMPTY,         1, 1  },
+    { ngx_string("if_not_empty"),     NGX_HTTP_VAR_OP_IF_NOT_EMPTY,     1, 1  },
+    { ngx_string("if_is_num"),        NGX_HTTP_VAR_OP_IF_IS_NUM,        1, 1  },
+    { ngx_string("if_str_eq"),        NGX_HTTP_VAR_OP_IF_STR_EQ,        2, 2  },
+    { ngx_string("if_str_ne"),        NGX_HTTP_VAR_OP_IF_STR_NE,        2, 2  },
+    { ngx_string("if_starts_with"),   NGX_HTTP_VAR_OP_IF_STARTS_WITH,   2, 2  },
+    { ngx_string("if_ends_with"),     NGX_HTTP_VAR_OP_IF_ENDS_WITH,     2, 2  },
+    { ngx_string("if_find"),          NGX_HTTP_VAR_OP_IF_FIND,          2, 2  },
+    { ngx_string("if_str_in"),        NGX_HTTP_VAR_OP_IF_STR_IN,        3, 99 },
+
+    { ngx_string("copy"),             NGX_HTTP_VAR_OP_COPY,             1, 1  },
+    { ngx_string("len"),              NGX_HTTP_VAR_OP_LEN,              1, 1  },
+    { ngx_string("upper"),            NGX_HTTP_VAR_OP_UPPER,            1, 1  },
+    { ngx_string("lower"),            NGX_HTTP_VAR_OP_LOWER,            1, 1  },
+    { ngx_string("trim"),             NGX_HTTP_VAR_OP_TRIM,             1, 1  },
+    { ngx_string("ltrim"),            NGX_HTTP_VAR_OP_LTRIM,            1, 1  },
+    { ngx_string("rtrim"),            NGX_HTTP_VAR_OP_RTRIM,            1, 1  },
+    { ngx_string("reverse"),          NGX_HTTP_VAR_OP_REVERSE,          1, 1  },
+    { ngx_string("find"),             NGX_HTTP_VAR_OP_FIND,             2, 2  },
+    { ngx_string("repeat"),           NGX_HTTP_VAR_OP_REPEAT,           2, 2  },
+    { ngx_string("substr"),           NGX_HTTP_VAR_OP_SUBSTR,           2, 3  },
+    { ngx_string("replace"),          NGX_HTTP_VAR_OP_REPLACE,          3, 3  },
+    { ngx_string("extract_param"),    NGX_HTTP_VAR_OP_EXTRACT_PARAM,    2, 4  },
+
+#if (NGX_PCRE)
+    { ngx_string("if_re_match"),      NGX_HTTP_VAR_OP_IF_RE_MATCH,      2, 2  },
+
+    { ngx_string("re_capture"),       NGX_HTTP_VAR_OP_RE_CAPTURE,       3, 3  },
+    { ngx_string("re_sub"),           NGX_HTTP_VAR_OP_RE_SUB,           3, 3  },
+    { ngx_string("re_gsub"),          NGX_HTTP_VAR_OP_RE_GSUB,          3, 3  },
+#endif
+
+    { ngx_string("if_eq"),            NGX_HTTP_VAR_OP_IF_EQ,            2, 2  },
+    { ngx_string("if_ne"),            NGX_HTTP_VAR_OP_IF_NE,            2, 2  },
+    { ngx_string("if_lt"),            NGX_HTTP_VAR_OP_IF_LT,            2, 2  },
+    { ngx_string("if_le"),            NGX_HTTP_VAR_OP_IF_LE,            2, 2  },
+    { ngx_string("if_gt"),            NGX_HTTP_VAR_OP_IF_GT,            2, 2  },
+    { ngx_string("if_ge"),            NGX_HTTP_VAR_OP_IF_GE,            2, 2  },
+    { ngx_string("if_range"),         NGX_HTTP_VAR_OP_IF_RANGE,         2, 3  },
+    { ngx_string("if_in"),            NGX_HTTP_VAR_OP_IF_IN,            3, 99 },
+
+    { ngx_string("abs"),              NGX_HTTP_VAR_OP_ABS,              1, 1  },
+    { ngx_string("max"),              NGX_HTTP_VAR_OP_MAX,              2, 2  },
+    { ngx_string("min"),              NGX_HTTP_VAR_OP_MIN,              2, 2  },
+    { ngx_string("add"),              NGX_HTTP_VAR_OP_ADD,              2, 2  },
+    { ngx_string("sub"),              NGX_HTTP_VAR_OP_SUB,              2, 2  },
+    { ngx_string("mul"),              NGX_HTTP_VAR_OP_MUL,              2, 2  },
+    { ngx_string("div"),              NGX_HTTP_VAR_OP_DIV,              2, 2  },
+    { ngx_string("mod"),              NGX_HTTP_VAR_OP_MOD,              2, 2  },
+    { ngx_string("round"),            NGX_HTTP_VAR_OP_ROUND,            2, 2  },
+    { ngx_string("floor"),            NGX_HTTP_VAR_OP_FLOOR,            1, 1  },
+    { ngx_string("ceil"),             NGX_HTTP_VAR_OP_CEIL,             1, 1  },
+    { ngx_string("rand"),             NGX_HTTP_VAR_OP_RAND,             0, 2  },
+    { ngx_string("hexrand"),          NGX_HTTP_VAR_OP_HEXRAND,          0, 1  },
+
+    { ngx_string("hex_encode"),       NGX_HTTP_VAR_OP_HEX_ENCODE,       1, 1  },
+    { ngx_string("hex_decode"),       NGX_HTTP_VAR_OP_HEX_DECODE,       1, 1  },
+    { ngx_string("dec_to_hex"),       NGX_HTTP_VAR_OP_DEC_TO_HEX,       1, 1  },
+    { ngx_string("hex_to_dec"),       NGX_HTTP_VAR_OP_HEX_TO_DEC,       1, 1  },
+    { ngx_string("escape_uri"),       NGX_HTTP_VAR_OP_ESCAPE_URI,       1, 1  },
+    { ngx_string("escape_args"),      NGX_HTTP_VAR_OP_ESCAPE_ARGS,      1, 1  },
+    { ngx_string("escape_uri_component"),
+                                NGX_HTTP_VAR_OP_ESCAPE_URI_COMPONENT,   1, 1  },
+    { ngx_string("escape_html"),      NGX_HTTP_VAR_OP_ESCAPE_HTML,      1, 1  },
+    { ngx_string("unescape_uri"),     NGX_HTTP_VAR_OP_UNESCAPE_URI,     1, 1  },
+    { ngx_string("base64_encode"),    NGX_HTTP_VAR_OP_BASE64_ENCODE,    1, 1  },
+    { ngx_string("base64url_encode"), NGX_HTTP_VAR_OP_BASE64URL_ENCODE, 1, 1  },
+    { ngx_string("base64_decode"),    NGX_HTTP_VAR_OP_BASE64_DECODE,    1, 1  },
+    { ngx_string("base64url_decode"), NGX_HTTP_VAR_OP_BASE64URL_DECODE, 1, 1  },
+
+    { ngx_string("crc32_short"),      NGX_HTTP_VAR_OP_CRC32_SHORT,      1, 1  },
+    { ngx_string("crc32_long"),       NGX_HTTP_VAR_OP_CRC32_LONG,       1, 1  },
+    { ngx_string("md5sum"),           NGX_HTTP_VAR_OP_MD5SUM,           1, 1  },
+    { ngx_string("sha1sum"),          NGX_HTTP_VAR_OP_SHA1SUM,          1, 1  },
+
+#if (NGX_HTTP_SSL)
+    { ngx_string("sha256sum"),        NGX_HTTP_VAR_OP_SHA256SUM,        1, 1  },
+    { ngx_string("sha384sum"),        NGX_HTTP_VAR_OP_SHA384SUM,        1, 1  },
+    { ngx_string("sha512sum"),        NGX_HTTP_VAR_OP_SHA512SUM,        1, 1  },
+    { ngx_string("hmac_sha1"),        NGX_HTTP_VAR_OP_HMAC_SHA1,        2, 2  },
+    { ngx_string("hmac_sha256"),      NGX_HTTP_VAR_OP_HMAC_SHA256,      2, 2  },
+    { ngx_string("hmac_sha384"),      NGX_HTTP_VAR_OP_HMAC_SHA384,      2, 2  },
+    { ngx_string("hmac_sha512"),      NGX_HTTP_VAR_OP_HMAC_SHA512,      2, 2  },
+#endif
+
+    { ngx_string("if_time_range"),    NGX_HTTP_VAR_OP_IF_TIME_RANGE,    1, 8  },
+
+    { ngx_string("gmt_time"),         NGX_HTTP_VAR_OP_GMT_TIME,         1, 2  },
+    { ngx_string("local_time"),       NGX_HTTP_VAR_OP_LOCAL_TIME,       1, 2  },
+    { ngx_string("unix_time"),        NGX_HTTP_VAR_OP_UNIX_TIME,        0, 3  },
+
+    { ngx_string("if_ip_range"),      NGX_HTTP_VAR_OP_IF_IP_RANGE,      2, 99 },
+
+    { ngx_null_string,                NGX_HTTP_VAR_OP_UNKNOWN,          0, 0  }
+};
+
+
+static ngx_command_t  ngx_http_var_commands[] = {
 
     { ngx_string("var"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_2MORE,
@@ -487,7 +488,7 @@ static ngx_command_t ngx_http_var_commands[] = {
 };
 
 
-static ngx_http_module_t ngx_http_var_module_ctx = {
+static ngx_http_module_t  ngx_http_var_module_ctx = {
     NULL,                                  /* preconfiguration */
     NULL,                                  /* postconfiguration */
 
@@ -502,7 +503,7 @@ static ngx_http_module_t ngx_http_var_module_ctx = {
 };
 
 
-ngx_module_t ngx_http_var_module = {
+ngx_module_t  ngx_http_var_module = {
     NGX_MODULE_V1,
     &ngx_http_var_module_ctx,              /* module context */
     ngx_http_var_commands,                 /* module directives */
@@ -518,7 +519,6 @@ ngx_module_t ngx_http_var_module = {
 };
 
 
-/* Create configuration */
 static void *
 ngx_http_var_create_loc_conf(ngx_conf_t *cf)
 {
@@ -535,7 +535,6 @@ ngx_http_var_create_loc_conf(ngx_conf_t *cf)
 }
 
 
-/* Merge configurations */
 static char *
 ngx_http_var_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 {
@@ -561,7 +560,6 @@ ngx_http_var_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 }
 
 
-/* "var" directive handler */
 static char *
 ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
@@ -606,7 +604,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    if (value[1].len == 0 || value[1].data == NULL || value[1].data[0] != '$') {
+    if (value[1].len == 0 || value[1].data[0] != '$') {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "http var: invalid variable name \"%V\"",
                            &value[1]);
