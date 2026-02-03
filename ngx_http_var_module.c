@@ -16,6 +16,10 @@
 #endif
 
 
+#define ngx_http_var_isspace(c)                                                \
+    ((c) == ' ' || (c) == '\t' || (c) == CR || (c) == LF)                      \
+
+
 typedef enum {
     NGX_HTTP_VAR_OP_AND = 0,
     NGX_HTTP_VAR_OP_OR,
@@ -2336,17 +2340,17 @@ ngx_http_var_exec_trim(ngx_http_request_t *r,
     end = src_str.data + src_str.len - 1;
 
     /* Trim left */
-    while (start <= end && isspace((unsigned char)*start)) {
+    while (start <= end && ngx_http_var_isspace(*start)) {
         start++;
     }
 
     /* Trim right */
-    while (end >= start && isspace((unsigned char)*end)) {
+    while (end >= start && ngx_http_var_isspace(*end)) {
         end--;
     }
 
     trimmed_str.data = start;
-    trimmed_str.len = end >= start ? (size_t)(end - start + 1) : 0;
+    trimmed_str.len = end >= start ? (size_t) (end - start + 1) : 0;
 
     /* Set variable value */
     v->len = trimmed_str.len;
@@ -2374,12 +2378,12 @@ ngx_http_var_exec_ltrim(ngx_http_request_t *r,
     end = src_str.data + src_str.len - 1;
 
     /* Trim left */
-    while (start <= end && isspace((unsigned char)*start)) {
+    while (start <= end && ngx_http_var_isspace(*start)) {
         start++;
     }
 
     trimmed_str.data = start;
-    trimmed_str.len = end >= start ? (size_t)(end - start + 1) : 0;
+    trimmed_str.len = end >= start ? (size_t) (end - start + 1) : 0;
 
     /* Set variable value */
     v->len = trimmed_str.len;
@@ -2407,12 +2411,12 @@ ngx_http_var_exec_rtrim(ngx_http_request_t *r,
     end = src_str.data + src_str.len - 1;
 
     /* Trim right */
-    while (end >= start && isspace((unsigned char)*end)) {
+    while (end >= start && ngx_http_var_isspace(*end)) {
         end--;
     }
 
     trimmed_str.data = start;
-    trimmed_str.len = end >= start ? (size_t)(end - start + 1) : 0;
+    trimmed_str.len = end >= start ? (size_t) (end - start + 1) : 0;
 
     /* Set variable value */
     v->len = trimmed_str.len;
@@ -2492,7 +2496,7 @@ ngx_http_var_exec_find(ngx_http_request_t *r,
 
         if (p) {
             /* Position starts from 1 */
-            pos = (ngx_int_t)(p - src_str.data) + 1;
+            pos = (ngx_int_t) (p - src_str.data) + 1;
 
         } else {
             pos = 0;
@@ -2612,7 +2616,7 @@ ngx_http_var_exec_substr(ngx_http_request_t *r,
         }
 
         /* Adjust len if it exceeds the string length */
-        if ((ngx_uint_t)(start + len) > src_len) {
+        if ((ngx_uint_t) (start + len) > src_len) {
             len = src_len - start;
         }
     } else {
@@ -2708,7 +2712,7 @@ ngx_http_var_exec_replace(ngx_http_request_t *r,
             if (var->ignore_case) {
                 rc = ngx_strncasecmp(p + i, search_str.data, search_str.len);
             } else {
-                rc = ngx_strncmp((const char *)(p + i),
+                rc = ngx_strncmp((const char *) (p + i),
                                  (const char *)search_str.data,
                                  search_str.len);
             }
@@ -2952,7 +2956,7 @@ ngx_http_var_exec_re_gsub(ngx_http_request_t *r,
 
         if (rc == NGX_DECLINED) {
             /* No more matches, copy the remaining part */
-            required = (ngx_uint_t)(p - result.data) + sub.len;
+            required = (ngx_uint_t) (p - result.data) + sub.len;
             if (required > allocated) {
                 /* Need to expand the buffer */
                 while (required > allocated) {
@@ -2986,7 +2990,7 @@ ngx_http_var_exec_re_gsub(ngx_http_request_t *r,
 
         /* Copy the part before the match */
         if (match_start > 0) {
-            required = (ngx_uint_t)(p - result.data) + match_start;
+            required = (ngx_uint_t) (p - result.data) + match_start;
             if (required > allocated) {
                 /* Need to expand the buffer */
                 while (required > allocated) {
@@ -3011,7 +3015,7 @@ ngx_http_var_exec_re_gsub(ngx_http_request_t *r,
         }
 
         /* Ensure the replacement string has enough space */
-        required = (ngx_uint_t)(p - result.data) + replaced.len
+        required = (ngx_uint_t) (p - result.data) + replaced.len
             + (subject.len - offset - match_end);
         if (required > allocated) {
             /* Expand the buffer to a sufficient size */
@@ -4177,7 +4181,7 @@ ngx_http_var_exec_hex_decode(ngx_http_request_t *r,
             ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "http var: invalid hex character "
                           "in hex_decode at position %d",
-                          (int)(p - hex_str.data));
+                          (int) (p - hex_str.data));
             return NGX_ERROR;
         }
 
@@ -5067,7 +5071,7 @@ ngx_http_var_exec_if_time_range(ngx_http_request_t *r,
     if (tz_offset >= 0) {
         raw_time = ngx_time() + (time_t)tz_offset;
     } else {
-        raw_time = ngx_time() - (time_t)(-tz_offset);
+        raw_time = ngx_time() - (time_t) (-tz_offset);
     }
 
     ngx_libc_gmtime(raw_time, &tm_copy);
@@ -5519,13 +5523,22 @@ ngx_http_var_exec_extra_param(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  name, src_str, separator, delimiter, value;
-    u_char                    *p, *last, sep, del;
+    ngx_str_t                  name, src_str, separator, delimiter;
+    u_char                    *p, *before, *last, sep, del;
 
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &name) != NGX_OK) {
         return NGX_ERROR;
+    }
+
+    while (name.len && ngx_http_var_isspace(name.data[0])) {
+        name.data++;
+        name.len--;
+    }
+
+    while (name.len && ngx_http_var_isspace(name.data[name.len - 1])) {
+        name.len--;
     }
 
     if (name.len == 0) {
@@ -5535,6 +5548,16 @@ ngx_http_var_exec_extra_param(ngx_http_request_t *r,
 
     if (ngx_http_complex_value(r, &args[1], &src_str) != NGX_OK) {
         return NGX_ERROR;
+    }
+
+    while (src_str.len && ngx_http_var_isspace(src_str.data[0])) {
+        src_str.data++;
+        src_str.len--;
+    }
+
+    while (src_str.len && ngx_http_var_isspace(src_str.data[src_str.len - 1]))
+    {
+        src_str.len--;
     }
 
     if (src_str.len == 0) {
@@ -5574,10 +5597,11 @@ ngx_http_var_exec_extra_param(ngx_http_request_t *r,
         ngx_str_set(&delimiter, "=");
     }
 
-    p = src_str.data;
-    last = p + src_str.len;
     sep = separator.data[0];
     del = delimiter.data[0];
+
+    p = src_str.data;
+    last = p + src_str.len;
 
     for ( /* void */ ; p < last; p++) {
 
@@ -5595,20 +5619,40 @@ ngx_http_var_exec_extra_param(ngx_http_request_t *r,
             return NGX_OK;
         }
 
-        if ((p == src_str.data || *(p - 1) == sep) && *(p + name.len) == del) {
+        if (*(p + name.len) != del) {
+            continue;
+        }
 
-            v->data = p + name.len + 1;
+        if (p > src_str.data) {
+            before = p - 1;
 
-            p = ngx_strlchr(p, last, sep);
-
-            if (p == NULL) {
-                p = src_str.data + src_str.len;
+            while (before > src_str.data && *before == ' ') {
+                before--;
             }
 
-            v->len = p - v->data;
-
-            return NGX_OK;
+            if (*before != sep) {
+                continue;
+            }
         }
+
+        v->data = p + name.len + 1;
+
+        p = ngx_strlchr(p, last, sep);
+
+        if (p == NULL) {
+            p = last;
+        }
+
+        v->len = p - v->data;
+
+        last = v->data + v->len;
+
+        while (last > v->data && *(last - 1) == ' ') {
+            last--;
+            v->len--;
+        }
+
+        return NGX_OK;
     }
 
     v->not_found = 1;
