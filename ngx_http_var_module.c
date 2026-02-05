@@ -2913,18 +2913,18 @@ ngx_http_var_exec_if_re_match(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t    *args;
-    ngx_str_t                    subject;
+    ngx_str_t                    val;
     ngx_int_t                    rc;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
     v->len = 1;
 
-    rc = ngx_http_regex_exec(r, var->regex, &subject);
+    rc = ngx_http_regex_exec(r, var->regex, &val);
 
     if (rc == NGX_OK) {
         v->data = (u_char *) "1";
@@ -2947,40 +2947,35 @@ ngx_http_var_exec_re_capture(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t    *args;
-    ngx_str_t                    subject, assign_value;
+    ngx_str_t                    val, assign_val;
     ngx_int_t                    rc;
 
     args = var->args->elts;
 
-    /* Calculate the value of src_str */
-    if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    /* Perform regex match */
-    rc = ngx_http_regex_exec(r, var->regex, &subject);
-    if (rc == NGX_DECLINED) {
-        return NGX_ERROR;
+    rc = ngx_http_regex_exec(r, var->regex, &val);
 
-    } else if (rc != NGX_OK) {
+    if (rc == NGX_DECLINED) {
+        v->len = 0;
+        v->data = (u_char *) "";
+        return NGX_OK;
+    }
+
+    if (rc != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http var: regex match failed");
         return NGX_ERROR;
     }
 
-    /* Calculate the value of assign_value */
-    if (ngx_http_complex_value(r, &args[1], &assign_value) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[1], &assign_val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    /* Set the variable value */
-    v->len = assign_value.len;
-    v->data = ngx_pnalloc(r->pool, v->len);
-    if (v->data == NULL) {
-        return NGX_ERROR;
-    }
-
-    ngx_memcpy(v->data, assign_value.data, v->len);
+    v->len = assign_val.len;
+    v->data = assign_val.data;
 
     return NGX_OK;
 }
@@ -2991,79 +2986,59 @@ ngx_http_var_exec_re_sub(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t    *args;
-    ngx_str_t                    subject, replacement, result;
+    ngx_str_t                    val, replacement;
     ngx_int_t                    rc;
     u_char                      *p;
     ngx_uint_t                   start, end, len;
 
     args = var->args->elts;
 
-    /* Calculate the value of src_str */
-    if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    /* Perform regex match */
-    rc = ngx_http_regex_exec(r, var->regex, &subject);
+    rc = ngx_http_regex_exec(r, var->regex, &val);
 
     if (rc == NGX_DECLINED) {
-        /* No match, return the original string */
-        v->len = subject.len;
-        v->data = ngx_pnalloc(r->pool, v->len);
-        if (v->data == NULL) {
-            return NGX_ERROR;
-        }
-        ngx_memcpy(v->data, subject.data, v->len);
+        v->len = val.len;
+        v->data = val.data;
         return NGX_OK;
+    }
 
-    } else if (rc != NGX_OK) {
+    if (rc != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http var: regex substitution failed");
         return NGX_ERROR;
     }
 
-    /* Ensure captures are available */
+    /* ensure captures are available */
     if (r->ncaptures < 2) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http var: insufficient captures");
         return NGX_ERROR;
     }
 
-    /* Compute the replacement string */
     if (ngx_http_complex_value(r, &args[1], &replacement) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    /* Build the result string */
     start = r->captures[0];
     end = r->captures[1];
 
-    len = start + replacement.len + (subject.len - end);
+    len = start + replacement.len + (val.len - end);
 
-    result.data = ngx_pnalloc(r->pool, len);
-    if (result.data == NULL) {
+    p = ngx_pnalloc(r->pool, len);
+    if (p == NULL) {
         return NGX_ERROR;
     }
 
-    p = result.data;
+    v->data = p;
 
-    /* Copy the part before the match */
-    ngx_memcpy(p, subject.data, start);
-    p += start;
+    p = ngx_cpymem(p, val.data, start);
+    p = ngx_cpymem(p, replacement.data, replacement.len);
+    p = ngx_cpymem(p, val.data + end, val.len - end);
 
-    /* Copy the replacement */
-    ngx_memcpy(p, replacement.data, replacement.len);
-    p += replacement.len;
-
-    /* Copy the part after the match */
-    ngx_memcpy(p, subject.data + end, subject.len - end);
-    p += subject.len - end;
-
-    result.len = p - result.data;
-
-    /* Set the variable value */
-    v->len = result.len;
-    v->data = result.data;
+    v->len = p - v->data;
 
     return NGX_OK;
 }
@@ -3073,152 +3048,141 @@ static ngx_int_t
 ngx_http_var_exec_re_gsub(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    ngx_str_t                    subject, replacement, result;
     ngx_http_complex_value_t    *args;
-    ngx_uint_t                   offset;
-    u_char                      *p;
+    ngx_str_t                    val, replacement, sub;
     ngx_int_t                    rc;
+    ngx_uint_t                   offset;
     int                         *captures;
-    ngx_uint_t                   allocated;
-    ngx_uint_t                   required;
-    ngx_str_t                    sub;
-    u_char                      *new_data;
     int                          match_start, match_end;
-    ngx_str_t                    replaced;
+    u_char                      *p, *result_data, *new_data;
+    size_t                       result_len, allocated, required;
 
     args = var->args->elts;
 
-    /* Calculate the value of src_str */
-    if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    /* Calculate the replacement string template */
-    if (ngx_http_complex_value(r, &args[1], &replacement) != NGX_OK) {
-        return NGX_ERROR;
-    }
-
-    /* Initialize the result string, initially allocate 2 times the original length */
-    allocated = subject.len * 2;
-
-    /* Set a smaller initial buffer limit to avoid excessive allocation for very small strings */
-    if (allocated < 256) {  
+    allocated = val.len + (val.len >> 1);
+    if (allocated < 256) {
         allocated = 256;
     }
 
-    result.len = 0;
-    result.data = ngx_pnalloc(r->pool, allocated);
-    if (result.data == NULL) {
+    result_data = ngx_pnalloc(r->pool, allocated);
+    if (result_data == NULL) {
         return NGX_ERROR;
     }
 
-    p = result.data;
-
+    p = result_data;
+    result_len = 0;
     offset = 0;
-    while (offset < subject.len) {
-        sub.len = subject.len - offset;
-        sub.data = subject.data + offset;
 
-        /* Perform regex match */
+    while (offset < val.len) {
+        sub.len = val.len - offset;
+        sub.data = val.data + offset;
+
         rc = ngx_http_regex_exec(r, var->regex, &sub);
 
         if (rc == NGX_DECLINED) {
-            /* No more matches, copy the remaining part */
-            required = (ngx_uint_t) (p - result.data) + sub.len;
+            required = result_len + sub.len;
+
             if (required > allocated) {
-                /* Need to expand the buffer */
-                while (required > allocated) {
-                    allocated *= 2;
-                }
+                allocated = required + (required >> 1);
                 new_data = ngx_pnalloc(r->pool, allocated);
                 if (new_data == NULL) {
                     return NGX_ERROR;
                 }
-                ngx_memcpy(new_data, result.data, p - result.data);
-                result.data = new_data;
-                p = new_data + (p - result.data);
-            }
-            ngx_memcpy(p, sub.data, sub.len);
-            p += sub.len;
-            result.len += sub.len;
-            break;
 
-        } else if (rc != NGX_OK) {
+                ngx_memcpy(new_data, result_data, result_len);
+                result_data = new_data;
+                p = result_data + result_len;
+            }
+
+            p = ngx_cpymem(p, sub.data, sub.len);
+            result_len += sub.len;
+            break;
+        }
+
+        if (rc != NGX_OK) {
             ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "http var: regex substitution failed");
             return NGX_ERROR;
         }
 
-        /* Retrieve capture group information */
         captures = r->captures;
-
-        /* captures is an array of ints, representing the start and end positions of the capture groups */
         match_start = captures[0];
         match_end = captures[1];
 
-        /* Copy the part before the match */
         if (match_start > 0) {
-            required = (ngx_uint_t) (p - result.data) + match_start;
+            required = result_len + match_start;
+
             if (required > allocated) {
-                /* Need to expand the buffer */
-                while (required > allocated) {
-                    allocated *= 2;
-                }
-                u_char *new_data = ngx_pnalloc(r->pool, allocated);
+                allocated = required + (required >> 1);
+                new_data = ngx_pnalloc(r->pool, allocated);
                 if (new_data == NULL) {
                     return NGX_ERROR;
                 }
-                ngx_memcpy(new_data, result.data, p - result.data);
-                result.data = new_data;
-                p = new_data + (p - result.data);
+
+                ngx_memcpy(new_data, result_data, result_len);
+                result_data = new_data;
+                p = result_data + result_len;
             }
-            ngx_memcpy(p, sub.data, match_start);
-            p += match_start;
-            result.len += match_start;
+
+            p = ngx_cpymem(p, sub.data, match_start);
+            result_len += match_start;
         }
 
-        /* Compute the replacement string, handling $n */
-        if (ngx_http_complex_value(r, &args[1], &replaced) != NGX_OK) {
+        if (ngx_http_complex_value(r, &args[1], &replacement) != NGX_OK) {
             return NGX_ERROR;
         }
 
-        /* Ensure the replacement string has enough space */
-        required = (ngx_uint_t) (p - result.data) + replaced.len
-            + (subject.len - offset - match_end);
+        required = result_len + replacement.len;
         if (required > allocated) {
-            /* Expand the buffer to a sufficient size */
-            while (required > allocated) {
-                allocated *= 2;
-            }
-            u_char *new_data = ngx_pnalloc(r->pool, allocated);
+            allocated = required + (required >> 1);
+            new_data = ngx_pnalloc(r->pool, allocated);
             if (new_data == NULL) {
                 return NGX_ERROR;
             }
-            ngx_memcpy(new_data, result.data, p - result.data);
-            result.data = new_data;
-            p = new_data + (p - result.data);
+
+            ngx_memcpy(new_data, result_data, result_len);
+            result_data = new_data;
+            p = result_data + result_len;
         }
 
-        /* Copy the replacement string */
-        ngx_memcpy(p, replaced.data, replaced.len);
-        p += replaced.len;
-        result.len += replaced.len;
+        p = ngx_cpymem(p, replacement.data, replacement.len);
+        result_len += replacement.len;
 
-        /* Update the offset to the end of the match */
         offset += match_end;
 
-        /* Prevent infinite loop */
+        /* prevent infinite loop */
         if (match_end == match_start) {
-            offset++;
-            if (offset > subject.len) {
+
+            if (offset >= val.len) {
                 break;
             }
+
+            /* copy one byte to advance */
+            required = result_len + 1;
+            if (required > allocated) {
+                allocated = required + (required >> 1);
+                new_data = ngx_pnalloc(r->pool, allocated);
+                if (new_data == NULL) {
+                    return NGX_ERROR;
+                }
+
+                ngx_memcpy(new_data, result_data, result_len);
+                result_data = new_data;
+                p = result_data + result_len;
+            }
+
+            *p++ = val.data[offset];
+            result_len++;
+            offset++;
         }
     }
 
-    /* Set the variable value */
-    v->len = p - result.data;
-    v->data = result.data;
+    v->len = result_len;
+    v->data = result_data;
 
     return NGX_OK;
 }
