@@ -182,7 +182,7 @@ static ngx_int_t ngx_http_var_utils_auto_atofp(ngx_str_t val1, ngx_str_t val2,
 static ngx_int_t ngx_http_var_utils_auto_atofp3(ngx_str_t val1, ngx_str_t val2,
     ngx_str_t val3, ngx_int_t *int_val1,
     ngx_int_t *int_val2, ngx_int_t *int_val3);
-static ngx_int_t ngx_http_var_utils_parse_int_range(ngx_str_t str,
+static ngx_int_t ngx_http_var_utils_parse_uint_range(ngx_str_t str,
     ngx_int_t *start, ngx_int_t *end);
 static ngx_int_t ngx_http_var_utils_escape_uri(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var,
@@ -714,7 +714,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         args--;
 
-        var->args = ngx_array_create(cf->pool, args ? args : 1,
+        var->args = ngx_array_create(cf->pool, ngx_max(args, 1),
             sizeof(ngx_http_complex_value_t));
         if (var->args == NULL) {
             return NGX_CONF_ERROR;
@@ -798,7 +798,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 #endif
 
-        var->args = ngx_array_create(cf->pool, args ? args : 1,
+        var->args = ngx_array_create(cf->pool, ngx_max(args, 1),
                                      sizeof(ngx_http_complex_value_t));
         if (var->args == NULL) {
             return NGX_CONF_ERROR;
@@ -1390,38 +1390,38 @@ ngx_http_var_variable_handler(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_utils_check_str_is_num(ngx_str_t num_str)
+ngx_http_var_utils_check_str_is_num(ngx_str_t val)
 {
-    ngx_str_t    num_abs_str;
+    ngx_str_t    val_abs;
     ngx_int_t    num;
     ngx_uint_t   decimal_places;
     ngx_uint_t   i;
 
-    num_abs_str = num_str;
+    val_abs = val;
     decimal_places = 0;
 
-    if (num_abs_str.len > 0 && num_abs_str.data[0] == '-') {
-        num_abs_str.data++;
-        num_abs_str.len--;
+    if (val_abs.len > 0 && val_abs.data[0] == '-') {
+        val_abs.data++;
+        val_abs.len--;
     }
 
-    if (num_abs_str.len == 0) {
+    if (val_abs.len == 0) {
         return NGX_ERROR;
     }
 
-    for (i = 0; i < num_abs_str.len; i++) {
+    for (i = 0; i < val_abs.len; i++) {
 
-        if (num_abs_str.data[i] == '.') {
-            decimal_places = num_abs_str.len - i - 1;
+        if (val_abs.data[i] == '.') {
+            decimal_places = val_abs.len - i - 1;
             break;
         }
     }
 
     if (decimal_places == 0) {
-        num = ngx_atoi(num_abs_str.data, num_abs_str.len);
+        num = ngx_atoi(val_abs.data, val_abs.len);
 
     } else {
-        num = ngx_atofp(num_abs_str.data, num_abs_str.len, decimal_places);
+        num = ngx_atofp(val_abs.data, val_abs.len, decimal_places);
     }
 
     if (num == NGX_ERROR) {
@@ -1439,7 +1439,16 @@ ngx_http_var_utils_auto_atoi(ngx_str_t val, ngx_int_t *int_val)
 
     is_negative = 0;
 
-    if (val.len > 0 && val.data[0] == '-') {
+    if (val.len == 0) {
+        return NGX_ERROR;
+    }
+
+    if (val.data[0] == '-') {
+
+        if (val.len == 1) {
+            return NGX_ERROR;
+        }
+
         *int_val = ngx_atoi(val.data + 1, val.len - 1);
         is_negative = 1;
 
@@ -1463,23 +1472,36 @@ static ngx_int_t
 ngx_http_var_utils_auto_atofp(ngx_str_t val1, ngx_str_t val2,
     ngx_int_t *int_val1, ngx_int_t *int_val2)
 {
-    ngx_uint_t  decimal_places1, decimal_places2;
-    ngx_int_t   is_negative1, is_negative2;
-    ngx_uint_t  max_decimal_places;
-    ngx_uint_t  i;
+    ngx_uint_t   decimal_places1, decimal_places2, max_decimal_places;
+    ngx_uint_t   is_negative1, is_negative2;
+    ngx_uint_t   i;
 
     decimal_places1 = 0;
     decimal_places2 = 0;
     is_negative1 = 0;
     is_negative2 = 0;
 
-    if (val1.len > 0 && val1.data[0] == '-') {
+    if (val1.len == 0 || val2.len == 0) {
+        return NGX_ERROR;
+    }
+
+    if (val1.data[0] == '-') {
+
+        if (val1.len == 1) {
+            return NGX_ERROR;
+        }
+
         is_negative1 = 1;
         val1.data++;
         val1.len--;
     }
 
-    if (val2.len > 0 && val2.data[0] == '-') {
+    if (val2.data[0] == '-') {
+
+        if (val2.len == 1) {
+            return NGX_ERROR;
+        }
+
         is_negative2 = 1;
         val2.data++;
         val2.len--;
@@ -1501,8 +1523,7 @@ ngx_http_var_utils_auto_atofp(ngx_str_t val1, ngx_str_t val2,
         }
     }
 
-    max_decimal_places = (decimal_places1 > decimal_places2)
-                         ? decimal_places1 : decimal_places2;
+    max_decimal_places = ngx_max(decimal_places1, decimal_places2);
 
     if (max_decimal_places == 0) {
         *int_val1 = ngx_atoi(val1.data, val1.len);
@@ -1534,8 +1555,8 @@ ngx_http_var_utils_auto_atofp3(ngx_str_t val1, ngx_str_t val2, ngx_str_t val3,
     ngx_int_t *int_val1, ngx_int_t *int_val2, ngx_int_t *int_val3)
 {
     ngx_uint_t  decimal_places1, decimal_places2, decimal_places3;
-    ngx_int_t   is_negative1, is_negative2, is_negative3;
     ngx_uint_t  max_decimal_places;
+    ngx_uint_t  is_negative1, is_negative2, is_negative3;
     ngx_uint_t  i;
 
     decimal_places1 = 0;
@@ -1545,19 +1566,38 @@ ngx_http_var_utils_auto_atofp3(ngx_str_t val1, ngx_str_t val2, ngx_str_t val3,
     is_negative2 = 0;
     is_negative3 = 0;
 
-    if (val1.len > 0 && val1.data[0] == '-') {
+    if (val1.len == 0 || val2.len == 0 || val3.len == 0) {
+        return NGX_ERROR;
+    }
+
+    if (val1.data[0] == '-') {
+
+        if (val1.len == 1) {
+            return NGX_ERROR;
+        }
+
         is_negative1 = 1;
         val1.data++;
         val1.len--;
     }
 
-    if (val2.len > 0 && val2.data[0] == '-') {
+    if (val2.data[0] == '-') {
+
+        if (val2.len == 1) {
+            return NGX_ERROR;
+        }
+
         is_negative2 = 1;
         val2.data++;
         val2.len--;
     }
 
-    if (val3.len > 0 && val3.data[0] == '-') {
+    if (val3.data[0] == '-') {
+
+        if (val3.len == 1) {
+            return NGX_ERROR;
+        }
+
         is_negative3 = 1;
         val3.data++;
         val3.len--;
@@ -1587,15 +1627,9 @@ ngx_http_var_utils_auto_atofp3(ngx_str_t val1, ngx_str_t val2, ngx_str_t val3,
         }
     }
 
-    max_decimal_places = decimal_places1;
 
-    if (decimal_places2 > max_decimal_places) {
-        max_decimal_places = decimal_places2;
-    }
-
-    if (decimal_places3 > max_decimal_places) {
-        max_decimal_places = decimal_places3;
-    }
+    max_decimal_places = ngx_max(decimal_places1, decimal_places2);
+    max_decimal_places = ngx_max(max_decimal_places, decimal_places3);
 
     if (max_decimal_places == 0) {
         *int_val1 = ngx_atoi(val1.data, val1.len);
@@ -1631,52 +1665,59 @@ ngx_http_var_utils_auto_atofp3(ngx_str_t val1, ngx_str_t val2, ngx_str_t val3,
 
 
 static ngx_int_t
-ngx_http_var_utils_parse_int_range(ngx_str_t str,
+ngx_http_var_utils_parse_uint_range(ngx_str_t val,
     ngx_int_t *start, ngx_int_t *end)
 {
     ngx_uint_t   i;
-    ngx_int_t    temp_start, temp_end, is_range;
+    ngx_str_t    val_start, val_end;
 
-    temp_start = 0;
-    temp_end = 0;
-    is_range = 0;
+    if (val.len == 0) {
+        return NGX_ERROR;
+    }
 
-    i = 0;
+    for (i = 1; i < val.len; i++) {
 
-    while (i < str.len) {
-
-        if (str.data[i] == '-') {
-            is_range = 1;
-            i++;
+        if (val.data[i] == '-') {
             break;
         }
+    }
 
-        if (str.data[i] < '0' || str.data[i] > '9') {
+    if (i == val.len) {
+        *start = ngx_atoi(val.data, val.len);
+        if (*start == NGX_ERROR) {
             return NGX_ERROR;
         }
 
-        temp_start = temp_start * 10 + (str.data[i] - '0');
-        i++;
+        *end = *start;
+        return NGX_OK;
     }
 
-    if (is_range) {
+    val_start.data = val.data;
+    val_start.len = i;
+    val_end.data = val.data + i + 1;
+    val_end.len = val.len - i - 1;
 
-        while (i < str.len) {
-
-            if (str.data[i] < '0' || str.data[i] > '9') {
-                return NGX_ERROR;
-            }
-
-            temp_end = temp_end * 10 + (str.data[i] - '0');
-            i++;
-        }
+    if (val_end.len == 0) {
+        return NGX_ERROR;
     }
 
-    *start = temp_start;
-    *end = is_range ? temp_end : temp_start;
+    *start = ngx_atoi(val_start.data, val_start.len);
+    if (*start == NGX_ERROR) {
+        return NGX_ERROR;
+    }
+
+    *end = ngx_atoi(val_end.data, val_end.len);
+    if (*end == NGX_ERROR) {
+        return NGX_ERROR;
+    }
+
+    if (*start > *end) {
+        return NGX_ERROR;
+    }
 
     return NGX_OK;
 }
+
 
 static ngx_int_t
 ngx_http_var_utils_escape_uri(ngx_http_request_t *r,
@@ -1684,60 +1725,53 @@ ngx_http_var_utils_escape_uri(ngx_http_request_t *r,
     ngx_uint_t type)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, escaped_str;
+    ngx_str_t                  val;
     size_t                     len;
     uintptr_t                  escape;
     u_char                    *src, *dst;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    /* Handle empty source string */
-    if (src_str.len == 0) {
-        return NGX_ERROR;
+    if (val.len == 0) {
+        v->len = 0;
+        v->data = (u_char *) "";
+        return NGX_OK;
     }
 
-    src = src_str.data;
+    src = val.data;
 
-    /* Calculate the escaped length */
-    escape = 2 * ngx_escape_uri(NULL, src, src_str.len, type);
-    len = src_str.len + escape;
+    escape = 2 * ngx_escape_uri(NULL, src, val.len, type);
+    len = val.len + escape;
 
     dst = ngx_pnalloc(r->pool, len);
     if (dst == NULL) {
         return NGX_ERROR;
     }
 
-    /* Perform the escaping */
     if (escape == 0) {
-        ngx_memcpy(dst, src, src_str.len);
+        ngx_memcpy(dst, src, val.len);
 
     } else {
-        ngx_escape_uri(dst, src, src_str.len, type);
+        ngx_escape_uri(dst, src, val.len, type);
     }
 
-    /* Set the escaped string */
-    escaped_str.data = dst;
-    escaped_str.len = len;
-
-    /* Set the variable value */
-    v->len = escaped_str.len;
-    v->data = escaped_str.data;
+    v->len = len;
+    v->data = dst;
 
     return NGX_OK;
 }
 
 
 /*
- * Same as ngx_strlcasestrn(), but case-sensitive.
+ * same as ngx_strlcasestrn(), but case-sensitive.
  * ngx_http_var_utils_strlstrn() is intended to search for static substring
  * with known length in string until the argument last. The argument n
  * must be length of the second substring - 1.
  */
-
 static u_char *
 ngx_http_var_utils_strlstrn(u_char *s1, u_char *last, u_char *s2, size_t n)
 {
@@ -1764,29 +1798,31 @@ ngx_http_var_utils_strlstrn(u_char *s1, u_char *last, u_char *s2, size_t n)
 
 
 #if (NGX_HTTP_SSL)
+
 static ngx_int_t
 ngx_http_var_utils_hmac(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var,
     const EVP_MD *evp_md)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, secret_str;
+    ngx_str_t                  val_src, val_secret;
     unsigned int               md_len;
     unsigned char              md[EVP_MAX_MD_SIZE];
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val_src) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    if (ngx_http_complex_value(r, &args[1], &secret_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[1], &val_secret) != NGX_OK) {
         return NGX_ERROR;
     }
 
     md_len = 0;
-    HMAC(evp_md, secret_str.data, secret_str.len,
-        src_str.data, src_str.len, md, &md_len);
+
+    HMAC(evp_md, val_secret.data, val_secret.len,
+        val_src.data, val_src.len, md, &md_len);
 
     if (md_len == 0 || md_len > EVP_MAX_MD_SIZE) {
         return NGX_ERROR;
@@ -1802,6 +1838,7 @@ ngx_http_var_utils_hmac(ngx_http_request_t *r,
 
     return NGX_OK;
 }
+
 #endif
 
 
@@ -1850,7 +1887,7 @@ ngx_http_var_exec_or(ngx_http_request_t *r,
             return NGX_ERROR;
         }
 
-        if (!(val.len == 0 || (val.len == 1 && val.data[0] == '0'))) {
+        if (val.len > 0 && (val.len != 1 || val.data[0] != '0')) {
             v->len = 1;
             v->data = (u_char *) "1";
             return NGX_OK;
@@ -1883,6 +1920,7 @@ ngx_http_var_exec_not(ngx_http_request_t *r,
     } else {
         v->data = (u_char *) "0";
     }
+
     return NGX_OK;
 }
 
@@ -1926,11 +1964,11 @@ ngx_http_var_exec_if_not_empty(ngx_http_request_t *r,
     }
 
     v->len = 1;
-    if (val.len > 0) {
-        v->data = (u_char *) "1";
+    if (val.len == 0) {
+        v->data = (u_char *) "0";
 
     } else {
-        v->data = (u_char *) "0";
+        v->data = (u_char *) "1";
     }
 
     return NGX_OK;
@@ -1984,20 +2022,20 @@ ngx_http_var_exec_if_str_eq(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-    if (var->ignore_case) {
-        if (ngx_strncasecmp(val1.data,
-                val2.data, val1.len) == 0) {
-            v->data = (u_char *) "1";
-            return NGX_OK;
-        }
-
-    } else if (ngx_strncmp(val1.data,
-                        val2.data, val1.len) == 0) {
+    if (val1.len == 0 && val2.len == 0) {
         v->data = (u_char *) "1";
         return NGX_OK;
     }
 
-    v->data = (u_char *) "0";
+    if (var->ignore_case) {
+        v->data = (ngx_strncasecmp(val1.data, val2.data, val1.len) == 0)
+                  ? (u_char *) "1" : (u_char *) "0";
+
+    } else {
+        v->data = (ngx_strncmp(val1.data, val2.data, val1.len) == 0)
+                  ? (u_char *) "1" : (u_char *) "0";
+    }
+
     return NGX_OK;
 }
 
@@ -2022,11 +2060,11 @@ ngx_http_var_exec_if_starts_with(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  str, prefix;
+    ngx_str_t                  val, prefix;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
@@ -2034,31 +2072,27 @@ ngx_http_var_exec_if_starts_with(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    v->len = 1;
+
     if (prefix.len == 0) {
-        v->len = 1;
         v->data = (u_char *) "1";
         return NGX_OK;
     }
 
-    v->len = 1;
-
-    if (prefix.len > str.len) {
+    if (prefix.len > val.len) {
         v->data = (u_char *) "0";
         return NGX_OK;
     }
 
     if (var->ignore_case) {
-        if (ngx_strncasecmp(str.data, prefix.data, prefix.len) == 0) {
-            v->data = (u_char *) "1";
-            return NGX_OK;
-        }
+        v->data = (ngx_strncasecmp(val.data, prefix.data, prefix.len) == 0)
+                  ? (u_char *) "1" : (u_char *) "0";
 
-    } else if (ngx_strncmp(str.data, prefix.data, prefix.len) == 0) {
-        v->data = (u_char *) "1";
-        return NGX_OK;
+    } else {
+        v->data = (ngx_strncmp(val.data, prefix.data, prefix.len) == 0)
+                  ? (u_char *) "1" : (u_char *) "0";
     }
 
-    v->data = (u_char *) "0";
     return NGX_OK;
 }
 
@@ -2068,12 +2102,12 @@ ngx_http_var_exec_if_ends_with(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  str, suffix;
-    u_char                    *str_end;
+    ngx_str_t                  val, suffix;
+    u_char                    *val_end;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
@@ -2081,33 +2115,29 @@ ngx_http_var_exec_if_ends_with(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    v->len = 1;
+
     if (suffix.len == 0) {
-        v->len = 1;
         v->data = (u_char *) "1";
         return NGX_OK;
     }
 
-    v->len = 1;
-
-    if (suffix.len > str.len) {
+    if (suffix.len > val.len) {
         v->data = (u_char *) "0";
         return NGX_OK;
     }
 
-    str_end = str.data + str.len - suffix.len;
+    val_end = val.data + val.len - suffix.len;
 
     if (var->ignore_case) {
-        if (ngx_strncasecmp(str_end, suffix.data, suffix.len) == 0) {
-            v->data = (u_char *) "1";
-            return NGX_OK;
-        }
+        v->data = (ngx_strncasecmp(val_end, suffix.data, suffix.len) == 0)
+                  ? (u_char *) "1" : (u_char *) "0";
 
-    } else if (ngx_strncmp(str_end, suffix.data, suffix.len) == 0) {
-        v->data = (u_char *) "1";
-        return NGX_OK;
+    } else {
+        v->data = (ngx_strncmp(val_end, suffix.data, suffix.len) == 0)
+                  ? (u_char *) "1" : (u_char *) "0";
     }
 
-    v->data = (u_char *) "0";
     return NGX_OK;
 }
 
@@ -2117,53 +2147,41 @@ ngx_http_var_exec_if_find(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  str, sub_str;
+    ngx_str_t                  val, sub;
     u_char                    *p;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    if (ngx_http_complex_value(r, &args[1], &sub_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[1], &sub) != NGX_OK) {
         return NGX_ERROR;
     }
 
     v->len = 1;
 
-    if (str.len == 0) {
-
-        if (sub_str.len == 0) {
-            v->data = (u_char *) "1";
-
-        } else {
-            v->data = (u_char *) "0";
-        }
-
+    if (sub.len == 0) {
+        v->data = (u_char *) "1";
         return NGX_OK;
     }
 
-    if (sub_str.len == 0 || sub_str.len > str.len) {
+    if (sub.len > val.len) {
         v->data = (u_char *) "0";
         return NGX_OK;
     }
 
     if (var->ignore_case) {
-        p = ngx_strlcasestrn(str.data, str.data + str.len,
-                sub_str.data, sub_str.len - 1);
+        p = ngx_strlcasestrn(val.data, val.data + val.len,
+                sub.data, sub.len - 1);
 
     } else {
-        p = ngx_http_var_utils_strlstrn(str.data, str.data + str.len,
-                sub_str.data, sub_str.len - 1);
+        p = ngx_http_var_utils_strlstrn(val.data, val.data + val.len,
+                sub.data, sub.len - 1);
     }
 
-    if (p != NULL) {
-        v->data = (u_char *) "1";
-
-    } else {
-        v->data = (u_char *) "0";
-    }
+    v->data = (p != NULL) ? (u_char *) "1" : (u_char *) "0";
 
     return NGX_OK;
 }
@@ -2175,16 +2193,18 @@ ngx_http_var_exec_if_str_in(ngx_http_request_t *r,
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  val1, val2;
-    ngx_uint_t                 i, nelts;
+    ngx_uint_t                 i;
 
     args = var->args->elts;
-    nelts = var->args->nelts;
 
     if (ngx_http_complex_value(r, &args[0], &val1) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    for (i = 1; i < nelts; i++) {
+    v->len = 1;
+
+    for (i = 1; i < var->args->nelts; i++) {
+
         if (ngx_http_complex_value(r, &args[i], &val2) != NGX_OK) {
             return NGX_ERROR;
         }
@@ -2194,23 +2214,20 @@ ngx_http_var_exec_if_str_in(ngx_http_request_t *r,
         }
 
         if (var->ignore_case) {
+
             if (ngx_strncasecmp(val1.data, val2.data, val1.len) == 0) {
                 v->data = (u_char *) "1";
-                v->len = 1;
                 return NGX_OK;
             }
 
-        } else {
-            if (ngx_strncmp(val1.data, val2.data, val1.len) == 0) {
-                v->data = (u_char *) "1";
-                v->len = 1;
-                return NGX_OK;
-            }
+        } else if (ngx_strncmp(val1.data, val2.data, val1.len) == 0) {
+            v->data = (u_char *) "1";
+            return NGX_OK;
         }
     }
 
     v->data = (u_char *) "0";
-    v->len = 1;
+
     return NGX_OK;
 }
 
@@ -2229,12 +2246,7 @@ ngx_http_var_exec_copy(ngx_http_request_t *r,
     }
 
     v->len = val.len;
-    v->data = ngx_pnalloc(r->pool, v->len);
-    if (v->data == NULL) {
-        return NGX_ERROR;
-    }
-
-    ngx_memcpy(v->data, val.data, v->len);
+    v->data = val.data;
 
     return NGX_OK;
 }
@@ -2245,24 +2257,21 @@ ngx_http_var_exec_len(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str;
+    ngx_str_t                  val;
     u_char                    *p;
-    size_t                     len;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    /* Convert length to string */
     p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
     if (p == NULL) {
         return NGX_ERROR;
     }
 
-    len = src_str.len;
-    v->len = ngx_sprintf(p, "%uz", len) - p;
+    v->len = ngx_sprintf(p, "%uz", val.len) - p;
     v->data = p;
 
     return NGX_OK;
@@ -2274,26 +2283,29 @@ ngx_http_var_exec_upper(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  value_str;
+    ngx_str_t                  val;
     ngx_uint_t                 i;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &value_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    v->len = value_str.len;
+    v->len = val.len;
+
+    if (v->len == 0) {
+        v->data = (u_char *) "";
+        return NGX_OK;
+    }
+
     v->data = ngx_pnalloc(r->pool, v->len);
     if (v->data == NULL) {
         return NGX_ERROR;
     }
 
-    ngx_memcpy(v->data, value_str.data, v->len);
-
-    /* Convert to uppercase */
     for (i = 0; i < v->len; i++) {
-        v->data[i] = ngx_toupper(v->data[i]);
+        v->data[i] = ngx_toupper(val.data[i]);
     }
 
     return NGX_OK;
@@ -2305,26 +2317,29 @@ ngx_http_var_exec_lower(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  value_str;
+    ngx_str_t                  val;
     ngx_uint_t                 i;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &value_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    v->len = value_str.len;
+    v->len = val.len;
+
+    if (v->len == 0) {
+        v->data = (u_char *) "";
+        return NGX_OK;
+    }
+
     v->data = ngx_pnalloc(r->pool, v->len);
     if (v->data == NULL) {
         return NGX_ERROR;
     }
 
-    ngx_memcpy(v->data, value_str.data, v->len);
-
-    /* Convert to lowercase */
     for (i = 0; i < v->len; i++) {
-        v->data[i] = ngx_tolower(v->data[i]);
+        v->data[i] = ngx_tolower(val.data[i]);
     }
 
     return NGX_OK;
@@ -2336,17 +2351,23 @@ ngx_http_var_exec_trim(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, trimmed_str;
+    ngx_str_t                  val;
     u_char                    *start, *end;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    start = src_str.data;
-    end = src_str.data + src_str.len - 1;
+    if (val.len == 0) {
+        v->len = 0;
+        v->data = (u_char *) "";
+        return NGX_OK;
+    }
+
+    start = val.data;
+    end = val.data + val.len - 1;
 
     /* Trim left */
     while (start <= end && ngx_http_var_isspace(*start)) {
@@ -2358,12 +2379,8 @@ ngx_http_var_exec_trim(ngx_http_request_t *r,
         end--;
     }
 
-    trimmed_str.data = start;
-    trimmed_str.len = end >= start ? (size_t) (end - start + 1) : 0;
-
-    /* Set variable value */
-    v->len = trimmed_str.len;
-    v->data = trimmed_str.data;
+    v->data = start;
+    v->len = (end >= start) ? (size_t) (end - start + 1) : 0;
 
     return NGX_OK;
 }
@@ -2374,29 +2391,31 @@ ngx_http_var_exec_ltrim(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, trimmed_str;
+    ngx_str_t                  val;
     u_char                    *start, *end;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    start = src_str.data;
-    end = src_str.data + src_str.len - 1;
+    if (val.len == 0) {
+        v->len = 0;
+        v->data = (u_char *) "";
+        return NGX_OK;
+    }
+
+    start = val.data;
+    end = val.data + val.len - 1;
 
     /* Trim left */
     while (start <= end && ngx_http_var_isspace(*start)) {
         start++;
     }
 
-    trimmed_str.data = start;
-    trimmed_str.len = end >= start ? (size_t) (end - start + 1) : 0;
-
-    /* Set variable value */
-    v->len = trimmed_str.len;
-    v->data = trimmed_str.data;
+    v->data = start;
+    v->len = (end >= start) ? (size_t) (end - start + 1) : 0;
 
     return NGX_OK;
 }
@@ -2407,29 +2426,31 @@ ngx_http_var_exec_rtrim(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, trimmed_str;
+    ngx_str_t                  val;
     u_char                    *start, *end;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    start = src_str.data;
-    end = src_str.data + src_str.len - 1;
+    if (val.len == 0) {
+        v->len = 0;
+        v->data = (u_char *) "";
+        return NGX_OK;
+    }
+
+    start = val.data;
+    end = val.data + val.len - 1;
 
     /* Trim right */
     while (end >= start && ngx_http_var_isspace(*end)) {
         end--;
     }
 
-    trimmed_str.data = start;
-    trimmed_str.len = end >= start ? (size_t) (end - start + 1) : 0;
-
-    /* Set variable value */
-    v->len = trimmed_str.len;
-    v->data = trimmed_str.data;
+    v->data = start;
+    v->len = (end >= start) ? (size_t) (end - start + 1) : 0;
 
     return NGX_OK;
 }
@@ -2440,31 +2461,34 @@ ngx_http_var_exec_reverse(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, reversed_str;
+    ngx_str_t                  val;
     u_char                    *p, *q;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    reversed_str.len = src_str.len;
-    reversed_str.data = ngx_pnalloc(r->pool, reversed_str.len);
-    if (reversed_str.data == NULL) {
+    v->len = val.len;
+
+    if (v->len == 0) {
+        v->data = (u_char *) "";
+        return NGX_OK;
+    }
+
+    v->data = ngx_pnalloc(r->pool, v->len);
+    if (v->data == NULL) {
         return NGX_ERROR;
     }
 
-    p = reversed_str.data;
-    q = src_str.data + src_str.len - 1;
+    /* Reverse the string */
+    p = v->data;
+    q = val.data + val.len - 1;
 
-    for ( /* void */ ; q >= src_str.data; q--) {
-        *p++ = *q;
+    while (q >= val.data) {
+        *p++ = *q--;
     }
-
-    /* Set variable value */
-    v->len = reversed_str.len;
-    v->data = reversed_str.data;
 
     return NGX_OK;
 }
@@ -2475,51 +2499,56 @@ ngx_http_var_exec_find(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, sub_str;
-    u_char                    *p;
+    ngx_str_t                  val, sub;
+    u_char                    *p, *found;
     ngx_int_t                  pos;
-    u_char                    *buf;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK
-        || ngx_http_complex_value(r, &args[1], &sub_str) != NGX_OK)
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &sub) != NGX_OK)
     {
         return NGX_ERROR;
     }
 
-    if (sub_str.len == 0 || src_str.len == 0) {
-        /* If sub_str is empty or src_str is empty, return 0 */
-        pos = 0;
-
-    } else {
-
-        if (var->ignore_case) {
-            p = ngx_strlcasestrn(src_str.data, src_str.data + src_str.len,
-                                 sub_str.data, sub_str.len - 1);
-
-        } else {
-            p = ngx_http_var_utils_strlstrn(src_str.data,
-                    src_str.data + src_str.len, sub_str.data, sub_str.len - 1);
-        }
-
-        if (p) {
-            /* Position starts from 1 */
-            pos = (ngx_int_t) (p - src_str.data) + 1;
-
-        } else {
-            pos = 0;
-        }
+    /* Empty substring is found at position 1 */
+    if (sub.len == 0) {
+        pos = 1;
+        goto covert_pos;
     }
 
-    /* Convert pos to string */
-    buf = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
-    if (buf == NULL) {
+    /* Non-empty substring not found in empty string */
+    if (val.len == 0 || sub.len > val.len) {
+        pos = 0;
+        goto covert_pos;
+    }
+
+    /* Search for substring */
+    if (var->ignore_case) {
+        found = ngx_strlcasestrn(val.data, val.data + val.len,
+                                 sub.data, sub.len - 1);
+
+    } else {
+        found = ngx_http_var_utils_strlstrn(val.data, val.data + val.len,
+                                            sub.data, sub.len - 1);
+    }
+
+    if (found != NULL) {
+        pos = (ngx_int_t) (found - val.data) + 1;
+
+    } else {
+        pos = 0;
+    }
+
+covert_pos:
+
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
         return NGX_ERROR;
     }
 
-    v->len = ngx_sprintf(buf, "%i", pos) - buf;
-    v->data = buf;
+    v->len = ngx_sprintf(p, "%i", pos) - p;
+    v->data = p;
 
     return NGX_OK;
 }
@@ -2530,50 +2559,42 @@ ngx_http_var_exec_repeat(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, repeat_times_str;
+    ngx_str_t                  val, times_str;
     ngx_int_t                  times;
-    size_t                     total_len;
     u_char                    *p;
     ngx_uint_t                 i;
 
     args = var->args->elts;
 
-    /* Compute arguments */
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK
-        || ngx_http_complex_value(r, &args[1], &repeat_times_str) != NGX_OK)
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &times_str) != NGX_OK)
     {
         return NGX_ERROR;
     }
 
-    /* Parse repeat times */
-    times = ngx_atoi(repeat_times_str.data, repeat_times_str.len);
-    if (times == NGX_ERROR || times < 0) {
+    times = ngx_atoi(times_str.data, times_str.len);
+    if (times == NGX_ERROR) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http var: invalid repeat times");
+                      "http var: invalid repeat times \"%V\"", &times_str);
         return NGX_ERROR;
     }
 
-    /* If times is zero, return an empty string */
-    if (times == 0 || src_str.len == 0) {
-        return NGX_ERROR;
+    if (times == 0 || val.len == 0) {
+        v->len = 0;
+        v->data = (u_char *) "";
+        return NGX_OK;
     }
 
-    /* Calculate total length */
-    total_len = src_str.len * times;
-
-    /* Allocate memory */
-    p = ngx_pnalloc(r->pool, total_len);
+    p = ngx_pnalloc(r->pool, src_str.len * times);
     if (p == NULL) {
         return NGX_ERROR;
     }
 
-    /* Fill the result with repeated strings */
-    for (i = 0; i < (ngx_uint_t)times; i++) {
-        ngx_memcpy(p + i * src_str.len, src_str.data, src_str.len);
+    for (i = 0; i < (ngx_uint_t) times; i++) {
+        ngx_memcpy(p + i * val.len, val.data, val.len);
     }
 
-    /* Set variable value */
-    v->len = total_len;
+    v->len = src_str.len * times;
     v->data = p;
 
     return NGX_OK;
@@ -2585,62 +2606,53 @@ ngx_http_var_exec_substr(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, start_str, len_str;
+    ngx_str_t                  val, val_start, val_len;
     ngx_int_t                  start, len;
-    ngx_uint_t                 src_len;
 
     args = var->args->elts;
 
-    /* Compute arguments */
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK
-        || ngx_http_complex_value(r, &args[1], &start_str) != NGX_OK)
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &val_start) != NGX_OK)
     {
         return NGX_ERROR;
     }
 
-    /* Parse start value */
-    start = ngx_atoi(start_str.data, start_str.len);
+    start = ngx_atoi(val_start.data, val_start.len);
     if (start == NGX_ERROR) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http var: invalid start in substr");
+                      "http var: invalid start \"%V\" in substr", &val_start);
         return NGX_ERROR;
     }
 
-    src_len = src_str.len;
-
-    /* Handle the case where start is beyond the string length */
-    if ((ngx_uint_t)start >= src_len) {
-        return NGX_ERROR;
+    if ((ngx_uint_t) start >= val.len) {
+        v->len = 0;
+        v->data = (u_char *) "";
+        return NGX_OK;
     }
 
-    /* Check if len is provided */
     if (var->args->nelts == 3
-        && ngx_http_complex_value(r, &args[2], &len_str) == NGX_OK)
+        && ngx_http_complex_value(r, &args[2], &val_len) == NGX_OK)
     {
-        len = ngx_atoi(len_str.data, len_str.len);
+        len = ngx_atoi(val_len.data, val_len.len);
         if (len == NGX_ERROR) {
             ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                          "http var: invalid length in substr");
+                          "http var: invalid length \"%V\" in substr",
+                          &val_len);
             return NGX_ERROR;
         }
 
-        /* Adjust len if it exceeds the string length */
-        if ((ngx_uint_t) (start + len) > src_len) {
-            len = src_len - start;
+        /* adjust len if it exceeds the remaining string length */
+        if ((ngx_uint_t) (start + len) > val.len) {
+            len = val.len - start;
         }
 
     } else {
-        /* Default len to the remaining string length */
-        len = src_len - start;
+        /* default len to the remaining string length */
+        len = val.len - start;
     }
 
-    /* Allocate memory for the substring */
     v->len = len;
-    v->data = ngx_pnalloc(r->pool, v->len);
-    if (v->data == NULL) {
-        return NGX_ERROR;
-    }
-    ngx_memcpy(v->data, src_str.data + start, v->len);
+    v->data = val.data + start;
 
     return NGX_OK;
 }
@@ -2651,7 +2663,7 @@ ngx_http_var_exec_replace(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, search_str, replace_str, result_str;
+    ngx_str_t                  val, val_search, val_replace;
     u_char                    *p, *q;
     size_t                     count, new_len;
     ngx_uint_t                 i;
@@ -2659,50 +2671,50 @@ ngx_http_var_exec_replace(ngx_http_request_t *r,
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK
-        || ngx_http_complex_value(r, &args[1], &search_str) != NGX_OK
-        || ngx_http_complex_value(r, &args[2], &replace_str) != NGX_OK)
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &val_search) != NGX_OK
+        || ngx_http_complex_value(r, &args[2], &val_replace) != NGX_OK)
     {
         return NGX_ERROR;
     }
 
-    if (search_str.len == 0) {
-        /* Prevent infinite loop */
+    if (val_search.len == 0) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http var: search string is empty in replace");
         return NGX_ERROR;
     }
 
-    /* Count occurrences */
+    /* count occurrences */
     count = 0;
-    p = src_str.data;
-    for (i = 0; i <= src_str.len - search_str.len; /* void */ ) {
+    p = val.data;
+
+    for (i = 0; i <= val.len - val_search.len; /* void */ ) {
 
         if (var->ignore_case) {
-            rc = ngx_strncasecmp(p + i, search_str.data, search_str.len);
+            rc = ngx_strncasecmp(p + i, val_search.data, val_search.len);
 
         } else {
-            rc = ngx_strncmp(p + i, search_str.data, search_str.len);
+            rc = ngx_strncmp(p + i, val_search.data, val_search.len);
         }
 
         if (rc == 0) {
             count++;
-            i += search_str.len;
+            i += val_search.len;
 
         } else {
             i++;
         }
     }
 
-    /* No replacements needed */
+    /* no replacements needed */
     if (count == 0) {
-        v->len = src_str.len;
-        v->data = src_str.data;
+        v->len = val.len;
+        v->data = val.data;
         return NGX_OK;
     }
 
-    /* Calculate new length */
-    new_len = src_str.len + count * (replace_str.len - search_str.len);
+    /* calculate new length */
+    new_len = val.len + count * (val_replace.len - val_search.len);
 
     if (new_len > NGX_MAX_SIZE_T_VALUE) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
@@ -2710,45 +2722,41 @@ ngx_http_var_exec_replace(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    result_str.data = ngx_pnalloc(r->pool, new_len);
-    if (result_str.data == NULL) {
+    p = ngx_pnalloc(r->pool, new_len);
+    if (p == NULL) {
         return NGX_ERROR;
     }
 
-    /* Perform replacement */
-    p = src_str.data;
-    q = result_str.data;
+    /* perform replacement */
+    q = p;
     i = 0;
 
-    while (i < src_str.len) {
+    while (i < val.len) {
 
-        if (i <= src_str.len - search_str.len) {
+        if (i <= val.len - val_search.len) {
 
             if (var->ignore_case) {
-                rc = ngx_strncasecmp(p + i, search_str.data, search_str.len);
+                rc = ngx_strncasecmp(val.data + i, val_search.data,
+                                     val_search.len);
 
             } else {
-                rc = ngx_strncmp((const char *) (p + i),
-                                 (const char *)search_str.data,
-                                 search_str.len);
+                rc = ngx_strncmp(val.data + i, val_search.data,
+                                 val_search.len);
             }
 
             if (rc == 0) {
-                ngx_memcpy(q, replace_str.data, replace_str.len);
-                q += replace_str.len;
-                i += search_str.len;
+                ngx_memcpy(q, val_replace.data, val_replace.len);
+                q += val_replace.len;
+                i += val_search.len;
                 continue;
             }
         }
 
-        *q++ = p[i++];
+        *q++ = val.data[i++];
     }
 
-    result_str.len = q - result_str.data;
-
-    /* Set variable value */
-    v->len = result_str.len;
-    v->data = result_str.data;
+    v->len = q - p;
+    v->data = p;
 
     return NGX_OK;
 }
@@ -2759,7 +2767,7 @@ ngx_http_var_exec_extract_param(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  name, src_str, separator, delimiter;
+    ngx_str_t                  name, val, separator, delimiter;
     u_char                    *p, *back, *last, sep, del;
 
     args = var->args->elts;
@@ -2782,21 +2790,21 @@ ngx_http_var_exec_extract_param(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-    if (ngx_http_complex_value(r, &args[1], &src_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[1], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    while (src_str.len && ngx_http_var_isspace(src_str.data[0])) {
-        src_str.data++;
-        src_str.len--;
+    while (val.len && ngx_http_var_isspace(val.data[0])) {
+        val.data++;
+        val.len--;
     }
 
-    while (src_str.len && ngx_http_var_isspace(src_str.data[src_str.len - 1]))
+    while (val.len && ngx_http_var_isspace(val.data[val.len - 1]))
     {
-        src_str.len--;
+        val.len--;
     }
 
-    if (src_str.len == 0) {
+    if (val.len == 0) {
         v->not_found = 1;
         return NGX_OK;
     }
@@ -2836,8 +2844,8 @@ ngx_http_var_exec_extract_param(ngx_http_request_t *r,
     sep = separator.data[0];
     del = delimiter.data[0];
 
-    p = src_str.data;
-    last = p + src_str.len;
+    p = val.data;
+    last = p + val.len;
 
     for ( /* void */ ; p < last; p++) {
 
@@ -2859,10 +2867,10 @@ ngx_http_var_exec_extract_param(ngx_http_request_t *r,
             continue;
         }
 
-        if (p > src_str.data) {
+        if (p > val.data) {
             back = p - 1;
 
-            while (back > src_str.data && *back == ' ') {
+            while (back > val.data && *back == ' ') {
                 back--;
             }
 
@@ -2910,29 +2918,27 @@ ngx_http_var_exec_if_re_match(ngx_http_request_t *r,
 
     args = var->args->elts;
 
-    /* Calculate the value of src_str */
     if (ngx_http_complex_value(r, &args[0], &subject) != NGX_OK) {
         return NGX_ERROR;
     }
 
     v->len = 1;
 
-    /* Perform regex match */
     rc = ngx_http_regex_exec(r, var->regex, &subject);
 
+    if (rc == NGX_OK) {
+        v->data = (u_char *) "1";
+        return NGX_OK;
+    } 
+    
     if (rc == NGX_DECLINED) {
         v->data = (u_char *) "0";
         return NGX_OK;
-
-    } else if (rc != NGX_OK) {
-        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http var: regex match failed");
-        return NGX_ERROR;
     }
 
-    v->data = (u_char *) "1";
-
-    return NGX_OK;
+    ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http var: regex match failed");
+    return NGX_ERROR;
 }
 
 
@@ -5182,7 +5188,7 @@ ngx_http_var_exec_if_time_range(ngx_http_request_t *r,
         }
 
         if (ngx_strncmp(param_str.data, "year=", 5) == 0) {
-            if (ngx_http_var_utils_parse_int_range(
+            if (ngx_http_var_utils_parse_uint_range(
                     (ngx_str_t){param_str.len - 5, param_str.data + 5},
                     &year_start, &year_end) != NGX_OK)
             {
@@ -5198,7 +5204,7 @@ ngx_http_var_exec_if_time_range(ngx_http_request_t *r,
             }
 
         } else if (ngx_strncmp(param_str.data, "month=", 6) == 0) {
-            if (ngx_http_var_utils_parse_int_range(
+            if (ngx_http_var_utils_parse_uint_range(
                     (ngx_str_t){param_str.len - 6, param_str.data + 6},
                     &month_start, &month_end) != NGX_OK)
             {
@@ -5216,7 +5222,7 @@ ngx_http_var_exec_if_time_range(ngx_http_request_t *r,
             }
 
         } else if (ngx_strncmp(param_str.data, "day=", 4) == 0) {
-            if (ngx_http_var_utils_parse_int_range(
+            if (ngx_http_var_utils_parse_uint_range(
                     (ngx_str_t){param_str.len - 4, param_str.data + 4},
                     &day_start, &day_end) != NGX_OK)
             {
@@ -5234,7 +5240,7 @@ ngx_http_var_exec_if_time_range(ngx_http_request_t *r,
             }
 
         } else if (ngx_strncmp(param_str.data, "wday=", 5) == 0) {
-            if (ngx_http_var_utils_parse_int_range(
+            if (ngx_http_var_utils_parse_uint_range(
                     (ngx_str_t){param_str.len - 5, param_str.data + 5},
                     &wday_start, &wday_end) != NGX_OK)
             {
@@ -5252,7 +5258,7 @@ ngx_http_var_exec_if_time_range(ngx_http_request_t *r,
             }
 
         } else if (ngx_strncmp(param_str.data, "hour=", 5) == 0) {
-            if (ngx_http_var_utils_parse_int_range(
+            if (ngx_http_var_utils_parse_uint_range(
                     (ngx_str_t){param_str.len - 5, param_str.data + 5},
                     &hour_start, &hour_end) != NGX_OK)
             {
@@ -5270,7 +5276,7 @@ ngx_http_var_exec_if_time_range(ngx_http_request_t *r,
             }
 
         } else if (ngx_strncmp(param_str.data, "min=", 4) == 0) {
-            if (ngx_http_var_utils_parse_int_range(
+            if (ngx_http_var_utils_parse_uint_range(
                     (ngx_str_t){param_str.len - 4, param_str.data + 4},
                     &min_start, &min_end) != NGX_OK)
             {
@@ -5288,7 +5294,7 @@ ngx_http_var_exec_if_time_range(ngx_http_request_t *r,
             }
 
         } else if (ngx_strncmp(param_str.data, "sec=", 4) == 0) {
-            if (ngx_http_var_utils_parse_int_range(
+            if (ngx_http_var_utils_parse_uint_range(
                     (ngx_str_t){param_str.len - 4, param_str.data + 4},
                     &sec_start, &sec_end) != NGX_OK)
             {
