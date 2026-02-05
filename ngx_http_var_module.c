@@ -629,7 +629,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         && (ngx_strncmp(value[last].data, "if=", 3) == 0
             || ngx_strncmp(value[last].data, "if!=", 4) == 0))
     {
-        if (value[2].data == '=') {
+        if (value[last].data[2] == '=') {
             s.len = value[last].len - 3;
             s.data = value[last].data + 3;
             negative = 0;
@@ -2585,7 +2585,7 @@ ngx_http_var_exec_repeat(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-    p = ngx_pnalloc(r->pool, src_str.len * times);
+    p = ngx_pnalloc(r->pool, val.len * times);
     if (p == NULL) {
         return NGX_ERROR;
     }
@@ -2594,7 +2594,7 @@ ngx_http_var_exec_repeat(ngx_http_request_t *r,
         ngx_memcpy(p + i * val.len, val.data, val.len);
     }
 
-    v->len = src_str.len * times;
+    v->len = val.len * times;
     v->data = p;
 
     return NGX_OK;
