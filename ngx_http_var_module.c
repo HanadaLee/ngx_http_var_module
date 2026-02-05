@@ -4343,14 +4343,14 @@ ngx_http_var_exec_hexrand(ngx_http_request_t *r,
     ngx_http_complex_value_t  *args;
     u_char                    *p;
     ngx_str_t                  s;
-    size_t                     len;
+    ngx_int_t                  n;
 
 #if (NGX_OPENSSL)
     u_char                     random_bytes[16];
 #endif
 
     if (var->args->nelts == 0) {
-        len = 32;
+        n = 32;
 
     } else {
         args = var->args->elts;
@@ -4365,8 +4365,8 @@ ngx_http_var_exec_hexrand(ngx_http_request_t *r,
             return NGX_ERROR;
         }
 
-        len = ngx_atoi(s.data, s.len);
-        if (len == NGX_ERROR || len == 0 || len > 32) {
+        n = ngx_atoi(s.data, s.len);
+        if (n == NGX_ERROR || n <= 0 || n > 32) {
             ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "http var: invalid length value for \"hexrand\"");
             return NGX_ERROR;
@@ -4378,7 +4378,7 @@ ngx_http_var_exec_hexrand(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    v->len = len;
+    v->len = (size_t) n;
     v->data = p;
 
 #if (NGX_OPENSSL)
