@@ -145,9 +145,6 @@ var $new_var re_capture [-i] src_str regex assign_value;
 # Substitute regex
 var $new_var re_sub [-i] src_str regex replacement;
 
-# Global regex substitution
-var $new_var re_gsub [-i] src_str regex replacement;
-
 
 #### Mathematical Judgement ####
 # Check if numbers are equal, returns 1 or 0

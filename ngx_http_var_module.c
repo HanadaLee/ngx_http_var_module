@@ -54,7 +54,6 @@ typedef enum {
 
     NGX_HTTP_VAR_OP_RE_CAPTURE,
     NGX_HTTP_VAR_OP_RE_SUB,
-    NGX_HTTP_VAR_OP_RE_GSUB,
 #endif
 
     NGX_HTTP_VAR_OP_IF_EQ,
@@ -257,8 +256,6 @@ static ngx_int_t ngx_http_var_exec_re_capture(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_exec_re_sub(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_re_gsub(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 #endif
 
 static ngx_int_t ngx_http_var_exec_if_eq(ngx_http_request_t *r,
@@ -407,7 +404,6 @@ static ngx_http_var_operator_enum_t  ngx_http_var_operators[] = {
 
     { ngx_string("re_capture"),       NGX_HTTP_VAR_OP_RE_CAPTURE,       3, 3  },
     { ngx_string("re_sub"),           NGX_HTTP_VAR_OP_RE_SUB,           3, 3  },
-    { ngx_string("re_gsub"),          NGX_HTTP_VAR_OP_RE_GSUB,          3, 3  },
 #endif
 
     { ngx_string("if_eq"),            NGX_HTTP_VAR_OP_IF_EQ,            2, 2  },
@@ -702,8 +698,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (op == NGX_HTTP_VAR_OP_IF_RE_MATCH
         || op == NGX_HTTP_VAR_OP_RE_CAPTURE
-        || op == NGX_HTTP_VAR_OP_RE_SUB
-        || op == NGX_HTTP_VAR_OP_RE_GSUB)
+        || op == NGX_HTTP_VAR_OP_RE_SUB)
     {
         if (args < 2) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -773,7 +768,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         if (op != NGX_HTTP_VAR_OP_IF_RE_MATCH) {
             if (args != 2) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "http var: re_capture, re_sub or re_gsub "
+                               "http var: re_capture or re_sub "
                                "operators requires 3 arguments");
                 return NGX_CONF_ERROR;
             }
@@ -1100,10 +1095,6 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
 
     case NGX_HTTP_VAR_OP_RE_SUB:
         rc = ngx_http_var_exec_re_sub(r, v, var);
-        break;
-
-    case NGX_HTTP_VAR_OP_RE_GSUB:
-        rc = ngx_http_var_exec_re_gsub(r, v, var);
         break;
 #endif
 
@@ -3039,150 +3030,6 @@ ngx_http_var_exec_re_sub(ngx_http_request_t *r,
     p = ngx_cpymem(p, val.data + end, val.len - end);
 
     v->len = p - v->data;
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_http_var_exec_re_gsub(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
-{
-    ngx_http_complex_value_t    *args;
-    ngx_str_t                    val, replacement, sub;
-    ngx_int_t                    rc;
-    ngx_uint_t                   offset;
-    int                         *captures;
-    int                          match_start, match_end;
-    u_char                      *p, *result_data, *new_data;
-    size_t                       result_len, allocated, required;
-
-    args = var->args->elts;
-
-    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
-        return NGX_ERROR;
-    }
-
-    allocated = val.len + (val.len >> 1);
-    if (allocated < 256) {
-        allocated = 256;
-    }
-
-    result_data = ngx_pnalloc(r->pool, allocated);
-    if (result_data == NULL) {
-        return NGX_ERROR;
-    }
-
-    p = result_data;
-    result_len = 0;
-    offset = 0;
-
-    while (offset < val.len) {
-        sub.len = val.len - offset;
-        sub.data = val.data + offset;
-
-        rc = ngx_http_regex_exec(r, var->regex, &sub);
-
-        if (rc == NGX_DECLINED) {
-            required = result_len + sub.len;
-
-            if (required > allocated) {
-                allocated = required + (required >> 1);
-                new_data = ngx_pnalloc(r->pool, allocated);
-                if (new_data == NULL) {
-                    return NGX_ERROR;
-                }
-
-                ngx_memcpy(new_data, result_data, result_len);
-                result_data = new_data;
-                p = result_data + result_len;
-            }
-
-            p = ngx_cpymem(p, sub.data, sub.len);
-            result_len += sub.len;
-            break;
-        }
-
-        if (rc != NGX_OK) {
-            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                          "http var: regex substitution failed");
-            return NGX_ERROR;
-        }
-
-        captures = r->captures;
-        match_start = captures[0];
-        match_end = captures[1];
-
-        if (match_start > 0) {
-            required = result_len + match_start;
-
-            if (required > allocated) {
-                allocated = required + (required >> 1);
-                new_data = ngx_pnalloc(r->pool, allocated);
-                if (new_data == NULL) {
-                    return NGX_ERROR;
-                }
-
-                ngx_memcpy(new_data, result_data, result_len);
-                result_data = new_data;
-                p = result_data + result_len;
-            }
-
-            p = ngx_cpymem(p, sub.data, match_start);
-            result_len += match_start;
-        }
-
-        if (ngx_http_complex_value(r, &args[1], &replacement) != NGX_OK) {
-            return NGX_ERROR;
-        }
-
-        required = result_len + replacement.len;
-        if (required > allocated) {
-            allocated = required + (required >> 1);
-            new_data = ngx_pnalloc(r->pool, allocated);
-            if (new_data == NULL) {
-                return NGX_ERROR;
-            }
-
-            ngx_memcpy(new_data, result_data, result_len);
-            result_data = new_data;
-            p = result_data + result_len;
-        }
-
-        p = ngx_cpymem(p, replacement.data, replacement.len);
-        result_len += replacement.len;
-
-        offset += match_end;
-
-        /* prevent infinite loop */
-        if (match_end == match_start) {
-
-            if (offset >= val.len) {
-                break;
-            }
-
-            /* copy one byte to advance */
-            required = result_len + 1;
-            if (required > allocated) {
-                allocated = required + (required >> 1);
-                new_data = ngx_pnalloc(r->pool, allocated);
-                if (new_data == NULL) {
-                    return NGX_ERROR;
-                }
-
-                ngx_memcpy(new_data, result_data, result_len);
-                result_data = new_data;
-                p = result_data + result_len;
-            }
-
-            *p++ = val.data[offset];
-            result_len++;
-            offset++;
-        }
-    }
-
-    v->len = result_len;
-    v->data = result_data;
 
     return NGX_OK;
 }
