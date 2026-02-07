@@ -263,6 +263,9 @@ var $new_var md5sum src_str;
 # SHA1
 var $new_var sha1sum src_str;
 
+# SHA224
+var $new_var sha224sum src_str;
+
 # SHA256
 var $new_var sha256sum src_str;
 
@@ -272,8 +275,14 @@ var $new_var sha384sum src_str;
 # SHA512
 var $new_var sha512sum src_str;
 
+# HMAC_MD5 encryption
+var $new_var hmac_md5 src_str secret;
+
 # HMAC_SHA1 encryption
 var $new_var hmac_sha1 src_str secret;
+
+# HMAC_SHA224 encryption
+var $new_var hmac_sha224 src_str secret;
 
 # HMAC_SHA256 encryption
 var $new_var hmac_sha256 src_str secret;
