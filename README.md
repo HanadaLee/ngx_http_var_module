@@ -324,8 +324,8 @@ var $new_var unix_time src_time date_format [timezone];
 
 
 #### IP range judgment ####
-# Determine whether the IP address is within the IP range, if yes, return 1, otherwise return 0
-var $bool_var if_ip_range ip_str ip_range_str1 ip_range_str2...;
+# Determine whether the ip address is within the ip, cidr or ipv4 range, if yes, return 1, otherwise return 0
+var $bool_var if_ip_range ip_str [ipv4 | ipv6 | cidr | ipv4_range ] ...;
 
 
 All parameters except regular expressions can contain variables. However, incorrect parameter values ​​will cause the function calculation result to be empty.
