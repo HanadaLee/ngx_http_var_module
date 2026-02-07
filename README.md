@@ -296,31 +296,31 @@ var $new_var hmac_sha512 src_str secret;
 #### Time Range Judgement ####
 # Determine if the current time meets the given time range, requires at least one parameter.
 # Returns 1 if all conditions are met, otherwise returns 0.
-# The day of the week is represented by 1-7, where Sunday is 7, and timezone format is gmt+0800
-var $bool_var if_time_range [year=year_range] [month=month_range] [day=day_range] [wday=wday_range(1-7)] [hour=hour_range] [min=min_range] [sec=sec_range] [timezone];
+# The day of the week is represented by 0-6, where sunday is 0, and timezone format is gmt+0800
+var $bool_var if_time_range [year=year_range] [month=month_range] [day=day_range] [wday=wday_range(0-6)] [hour=hour_range] [min=min_range] [sec=sec_range] [gmt | gmt+0000];
 
 
 #### Time Format ####
-# Convert timestamp to GMT time in specified format (current time if timestamp is omitted)
-var $new_var gmt_time [src_ts] date_format;
-
 # Convert timestamp to HTTP time (current time if timestamp is omitted)
 var $new_var gmt_time [src_ts] http_time;
 
 # Convert timestamp to cookie time (current time if timestamp is omitted)
 var $new_var gmt_time [src_ts] cookie_time;
 
+# Convert timestamp to GMT time in specified format (current time if timestamp is omitted)
+var $new_var gmt_time [src_ts] date_format;
+
 # Convert timestamp to local time in specified format (current time if timestamp is omitted)
 var $new_var local_time [src_ts] date_format;
 
 # Return current timestamp
-var $new_var unixtime;
+var $new_var unix_time;
 
 # Convert HTTP time to timestamp
-var $new_var unixtime src_http_time http_time;
+var $new_var unix_time src_time http_time;
 
 # Convert specified date to timestamp (return current timestamp if all are omitted)
-var $new_var unixtime src_time date_format timezone; 
+var $new_var unix_time src_time date_format [timezone];
 
 
 #### IP range judgment ####
