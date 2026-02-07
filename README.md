@@ -254,25 +254,22 @@ var $new_var base64url_decode src_str;
 
 
 #### Cryptographic Hash Calculations ####
-# CRC32 encoding (for short string)
-var $new_var crc32_short src_str;
+# CRC32
+var $new_var crc32 src_str;
 
-# CRC32 encoding (for long string)
-var $new_var crc32_long src_str;
-
-# MD5 encoding
+# MD5
 var $new_var md5sum src_str;
 
-# SHA1 encoding
+# SHA1
 var $new_var sha1sum src_str;
 
-# SHA256 encoding
+# SHA256
 var $new_var sha256sum src_str;
 
-# SHA384 encoding
+# SHA384
 var $new_var sha384sum src_str;
 
-# SHA512 encoding
+# SHA512
 var $new_var sha512sum src_str;
 
 # HMAC_SHA1 encryption
@@ -280,6 +277,12 @@ var $new_var hmac_sha1 src_str secret;
 
 # HMAC_SHA256 encryption
 var $new_var hmac_sha256 src_str secret;
+
+# HMAC_SHA384 encryption
+var $new_var hmac_sha384 src_str secret;
+
+# HMAC_SHA512 encryption
+var $new_var hmac_sha512 src_str secret;
 
 #### Time Range Judgement ####
 # Determine if the current time meets the given time range, requires at least one parameter.

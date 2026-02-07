@@ -93,8 +93,7 @@ typedef enum {
     NGX_HTTP_VAR_OP_BASE64_DECODE,
     NGX_HTTP_VAR_OP_BASE64URL_DECODE,
 
-    NGX_HTTP_VAR_OP_CRC32_SHORT,
-    NGX_HTTP_VAR_OP_CRC32_LONG,
+    NGX_HTTP_VAR_OP_CRC32,
     NGX_HTTP_VAR_OP_MD5SUM,
     NGX_HTTP_VAR_OP_SHA1SUM,
 
@@ -331,10 +330,9 @@ static ngx_int_t ngx_http_var_exec_base64_decode(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_exec_base64url_decode(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
-static ngx_int_t ngx_http_var_exec_crc32_short(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_crc32(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_crc32_long(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+
 static ngx_int_t ngx_http_var_exec_md5sum(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_exec_sha1sum(ngx_http_request_t *r,
@@ -444,8 +442,7 @@ static ngx_http_var_operator_enum_t  ngx_http_var_operators[] = {
     { ngx_string("base64_decode"),    NGX_HTTP_VAR_OP_BASE64_DECODE,    1, 1  },
     { ngx_string("base64url_decode"), NGX_HTTP_VAR_OP_BASE64URL_DECODE, 1, 1  },
 
-    { ngx_string("crc32_short"),      NGX_HTTP_VAR_OP_CRC32_SHORT,      1, 1  },
-    { ngx_string("crc32_long"),       NGX_HTTP_VAR_OP_CRC32_LONG,       1, 1  },
+    { ngx_string("crc32"),            NGX_HTTP_VAR_OP_CRC32,            1, 1  },
     { ngx_string("md5sum"),           NGX_HTTP_VAR_OP_MD5SUM,           1, 1  },
     { ngx_string("sha1sum"),          NGX_HTTP_VAR_OP_SHA1SUM,          1, 1  },
 
@@ -4760,64 +4757,32 @@ ngx_http_var_exec_base64url_decode(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_crc32_short(ngx_http_request_t *r,
+ngx_http_var_exec_crc32(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str;
+    ngx_str_t                  val;
     ngx_uint_t                 crc;
     u_char                    *p;
 
     args = var->args->elts;
 
-    /* Evaluate source string */
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    /* Compute CRC32 */
-    crc = ngx_crc32_short(src_str.data, src_str.len);
+    if (val.len < 64) {
+        crc = ngx_crc32_short(val.data, val.len);
 
-    /* Allocate buffer for CRC32 result */
-    p = ngx_pnalloc(r->pool, 9);
+    } else {
+        crc = ngx_crc32_long(val.data, val.len);
+    }
+
+    p = ngx_pnalloc(r->pool, 8 + 1);
     if (p == NULL) {
         return NGX_ERROR;
     }
 
-    /* Convert CRC32 result to string */
-    v->len = ngx_sprintf(p, "%08xD", crc) - p;
-    v->data = p;
-
-    return NGX_OK;
-}
-
-
-static ngx_int_t
-ngx_http_var_exec_crc32_long(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
-{
-    ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str;
-    ngx_uint_t                 crc;
-    u_char                    *p;
-
-    args = var->args->elts;
-
-    /* Evaluate source string */
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        return NGX_ERROR;
-    }
-
-    /* Compute CRC32 */
-    crc = ngx_crc32_long(src_str.data, src_str.len);
-
-    /* Allocate buffer for CRC32 result */
-    p = ngx_pnalloc(r->pool, 9);
-    if (p == NULL) {
-        return NGX_ERROR;
-    }
-
-    /* Convert CRC32 result to string */
     v->len = ngx_sprintf(p, "%08xD", crc) - p;
     v->data = p;
 
@@ -4830,33 +4795,27 @@ ngx_http_var_exec_md5sum(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str;
-    u_char                    *hash_data;
+    ngx_str_t                  val;
+    u_char                     hash[16];
     ngx_md5_t                  md5;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    hash_data = ngx_pnalloc(r->pool, 32);
-    if (hash_data == NULL) {
-        return NGX_ERROR;
-    }
-
-    ngx_md5_init(&md5);
-    ngx_md5_update(&md5, src_str.data, src_str.len);
-    ngx_md5_final(hash_data, &md5);
-
-    /* Convert the MD5 hash to a hexadecimal string */
-    v->data = ngx_pnalloc(r->pool, 32);
+    v->data = ngx_pnalloc(r->pool, 16 * 2);
     if (v->data == NULL) {
         return NGX_ERROR;
     }
 
-    ngx_hex_dump(v->data, hash_data, 16);
-    v->len = 32;
+    ngx_md5_init(&md5);
+    ngx_md5_update(&md5, val.data, val.len);
+    ngx_md5_final(hash, &md5);
+
+    ngx_hex_dump(v->data, hash, 16);
+    v->len = 16 * 2;
 
     return NGX_OK;
 }
@@ -4867,56 +4826,46 @@ ngx_http_var_exec_sha1sum(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str;
-    u_char                    *hash_data;
+    ngx_str_t                  val;
+    u_char                     hash[20];
     ngx_sha1_t                 sha1;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    hash_data = ngx_pnalloc(r->pool, 40);
-    if (hash_data == NULL) {
-        return NGX_ERROR;
-    }
-
-    ngx_sha1_init(&sha1);
-    ngx_sha1_update(&sha1, src_str.data, src_str.len);
-    ngx_sha1_final(hash_data, &sha1);
-
-    /* Convert the SHA1 hash to a hexadecimal string */
-    v->data = ngx_pnalloc(r->pool, 40);
+    v->data = ngx_pnalloc(r->pool, 20 * 2);
     if (v->data == NULL) {
         return NGX_ERROR;
     }
 
-    ngx_hex_dump(v->data, hash_data, 20);
-    v->len = 40;
+    ngx_sha1_init(&sha1);
+    ngx_sha1_update(&sha1, val.data, val.len);
+    ngx_sha1_final(hash, &sha1);
+
+    ngx_hex_dump(v->data, hash, 20);
+    v->len = 20 * 2;
 
     return NGX_OK;
 }
 
 
 #if (NGX_HTTP_SSL)
+
 static ngx_int_t
 ngx_http_var_exec_sha256sum(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str;
-    u_char                    *hash_data;
+    ngx_str_t                  val;
     EVP_MD_CTX                *md;
+    u_char                     hash[EVP_MAX_MD_SIZE];
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        return NGX_ERROR;
-    }
-
-    hash_data = ngx_pnalloc(r->pool, 64);
-    if (hash_data == NULL) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
@@ -4928,33 +4877,38 @@ ngx_http_var_exec_sha256sum(ngx_http_request_t *r,
     if (EVP_DigestInit_ex(md, EVP_sha256(), NULL) == 0) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "EVP_DigestInit_ex() failed");
-        return NGX_ERROR;
+        goto failed;
     }
 
-    if (EVP_DigestUpdate(md, src_str.data, src_str.len) == 0) {
+    if (EVP_DigestUpdate(md, val.data, val.len) == 0) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "EVP_DigestUpdate() failed");
-        return NGX_ERROR;
+        goto failed;
     }
 
-    if (EVP_DigestFinal_ex(md, hash_data, NULL) == 0) {
+    if (EVP_DigestFinal_ex(md, hash, NULL) == 0) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "EVP_DigestFinal_ex() failed");
-        return NGX_ERROR;
+        goto failed;
     }
 
     EVP_MD_CTX_destroy(md);
 
-    /* Convert the SHA256 hash to a hexadecimal string */
-    v->data = ngx_pnalloc(r->pool, 64);
+    v->data = ngx_pnalloc(r->pool, 32 * 2);
     if (v->data == NULL) {
         return NGX_ERROR;
     }
 
-    ngx_hex_dump(v->data, hash_data, 32);
-    v->len = 64;
+    ngx_hex_dump(v->data, hash, 32);
+    v->len = 32 * 2;
 
     return NGX_OK;
+
+failed:
+
+    EVP_MD_CTX_destroy(md);
+
+    return NGX_ERROR;
 }
 
 
@@ -4963,18 +4917,13 @@ ngx_http_var_exec_sha384sum(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str;
-    u_char                    *hash_data;
+    ngx_str_t                  val;
     EVP_MD_CTX                *md;
+    u_char                     hash[EVP_MAX_MD_SIZE];
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        return NGX_ERROR;
-    }
-
-    hash_data = ngx_pnalloc(r->pool, 96);
-    if (hash_data == NULL) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
@@ -4986,33 +4935,38 @@ ngx_http_var_exec_sha384sum(ngx_http_request_t *r,
     if (EVP_DigestInit_ex(md, EVP_sha384(), NULL) == 0) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "EVP_DigestInit_ex() failed");
-        return NGX_ERROR;
+        goto failed;
     }
 
-    if (EVP_DigestUpdate(md, src_str.data, src_str.len) == 0) {
+    if (EVP_DigestUpdate(md, val.data, val.len) == 0) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "EVP_DigestUpdate() failed");
-        return NGX_ERROR;
+        goto failed;
     }
 
-    if (EVP_DigestFinal_ex(md, hash_data, NULL) == 0) {
+    if (EVP_DigestFinal_ex(md, hash, NULL) == 0) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "EVP_DigestFinal_ex() failed");
-        return NGX_ERROR;
+        goto failed;
     }
 
     EVP_MD_CTX_destroy(md);
 
-    /* Convert the SHA384 hash to a hexadecimal string */
-    v->data = ngx_pnalloc(r->pool, 96);
+    v->data = ngx_pnalloc(r->pool, 48 * 2);
     if (v->data == NULL) {
         return NGX_ERROR;
     }
 
-    ngx_hex_dump(v->data, hash_data, 48);
-    v->len = 96;
+    ngx_hex_dump(v->data, hash, 48);
+    v->len = 48 * 2;
 
     return NGX_OK;
+
+failed:
+
+    EVP_MD_CTX_destroy(md);
+
+    return NGX_ERROR;
 }
 
 
@@ -5021,18 +4975,13 @@ ngx_http_var_exec_sha512sum(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str;
-    u_char                    *hash_data;
+    ngx_str_t                  val;
     EVP_MD_CTX                *md;
+    u_char                     hash[EVP_MAX_MD_SIZE];
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
-        return NGX_ERROR;
-    }
-
-    hash_data = ngx_pnalloc(r->pool, 128);
-    if (hash_data == NULL) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
@@ -5044,33 +4993,38 @@ ngx_http_var_exec_sha512sum(ngx_http_request_t *r,
     if (EVP_DigestInit_ex(md, EVP_sha512(), NULL) == 0) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "EVP_DigestInit_ex() failed");
-        return NGX_ERROR;
+        goto failed;
     }
 
-    if (EVP_DigestUpdate(md, src_str.data, src_str.len) == 0) {
+    if (EVP_DigestUpdate(md, val.data, val.len) == 0) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "EVP_DigestUpdate() failed");
-        return NGX_ERROR;
+        goto failed;
     }
 
-    if (EVP_DigestFinal_ex(md, hash_data, NULL) == 0) {
+    if (EVP_DigestFinal_ex(md, hash, NULL) == 0) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "EVP_DigestFinal_ex() failed");
-        return NGX_ERROR;
+        goto failed;
     }
 
     EVP_MD_CTX_destroy(md);
 
-    /* Convert the SHA384 hash to a hexadecimal string */
-    v->data = ngx_pnalloc(r->pool, 128);
+    v->data = ngx_pnalloc(r->pool, 64 * 2);
     if (v->data == NULL) {
         return NGX_ERROR;
     }
 
-    ngx_hex_dump(v->data, hash_data, 64);
-    v->len = 128;
+    ngx_hex_dump(v->data, hash, 64);
+    v->len = 64 * 2;
 
     return NGX_OK;
+
+failed:
+
+    EVP_MD_CTX_destroy(md);
+
+    return NGX_ERROR;
 }
 
 
@@ -5104,6 +5058,7 @@ ngx_http_var_exec_hmac_sha512(ngx_http_request_t *r,
 {
     return ngx_http_var_utils_hmac(r, v, var, EVP_sha512());
 }
+
 #endif
 
 
