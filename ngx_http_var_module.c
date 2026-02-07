@@ -3838,9 +3838,10 @@ ngx_http_var_exec_round(ngx_http_request_t *r,
     }
 
     /* pad with zeros */
-    if (frac_len < (size_t)precision) {
+    if (frac_len < (size_t) precision) {
         /* calculate how many characters to add */
-        i = (decimal_point == -1) ? (1 + precision) : (precision - frac_len);
+        i = (decimal_point == -1)
+            ? (1 + precision) : (precision - (ngx_int_t) frac_len);
 
         result = ngx_palloc(r->pool, val.len + i + 1);
         if (result == NULL) {
@@ -4619,27 +4620,30 @@ ngx_http_var_exec_base64_encode(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, encoded_str;
-    size_t                     len;
+    ngx_str_t                  val, dst;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    len = ngx_base64_encoded_length(src_str.len);
+    if (val.len == 0) {
+        v->len = 0;
+        v->data = (u_char *) "";
+        return NGX_OK;
+    }
 
-    encoded_str.data = ngx_pnalloc(r->pool, len);
-    if (encoded_str.data == NULL) {
+    dst.len = ngx_base64_encoded_length(val.len);
+    dst.data = ngx_pnalloc(r->pool, dst.len);
+    if (dst.data == NULL) {
         return NGX_ERROR;
     }
 
-    ngx_encode_base64(&encoded_str, &src_str);
+    ngx_encode_base64(&dst, &val);
 
-    /* Set variable value */
-    v->len = encoded_str.len;
-    v->data = encoded_str.data;
+    v->len = dst.len;
+    v->data = dst.data;
 
     return NGX_OK;
 }
@@ -4650,27 +4654,30 @@ ngx_http_var_exec_base64url_encode(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, encoded_str;
-    size_t                     len;
+    ngx_str_t                  val, dst;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    len = ngx_base64_encoded_length(src_str.len);
+    if (val.len == 0) {
+        v->len = 0;
+        v->data = (u_char *) "";
+        return NGX_OK;
+    }
 
-    encoded_str.data = ngx_pnalloc(r->pool, len);
-    if (encoded_str.data == NULL) {
+    dst.len = ngx_base64_encoded_length(val.len);
+    dst.data = ngx_pnalloc(r->pool, dst.len);
+    if (dst.data == NULL) {
         return NGX_ERROR;
     }
 
-    ngx_encode_base64url(&encoded_str, &src_str);
+    ngx_encode_base64url(&dst, &val);
 
-    /* Set variable value */
-    v->len = encoded_str.len;
-    v->data = encoded_str.data;
+    v->len = dst.len;
+    v->data = dst.data;
 
     return NGX_OK;
 }
@@ -4681,31 +4688,34 @@ ngx_http_var_exec_base64_decode(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, decoded_str;
-    size_t                     len;
+    ngx_str_t                  val, dst;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    len = ngx_base64_decoded_length(src_str.len);
+    if (val.len == 0) {
+        v->len = 0;
+        v->data = (u_char *) "";
+        return NGX_OK;
+    }
 
-    decoded_str.data = ngx_pnalloc(r->pool, len);
-    if (decoded_str.data == NULL) {
+    dst.len = ngx_base64_decoded_length(val.len);
+    dst.data = ngx_pnalloc(r->pool, dst.len);
+    if (dst.data == NULL) {
         return NGX_ERROR;
     }
 
-    if (ngx_decode_base64(&decoded_str, &src_str) != NGX_OK) {
+    if (ngx_decode_base64(&dst, &val) != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http var: failed to decode base64 string");
         return NGX_ERROR;
     }
 
-    /* Set variable value */
-    v->len = decoded_str.len;
-    v->data = decoded_str.data;
+    v->len = dst.len;
+    v->data = dst.data;
 
     return NGX_OK;
 }
@@ -4716,31 +4726,34 @@ ngx_http_var_exec_base64url_decode(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  src_str, decoded_str;
-    size_t                     len;
+    ngx_str_t                  val, dst;
 
     args = var->args->elts;
 
-    if (ngx_http_complex_value(r, &args[0], &src_str) != NGX_OK) {
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    len = ngx_base64_decoded_length(src_str.len);
+    if (val.len == 0) {
+        v->len = 0;
+        v->data = (u_char *) "";
+        return NGX_OK;
+    }
 
-    decoded_str.data = ngx_pnalloc(r->pool, len);
-    if (decoded_str.data == NULL) {
+    dst.len = ngx_base64_decoded_length(val.len);
+    dst.data = ngx_pnalloc(r->pool, dst.len);
+    if (dst.data == NULL) {
         return NGX_ERROR;
     }
 
-    if (ngx_decode_base64url(&decoded_str, &src_str) != NGX_OK) {
+    if (ngx_decode_base64url(&dst, &val) != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http var: failed to decode base64url string");
         return NGX_ERROR;
     }
 
-    /* Set variable value */
-    v->len = decoded_str.len;
-    v->data = decoded_str.data;
+    v->len = dst.len;
+    v->data = dst.data;
 
     return NGX_OK;
 }
