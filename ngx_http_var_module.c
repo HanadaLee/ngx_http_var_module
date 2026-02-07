@@ -5247,7 +5247,7 @@ ngx_http_var_exec_if_time_range(ngx_http_request_t *r,
             s.len = s.len - 9;
             s.data = s.data + 9;
 
-            if (ngx_strncasecmp(s.data, "gmt", 3) != 0) {
+            if (ngx_strncasecmp(s.data, (u_char *) "gmt", 3) != 0) {
                 ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                               "http var: invalid timezone format");
                 return NGX_ERROR;
@@ -5365,6 +5365,7 @@ ngx_http_var_exec_gmt_time(ngx_http_request_t *r,
     u_char                    *p;
     struct tm                  tm;
     char                       buf[2048];
+    char                       fmt[2048];
 
     args = var->args->elts;
 
@@ -5418,7 +5419,7 @@ ngx_http_var_exec_gmt_time(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-    if (s.len >= sizeof(buf)) {
+    if (s.len >= sizeof(fmt)) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http var: time format too long");
         return NGX_ERROR;
@@ -5434,12 +5435,12 @@ ngx_http_var_exec_gmt_time(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-    ngx_memcpy(buf, s.data, s.len);
-    buf[s.len] = '\0';
+    ngx_memcpy(fmt, s.data, s.len);
+    fmt[s.len] = '\0';
 
     ngx_libc_gmtime(ts, &tm);
 
-    v->len = strftime(buf, sizeof(buf), buf, &tm);
+    v->len = strftime(buf, sizeof(buf), fmt, &tm);
     if (v->len == 0) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http var: strftime failed");
@@ -5467,6 +5468,7 @@ ngx_http_var_exec_local_time(ngx_http_request_t *r,
     u_char                    *p;
     struct tm                  tm;
     char                       buf[2048];
+    char                       fmt[2048];
 
     args = var->args->elts;
 
@@ -5496,7 +5498,7 @@ ngx_http_var_exec_local_time(ngx_http_request_t *r,
         }
     }
 
-    if (s.len >= sizeof(buf)) {
+    if (s.len >= sizeof(fmt)) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http var: date format too long");
         return NGX_ERROR;
@@ -5513,12 +5515,12 @@ ngx_http_var_exec_local_time(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-    ngx_memcpy(buf, s.data, s.len);
-    buf[s.len] = '\0';
+    ngx_memcpy(fmt, s.data, s.len);
+    fmt[s.len] = '\0';
 
     ngx_libc_localtime(ts, &tm);
 
-    v->len = strftime(buf, sizeof(buf), buf, &tm);
+    v->len = strftime(buf, sizeof(buf), fmt, &tm);
     if (v->len == 0) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http var: strftime failed");
@@ -5589,7 +5591,7 @@ ngx_http_var_exec_unix_time(ngx_http_request_t *r,
             return NGX_ERROR;
         }
 
-        if (ngx_strncasecmp(tz.data, "gmt", 3) != 0) {
+        if (ngx_strncasecmp(tz.data, (u_char *) "gmt", 3) != 0) {
             ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "http var: invalid timezone format");
             return NGX_ERROR;
