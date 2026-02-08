@@ -35,7 +35,7 @@ typedef enum {
     NGX_HTTP_VAR_OP_IF_FIND,
     NGX_HTTP_VAR_OP_IF_STR_IN,
 
-    NGX_HTTP_VAR_OP_COPY,
+    NGX_HTTP_VAR_OP_SET,
     NGX_HTTP_VAR_OP_LEN,
     NGX_HTTP_VAR_OP_UPPER,
     NGX_HTTP_VAR_OP_LOWER,
@@ -73,7 +73,15 @@ typedef enum {
     NGX_HTTP_VAR_OP_MUL,
     NGX_HTTP_VAR_OP_DIV,
     NGX_HTTP_VAR_OP_MOD,
+    NGX_HTTP_VAR_OP_BITWISE_AND,
+    NGX_HTTP_VAR_OP_BITWISE_NOT,
+    NGX_HTTP_VAR_OP_BITWISE_OR,
+    NGX_HTTP_VAR_OP_BITWISE_XOR,
+    NGX_HTTP_VAR_OP_LSHIFT,
+    NGX_HTTP_VAR_OP_RSHIFT,
+    NGX_HTTP_VAR_OP_URSHIFT,
     NGX_HTTP_VAR_OP_ROUND,
+    NGX_HTTP_VAR_OP_INT,
     NGX_HTTP_VAR_OP_FLOOR,
     NGX_HTTP_VAR_OP_CEIL,
     NGX_HTTP_VAR_OP_RAND,
@@ -227,7 +235,7 @@ static ngx_int_t ngx_http_var_exec_if_find(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_exec_if_str_in(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
-static ngx_int_t ngx_http_var_exec_copy(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_set(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_exec_len(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -297,7 +305,23 @@ static ngx_int_t ngx_http_var_exec_div(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_exec_mod(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_exec_bitwise_and(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_exec_bitwise_not(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_exec_bitwise_or(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_exec_bitwise_xor(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_exec_lshift(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_exec_rshift(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_exec_urshift(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_exec_round(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_exec_int(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_exec_floor(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -395,7 +419,7 @@ static ngx_http_var_operator_enum_t  ngx_http_var_operators[] = {
     { ngx_string("if_find"),          NGX_HTTP_VAR_OP_IF_FIND,         2, 2  },
     { ngx_string("if_str_in"),        NGX_HTTP_VAR_OP_IF_STR_IN,       3, 99 },
 
-    { ngx_string("copy"),             NGX_HTTP_VAR_OP_COPY,            1, 1  },
+    { ngx_string("set"),              NGX_HTTP_VAR_OP_SET,            1, 1  },
     { ngx_string("len"),              NGX_HTTP_VAR_OP_LEN,             1, 1  },
     { ngx_string("upper"),            NGX_HTTP_VAR_OP_UPPER,           1, 1  },
     { ngx_string("lower"),            NGX_HTTP_VAR_OP_LOWER,           1, 1  },
@@ -433,7 +457,15 @@ static ngx_http_var_operator_enum_t  ngx_http_var_operators[] = {
     { ngx_string("mul"),              NGX_HTTP_VAR_OP_MUL,             2, 2  },
     { ngx_string("div"),              NGX_HTTP_VAR_OP_DIV,             2, 2  },
     { ngx_string("mod"),              NGX_HTTP_VAR_OP_MOD,             2, 2  },
+    { ngx_string("bitwise_and"),      NGX_HTTP_VAR_OP_BITWISE_AND,     2, 2  },
+    { ngx_string("bitwise_not"),      NGX_HTTP_VAR_OP_BITWISE_NOT,     1, 1  },
+    { ngx_string("bitwise_or"),       NGX_HTTP_VAR_OP_BITWISE_OR,      2, 2  },
+    { ngx_string("bitwise_xor"),      NGX_HTTP_VAR_OP_BITWISE_XOR,     2, 2  },
+    { ngx_string("lshift"),           NGX_HTTP_VAR_OP_LSHIFT,          2, 2  },
+    { ngx_string("rshift"),           NGX_HTTP_VAR_OP_RSHIFT,          2, 2  },
+    { ngx_string("urshift"),          NGX_HTTP_VAR_OP_URSHIFT,         2, 2  },
     { ngx_string("round"),            NGX_HTTP_VAR_OP_ROUND,           2, 2  },
+    { ngx_string("int"),              NGX_HTTP_VAR_OP_INT,             1, 1  },
     { ngx_string("floor"),            NGX_HTTP_VAR_OP_FLOOR,           1, 1  },
     { ngx_string("ceil"),             NGX_HTTP_VAR_OP_CEIL,            1, 1  },
     { ngx_string("rand"),             NGX_HTTP_VAR_OP_RAND,            0, 2  },
@@ -1050,8 +1082,8 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_exec_if_str_in(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_COPY:
-        rc = ngx_http_var_exec_copy(r, v, var);
+    case NGX_HTTP_VAR_OP_SET:
+        rc = ngx_http_var_exec_set(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_LEN:
@@ -1176,8 +1208,40 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_exec_mod(r, v, var);
         break;
 
+    case NGX_HTTP_VAR_OP_BITWISE_AND:
+        rc = ngx_http_var_exec_bitwise_and(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_BITWISE_NOT:
+        rc = ngx_http_var_exec_bitwise_not(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_BITWISE_OR:
+        rc = ngx_http_var_exec_bitwise_or(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_BITWISE_XOR:
+        rc = ngx_http_var_exec_bitwise_xor(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_LSHIFT:
+        rc = ngx_http_var_exec_lshift(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_RSHIFT:
+        rc = ngx_http_var_exec_rshift(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_URSHIFT:
+        rc = ngx_http_var_exec_urshift(r, v, var);
+        break;
+
     case NGX_HTTP_VAR_OP_ROUND:
         rc = ngx_http_var_exec_round(r, v, var);
+        break;
+
+    case NGX_HTTP_VAR_OP_INT:
+        rc = ngx_http_var_exec_int(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_FLOOR:
@@ -2305,7 +2369,7 @@ ngx_http_var_exec_if_str_in(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_copy(ngx_http_request_t *r,
+ngx_http_var_exec_set(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -3812,6 +3876,310 @@ ngx_http_var_exec_mod(ngx_http_request_t *r,
 
 
 static ngx_int_t
+ngx_http_var_exec_bitwise_and(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val1, val2;
+    ngx_int_t                  int_val1, int_val2, result;
+    u_char                    *p;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &val1) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &val2) != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_var_utils_auto_atoi(val1, &int_val1) != NGX_OK
+        || ngx_http_var_utils_auto_atoi(val2, &int_val2) != NGX_OK)
+    {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http var: invalid integer value");
+        return NGX_ERROR;
+    }
+
+    result = int_val1 & int_val2;
+
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%i", result) - p;
+    v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_exec_bitwise_not(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val;
+    ngx_int_t                  int_val, result;
+    u_char                    *p;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_var_utils_auto_atoi(val, &int_val) != NGX_OK) {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http var: invalid integer value");
+        return NGX_ERROR;
+    }
+
+    result = ~int_val;
+
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%i", result) - p;
+    v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_exec_bitwise_or(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val1, val2;
+    ngx_int_t                  int_val1, int_val2, result;
+    u_char                    *p;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &val1) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &val2) != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_var_utils_auto_atoi(val1, &int_val1) != NGX_OK
+        || ngx_http_var_utils_auto_atoi(val2, &int_val2) != NGX_OK)
+    {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http var: invalid integer value");
+        return NGX_ERROR;
+    }
+
+    result = int_val1 | int_val2;
+
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%i", result) - p;
+    v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_exec_bitwise_xor(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val1, val2;
+    ngx_int_t                  int_val1, int_val2, result;
+    u_char                    *p;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &val1) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &val2) != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_var_utils_auto_atoi(val1, &int_val1) != NGX_OK
+        || ngx_http_var_utils_auto_atoi(val2, &int_val2) != NGX_OK)
+    {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http var: invalid integer value");
+        return NGX_ERROR;
+    }
+
+    result = int_val1 ^ int_val2;
+
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%i", result) - p;
+    v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_exec_lshift(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val1, val2;
+    ngx_int_t                  int_val, shift_bits, result;
+    u_char                    *p;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &val1) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &val2) != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_var_utils_auto_atoi(val1, &int_val) != NGX_OK) {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http var: invalid integer value");
+        return NGX_ERROR;
+    }
+
+    shift_bits = ngx_atoi(val2.data, val2.len);
+    if (shift_bits == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http var: invalid shift bits");
+        return NGX_ERROR;
+    }
+
+    if (shift_bits >= (ngx_int_t) (sizeof(ngx_int_t) * 8)) {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http var: shift bits too large");
+        return NGX_ERROR;
+    }
+
+    result = int_val << shift_bits;
+
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%i", result) - p;
+    v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_exec_rshift(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val1, val2;
+    ngx_int_t                  int_val, shift_bits, result;
+    u_char                    *p;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &val1) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &val2) != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_var_utils_auto_atoi(val1, &int_val) != NGX_OK) {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http var: invalid integer value");
+        return NGX_ERROR;
+    }
+
+    shift_bits = ngx_atoi(val2.data, val2.len);
+    if (shift_bits == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http var: invalid shift bits");
+        return NGX_ERROR;
+    }
+
+    if (shift_bits >= (ngx_int_t) (sizeof(ngx_int_t) * 8)) {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http var: shift bits too large");
+        return NGX_ERROR;
+    }
+
+    result = int_val >> shift_bits;
+
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%i", result) - p;
+    v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_exec_urshift(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val1, val2;
+    ngx_int_t                  int_val, shift_bits;
+    ngx_uint_t                 unsigned_val, result;
+    u_char                    *p;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &val1) != NGX_OK
+        || ngx_http_complex_value(r, &args[1], &val2) != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_var_utils_auto_atoi(val1, &int_val) != NGX_OK) {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http var: invalid integer value");
+        return NGX_ERROR;
+    }
+
+    shift_bits = ngx_atoi(val2.data, val2.len);
+    if (shift_bits == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http var: invalid shift bits");
+        return NGX_ERROR;
+    }
+
+    if (shift_bits >= (ngx_int_t) (sizeof(ngx_int_t) * 8)) {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http var: shift bits too large");
+        return NGX_ERROR;
+    }
+
+    unsigned_val = (ngx_uint_t) int_val;
+    result = unsigned_val >> shift_bits;
+
+    p = ngx_pnalloc(r->pool, NGX_INT_T_LEN);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_sprintf(p, "%ui", result) - p;
+    v->data = p;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_http_var_exec_round(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
@@ -3997,6 +4365,83 @@ ngx_http_var_exec_round(ngx_http_request_t *r,
         v->data = result;
         v->len = i;
     }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_exec_int(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val;
+    ngx_int_t                  i, decimal_point;
+    u_char                    *num_data;
+    size_t                     num_len;
+    ngx_int_t                  is_negative;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    num_data = val.data;
+    num_len = val.len;
+
+    if (num_len == 0) {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http var: empty input");
+        return NGX_ERROR;
+    }
+
+    /* check for negative sign */
+    is_negative = 0;
+    if (num_data[0] == '-') {
+        is_negative = 1;
+        num_data++;
+        num_len--;
+    }
+
+    if (num_len == 0 || num_data[0] == '.') {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http var: invalid number format");
+        return NGX_ERROR;
+    }
+
+    /* find decimal point and validate */
+    decimal_point = -1;
+
+    for (i = 0; i < (ngx_int_t) num_len; i++) {
+
+        if (num_data[i] == '.') {
+
+            if (decimal_point != -1) {
+                ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                              "http var: multiple decimal points found");
+                return NGX_ERROR;
+            }
+
+            decimal_point = i;
+
+        } else if (num_data[i] < '0' || num_data[i] > '9') {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "http var: invalid character in number");
+            return NGX_ERROR;
+        }
+    }
+
+    /* no decimal point, return as is */
+    if (decimal_point == -1) {
+        v->data = val.data;
+        v->len = val.len;
+        return NGX_OK;
+    }
+
+    /* truncate decimal part */
+    v->data = val.data;
+    v->len = (is_negative ? 1 : 0) + decimal_point;
 
     return NGX_OK;
 }
@@ -5790,6 +6235,7 @@ ngx_http_var_exec_if_ip_range(ngx_http_request_t *r,
         }
 
 next:
+
         continue;
     }
 
@@ -5799,8 +6245,10 @@ next:
     return NGX_OK;
 
 invalid_ip_range:
+
     ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                   "http var: invalid ip or cidr range: \"%V\"",
                   &range);
     return NGX_ERROR;
 }
+

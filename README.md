@@ -26,7 +26,7 @@ server {
     server_name localhost;
 
     location / {
-        var $copy_var copy $scheme://$host$request_uri;
+        var $new_var set $scheme://$host$request_uri;
     }
 }
 ```
@@ -89,8 +89,8 @@ var $bool_var if_find [-i] str sub_str;
 var $bool_var if_str_in [-i] str1 str2 str3 .. strn;
 
 #### General String Operations ####
-# Copy the value of the variable
-var $new_var copy src_str;
+# Set the value directly of the variable
+var $new_var set src_str;
 
 # Length of the string
 var $new_var len src_str;
@@ -196,8 +196,32 @@ var $new_var div int1 int2;
 # Integer modulus, int2 cannot be 0
 var $new_var mod int1 int2;
 
+# Bitwise AND operation
+var $new_var bitwise_and int1 int2;
+
+# Bitwise NOT operation
+var $new_var bitwise_not int;
+
+# Bitwise OR operation
+var $new_var bitwise_or int1 int2;
+
+# Bitwise XOR operation (exclusive or)
+var $new_var bitwise_xor int1 int2;
+
+# Left shift operation, shift_bits must be >= 0
+var $new_var lshift int shift_bits;
+
+# Right shift operation (arithmetic shift, sign bit preserved), shift_bits must be >= 0
+var $new_var rshift int shift_bits;
+
+# Unsigned right shift operation (logical shift, zero fill), shift_bits must be >= 0
+var $new_var urshift int shift_bits;
+
 # Round to n significant digits
 var $new_var round src_num int;
+
+# Truncate decimal part directly (no rounding)
+var $new_var int src_num;
 
 # Floor value, the largest integer less than or equal to the source
 var $new_var floor src_num;
@@ -336,13 +360,13 @@ The if parameter enables conditional var. var will not be assign a value if the 
 
 ```nginx
 # When request header A is present, the value of the variable is 'have-header-a'
-var $new_var copy have-header-a if=$http_a;
+var $new_var set have-header-a if=$http_a;
 
 # When request header A is not present but request header B is present, the value of the variable is 'have-header-b'
-var $new_var copy have-header-b if=$http_b;
+var $new_var set have-header-b if=$http_b;
 
 # When both request header A and B are not present, the value of the variable is 'not-have-a-or-b'
-var $new_var copy not-have-a-or-b;
+var $new_var set not-have-a-or-b;
 ```
 
 # Author
