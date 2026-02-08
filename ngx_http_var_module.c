@@ -134,6 +134,7 @@ typedef enum {
     NGX_HTTP_VAR_OP_UNIX_TIME,
 
     NGX_HTTP_VAR_OP_IP_RANGE,
+    NGX_HTTP_VAR_OP_CIDR,
 
     NGX_HTTP_VAR_OP_UNKNOWN
 } ngx_http_var_operator_e;
@@ -415,6 +416,8 @@ static ngx_int_t ngx_http_var_exec_unix_time(ngx_http_request_t *r,
 
 static ngx_int_t ngx_http_var_exec_ip_range(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_exec_cidr(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 
 static ngx_http_var_operator_enum_t  ngx_http_var_operators[] = {
@@ -529,6 +532,7 @@ static ngx_http_var_operator_enum_t  ngx_http_var_operators[] = {
     { ngx_string("unix_time"),        NGX_HTTP_VAR_OP_UNIX_TIME,       0, 3  },
 
     { ngx_string("ip_range"),         NGX_HTTP_VAR_OP_IP_RANGE,        2, 99 },
+    { ngx_string("cidr"),             NGX_HTTP_VAR_OP_CIDR,            2, 3  },
 
     { ngx_null_string,                NGX_HTTP_VAR_OP_UNKNOWN,         0, 0  }
 };
@@ -1147,6 +1151,16 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_exec_replace(r, v, var);
         break;
 
+    case NGX_HTTP_VAR_OP_EXTRACT_PARAM:
+        rc = ngx_http_var_exec_extract_param(r, v, var);
+        break;
+
+#if (NGX_HAVE_CJSON)
+    case NGX_HTTP_VAR_OP_EXTRACT_JSON:
+        rc = ngx_http_var_exec_extract_json(r, v, var);
+        break;
+#endif
+
 #if (NGX_PCRE)
     case NGX_HTTP_VAR_OP_RE_MATCH:
         rc = ngx_http_var_exec_re_match(r, v, var);
@@ -1403,15 +1417,9 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_exec_ip_range(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_EXTRACT_PARAM:
-        rc = ngx_http_var_exec_extract_param(r, v, var);
+    case NGX_HTTP_VAR_OP_CIDR:
+        rc = ngx_http_var_exec_cidr(r, v, var);
         break;
-
-#if (NGX_HAVE_CJSON)
-    case NGX_HTTP_VAR_OP_EXTRACT_JSON:
-        rc = ngx_http_var_exec_extract_json(r, v, var);
-        break;
-#endif
 
     default:
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -6359,7 +6367,6 @@ ngx_http_var_exec_ip_range(ngx_http_request_t *r,
             ipv4_addr += ipv6_addr.s6_addr[13] << 16;
             ipv4_addr += ipv6_addr.s6_addr[14] << 8;
             ipv4_addr += ipv6_addr.s6_addr[15];
-            ipv4_addr = htonl(ipv4_addr);
         }
     }
 
@@ -6463,3 +6470,154 @@ invalid_ip_range:
     return NGX_ERROR;
 }
 
+
+static ngx_int_t
+ngx_http_var_exec_cidr(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  ip, s;
+    ngx_int_t                  ipv4_bits, ipv6_bits;
+    in_addr_t                  ipv4_addr, network;
+    u_char                    *p;
+    size_t                     len;
+
+#if (NGX_HAVE_INET6)
+    u_char                     ipv6_buf[16];
+    struct in6_addr            ipv6_addr, ipv6_network;
+    ngx_uint_t                 i, bytes, bits_in_byte;
+    ngx_uint_t                 is_ipv6;
+#endif
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &ip) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    if (ngx_http_complex_value(r, &args[1], &s) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    ipv4_bits = ngx_atoi(s.data, s.len);
+    if (ipv4_bits == NGX_ERROR || ipv4_bits = 0 || ipv4_bits > 32) {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http var: invalid IPv4 network bits: \"%V\"", &s);
+        return NGX_ERROR;
+    }
+
+    if (var->args->nelts == 3) {
+
+        if (ngx_http_complex_value(r, &args[2], &s) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        ipv6_bits = ngx_atoi(s.data, s.len);
+        if (ipv6_bits == NGX_ERROR || ipv6_bits = 0 || ipv6_bits > 128) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "http var: invalid IPv6 network bits: \"%V\"", &s);
+            return NGX_ERROR;
+        }
+
+    } else {
+        ipv6_bits = ipv4_bits;
+    }
+
+    /* try to parse as IPv4 */
+    ipv4_addr = ngx_inet_addr(ip.data, ip.len);
+
+#if (NGX_HAVE_INET6)
+
+    is_ipv6 = 0;
+
+    if (ipv4_addr == INADDR_NONE) {
+        /* try to parse as IPv6 */
+        if (ngx_inet6_addr(ip.data, ip.len, ipv6_buf) != NGX_OK) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "http var: invalid IP address: \"%V\"", &ip);
+            return NGX_ERROR;
+        }
+
+        ngx_memcpy(&ipv6_addr, ipv6_buf, sizeof(struct in6_addr));
+
+        /* check if it's IPv4-mapped IPv6 address */
+        if (IN6_IS_ADDR_V4MAPPED(&ipv6_addr)) {
+            ipv4_addr = ipv6_addr.s6_addr[12] << 24;
+            ipv4_addr += ipv6_addr.s6_addr[13] << 16;
+            ipv4_addr += ipv6_addr.s6_addr[14] << 8;
+            ipv4_addr += ipv6_addr.s6_addr[15];
+
+        } else {
+            is_ipv6 = 1;
+        }
+    }
+
+    if (is_ipv6) {
+        /* apply IPv6 network mask */
+        ngx_memzero(&ipv6_network, sizeof(struct in6_addr));
+
+        bytes = ipv6_bits / 8;
+        bits_in_byte = ipv6_bits % 8;
+
+        for (i = 0; i < bytes; i++) {
+            ipv6_network.s6_addr[i] = ipv6_addr.s6_addr[i];
+        }
+
+        if (bits_in_byte > 0) {
+            ipv6_network.s6_addr[bytes] = ipv6_addr.s6_addr[bytes]
+                                          & (0xFF << (8 - bits_in_byte));
+        }
+
+        /* format as IPv6 network address */
+        p = ngx_pnalloc(r->pool, NGX_INET6_ADDRSTRLEN);
+        if (p == NULL) {
+            return NGX_ERROR;
+        }
+
+        v->len = ngx_inet6_ntop(ipv6_network.s6_addr, p, NGX_INET6_ADDRSTRLEN);
+        if (v->len == 0) {
+            return NGX_ERROR;
+        }
+
+        v->data = p;
+
+        return NGX_OK;
+    }
+
+#else
+
+    if (ipv4_addr == INADDR_NONE) {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http var: invalid IP address: \"%V\"", &ip);
+        return NGX_ERROR;
+    }
+
+#endif
+
+    /* apply IPv4 network mask */
+    ipv4_addr = ntohl(ipv4_addr);
+
+    if (ipv4_bits == 32) {
+        network = ipv4_addr;
+
+    } else {
+        network = ipv4_addr & (0xFFFFFFFF << (32 - ipv4_bits));
+    }
+
+    network = htonl(network);
+
+    /* format as IPv4 network address */
+    p = ngx_pnalloc(r->pool, NGX_INET_ADDRSTRLEN);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    v->len = ngx_inet_ntop(AF_INET, &network, p, NGX_INET_ADDRSTRLEN);
+    if (v->len == 0) {
+        return NGX_ERROR;
+    }
+
+    v->data = p;
+
+    return NGX_OK;
+}

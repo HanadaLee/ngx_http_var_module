@@ -419,9 +419,16 @@ var $new_var unix_time src_time http_time;
 var $new_var unix_time src_time date_format [timezone];
 
 
-#### IP range judgment ####
+#### IP ####
 # Determine whether the ip address is within the ip, cidr or ipv4 range, if yes, return 1, otherwise return 0
 var $bool_var ip_range ip_str [ipv4 | ipv6 | cidr | ipv4_range ] ...;
+
+# Calculate the network address based on IP address and network bits
+# For IPv4: network_bits range is 1-32
+# For IPv6: network_bits range is 1-128
+# If ipv6_network_bits is not specified, it will use the same value as ipv4_network_bits
+# Returns only the network address without the prefix length (e.g., "10.0.0.0" not "10.0.0.0/8")
+var $new_var cidr ipv4/ipv6 ipv4_network_bits [ipv6_network_bits];
 
 
 All parameters except regular expressions can contain variables. However, incorrect parameter values ​​will cause the function calculation result to be empty.
