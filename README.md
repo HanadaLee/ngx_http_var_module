@@ -39,15 +39,26 @@ To use theses modules, configure your nginx branch with `--add-module=/path/to/n
 
 ## var
 
-**Syntax:** *var $new_variable operator \[-i\] args... \[if\=condition\]*
+**Syntax:** *var $new_variable function \[-i\] args... \[if\=condition\]*
 
 **Default:** *-*
 
 **Context:** *http, server, location*
 
-Define a variable whose value is the result of function calculation. The variable value cannot be cached and is recalculated each time it is used. If the current level does not define a variable with the same variable name using this instruction, it can be inherited from the previous level. The -i parameter is used to ignore case.
+Define a new variable whose value is the result of function calculation. The variable value cannot be cached and is recalculated each time it is used.
+
+If the current level does not define a variable with the same variable name, it can be inherited from the previous level.
+
+The `-i` parameter is used to ignore case (Available only in some functions).
+
+Except for the function name, the `-i` parameter, and the regular expression, all parameters are allowed to contain variables.
+
+When the value of a parameter is invalid, the variable's value is empty. In Boolean functions, invalid parameters will also result in an empty value instead of 0.
+
+`var` cannot be used to define the same variable simultaneously with the `map` or `geo` directives. However, the `set` directive can be used to override variables defined by `var`.
 
 The following functions are available:
+
 ```nginx
 #### Conditional Judgement ####
 # Returns 1 if the input parameter is empty or 0, otherwise returns 0
@@ -83,7 +94,7 @@ var $bool_var starts_with [-i] str prefix;
 var $bool_var ends_with [-i] str suffix;
 
 # Checks if the substring is present, returns 1 or 0
-var $bool_var find [-i] str sub_str;
+var $bool_var contains [-i] str sub_str;
 
 # Checks if the str1 is one of str2 .. strn, returns 1 or 0
 var $bool_var str_in [-i] str1 str2 str3 .. strn;
@@ -114,7 +125,7 @@ var $new_var rtrim src_str;
 var $new_var reverse src_str;
 
 # Get starting position of substring
-var $new_var find [-i] src_str sub_str;
+var $new_var position [-i] src_str sub_str;
 
 # Repeat the string a given number of times
 var $new_var repeat src_str times;

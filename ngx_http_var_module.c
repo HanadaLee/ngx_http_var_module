@@ -32,7 +32,7 @@ typedef enum {
     NGX_HTTP_VAR_OP_STR_NE,
     NGX_HTTP_VAR_OP_STARTS_WITH,
     NGX_HTTP_VAR_OP_ENDS_WITH,
-    NGX_HTTP_VAR_OP_FIND,
+    NGX_HTTP_VAR_OP_CONTAINS,
     NGX_HTTP_VAR_OP_STR_IN,
 
     NGX_HTTP_VAR_OP_SET,
@@ -43,7 +43,7 @@ typedef enum {
     NGX_HTTP_VAR_OP_LTRIM,
     NGX_HTTP_VAR_OP_RTRIM,
     NGX_HTTP_VAR_OP_REVERSE,
-    NGX_HTTP_VAR_OP_FIND,
+    NGX_HTTP_VAR_OP_POSITION,
     NGX_HTTP_VAR_OP_REPEAT,
     NGX_HTTP_VAR_OP_SUBSTR,
     NGX_HTTP_VAR_OP_REPLACE,
@@ -230,7 +230,7 @@ static ngx_int_t ngx_http_var_exec_starts_with(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_exec_ends_with(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_find(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_contains(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_exec_str_in(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -251,7 +251,7 @@ static ngx_int_t ngx_http_var_exec_rtrim(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_exec_reverse(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_find(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_position(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_exec_repeat(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -416,7 +416,7 @@ static ngx_http_var_operator_enum_t  ngx_http_var_operators[] = {
     { ngx_string("str_ne"),           NGX_HTTP_VAR_OP_STR_NE,          2, 2  },
     { ngx_string("starts_with"),      NGX_HTTP_VAR_OP_STARTS_WITH,     2, 2  },
     { ngx_string("ends_with"),        NGX_HTTP_VAR_OP_ENDS_WITH,       2, 2  },
-    { ngx_string("find"),             NGX_HTTP_VAR_OP_FIND,            2, 2  },
+    { ngx_string("contains"),         NGX_HTTP_VAR_OP_CONTAINS,        2, 2  },
     { ngx_string("str_in"),           NGX_HTTP_VAR_OP_STR_IN,          3, 99 },
 
     { ngx_string("set"),              NGX_HTTP_VAR_OP_SET,            1, 1  },
@@ -427,7 +427,7 @@ static ngx_http_var_operator_enum_t  ngx_http_var_operators[] = {
     { ngx_string("ltrim"),            NGX_HTTP_VAR_OP_LTRIM,           1, 1  },
     { ngx_string("rtrim"),            NGX_HTTP_VAR_OP_RTRIM,           1, 1  },
     { ngx_string("reverse"),          NGX_HTTP_VAR_OP_REVERSE,         1, 1  },
-    { ngx_string("find"),             NGX_HTTP_VAR_OP_FIND,            2, 2  },
+    { ngx_string("position"),         NGX_HTTP_VAR_OP_POSITION,        2, 2  },
     { ngx_string("repeat"),           NGX_HTTP_VAR_OP_REPEAT,          2, 2  },
     { ngx_string("substr"),           NGX_HTTP_VAR_OP_SUBSTR,          2, 3  },
     { ngx_string("replace"),          NGX_HTTP_VAR_OP_REPLACE,         3, 3  },
@@ -1074,8 +1074,8 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_exec_ends_with(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_FIND:
-        rc = ngx_http_var_exec_find(r, v, var);
+    case NGX_HTTP_VAR_OP_CONTAINS:
+        rc = ngx_http_var_exec_contains(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_STR_IN:
@@ -1114,8 +1114,8 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_exec_reverse(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_FIND:
-        rc = ngx_http_var_exec_find(r, v, var);
+    case NGX_HTTP_VAR_OP_POSITION:
+        rc = ngx_http_var_exec_position(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_REPEAT:
@@ -2279,7 +2279,7 @@ ngx_http_var_exec_ends_with(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_find(ngx_http_request_t *r,
+ngx_http_var_exec_contains(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -2631,7 +2631,7 @@ ngx_http_var_exec_reverse(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_find(ngx_http_request_t *r,
+ngx_http_var_exec_position(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
