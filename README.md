@@ -143,6 +143,13 @@ var $new_var extract_param [-i] param_name src_string [separator] [delimiter];
 # example: a query "foo=123&bar=456&baz=789". If the parameter name is bar and the Separator is &, then the resulting variable value will be 456.
 # var $extraed_arg_bar extract_param bar "foo=123&bar=456&baz=789" & =;
 
+#### JSON operation ####
+# Extract json value from a valid json string. 
+var $new_var extract_json json subkey1 [subkey2] [subkey3] ...;
+
+# example: The value of $new_var will be c in the following expression. [uint] represents the key number in the array.
+# var $new_var extract_json '{"a":{"b":["c",3]}}' a b [0];
+
 
 #### Regex Judgement ####
 # Check if regex matches, returns 1 or 0

@@ -15,6 +15,10 @@
 #include <openssl/hmac.h>
 #endif
 
+#if (NGX_HAVE_CJSON)
+#include <cjson/cJSON.h>
+#endif
+
 
 #define ngx_http_var_isspace(c)                                               \
     ((c) == ' ' || (c) == '\t' || (c) == CR || (c) == LF)                     \
@@ -48,6 +52,10 @@ typedef enum {
     NGX_HTTP_VAR_OP_SUBSTR,
     NGX_HTTP_VAR_OP_REPLACE,
     NGX_HTTP_VAR_OP_EXTRACT_PARAM,
+
+#if (NGX_HAVE_CJSON)
+    NGX_HTTP_VAR_OP_EXTRACT_JSON,
+#endif
 
 #if (NGX_PCRE)
     NGX_HTTP_VAR_OP_RE_MATCH,
@@ -432,6 +440,10 @@ static ngx_http_var_operator_enum_t  ngx_http_var_operators[] = {
     { ngx_string("substr"),           NGX_HTTP_VAR_OP_SUBSTR,          2, 3  },
     { ngx_string("replace"),          NGX_HTTP_VAR_OP_REPLACE,         3, 3  },
     { ngx_string("extract_param"),    NGX_HTTP_VAR_OP_EXTRACT_PARAM,   2, 4  },
+
+#if (NGX_HAVE_CJSON)
+    { ngx_string("extract_json"),     NGX_HTTP_VAR_OP_EXTRACT_JSON,    2, 99 },
+#endif
 
 #if (NGX_PCRE)
     { ngx_string("re_match"),         NGX_HTTP_VAR_OP_RE_MATCH,        2, 2  },
@@ -1389,6 +1401,12 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
     case NGX_HTTP_VAR_OP_EXTRACT_PARAM:
         rc = ngx_http_var_exec_extract_param(r, v, var);
         break;
+
+#if (NGX_HAVE_CJSON)
+    case NGX_HTTP_VAR_OP_EXTRACT_JSON:
+        rc = ngx_http_var_exec_extract_json(r, v, var);
+        break;
+#endif
 
     default:
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
@@ -3040,6 +3058,194 @@ ngx_http_var_exec_extract_param(ngx_http_request_t *r,
     v->not_found = 1;
     return NGX_OK;
 }
+
+
+#if (NGX_HAVE_CJSON)
+
+static ngx_int_t
+ngx_http_var_exec_extract_json(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val, s;
+    cJSON                     *json, *current;
+    u_char                    *json_data, *key, *result;
+    ngx_uint_t                 i;
+    ngx_int_t                  index;
+    char                      *str;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    while (val.len && ngx_http_var_isspace(val.data[0])) {
+        val.data++;
+        val.len--;
+    }
+
+    while (val.len && ngx_http_var_isspace(val.data[val.len - 1])) {
+        val.len--;
+    }
+
+    if (val.len == 0) {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+
+    json_data = ngx_pnalloc(r->pool, val.len + 1);
+    if (json_data == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_memcpy(json_data, val.data, val.len);
+    json_data[val.len] = '\0';
+
+    json = cJSON_Parse((char *) json_data);
+    if (json == NULL) {
+        ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                      "http var: invalid json string");
+        return NGX_ERROR;
+    }
+
+    current = json;
+
+    for (i = 1; i < var->args->nelts; i++) {
+
+        if (ngx_http_complex_value(r, &args[i], &s) != NGX_OK) {
+            goto failed;
+        }
+
+        while (s.len && ngx_http_var_isspace(s.data[0])) {
+            s.data++;
+            s.len--;
+        }
+
+        while (s.len && ngx_http_var_isspace(s.data[s.len - 1])) {
+            s.len--;
+        }
+
+        /* check if it's an array index like [0] or [1] */
+        if (s.len >= 3 && s.data[0] == '[' && s.data[s.len - 1] == ']') {
+
+            index = ngx_atoi(s.data + 1, s.len - 2);
+
+            if (index == NGX_ERROR) {
+                goto failed;
+            }
+
+            /* check if current node is an array */
+            if (!cJSON_IsArray(current)) {
+                goto not_found;
+            }
+
+            /* get array item by index */
+            current = cJSON_GetArrayItem(current, (int) index);
+            if (current == NULL) {
+                goto not_found;
+            }
+
+        } else {
+
+            if (!cJSON_IsObject(current)) {
+                goto not_found;
+            }
+
+            key = ngx_pnalloc(r->pool, s.len + 1);
+            if (key == NULL) {
+                goto failed;
+            }
+
+            ngx_memcpy(key, s.data, s.len);
+            key[s.len] = '\0';
+
+            current = cJSON_GetObjectItem(current, (char *) key);
+            if (current == NULL) {
+                goto not_found;
+            }
+        }
+    }
+
+    /* extract the value based on type */
+    if (cJSON_IsString(current)) {
+        str = cJSON_GetStringValue(current);
+        if (str == NULL) {
+            goto not_found;
+        }
+
+        v->len = ngx_strlen(str);
+        result = ngx_pnalloc(r->pool, v->len);
+        if (result == NULL) {
+            goto failed;
+        }
+
+        ngx_memcpy(result, str, v->len);
+        v->data = result;
+
+    } else if (cJSON_IsBool(current)) {
+
+        /* convert boolean to string */
+        if (cJSON_IsTrue(current)) {
+            v->len = 4;
+            v->data = (u_char *) "true";
+
+        } else {
+            v->len = 5;
+            v->data = (u_char *) "false";
+        }
+
+    } else if (cJSON_IsNull(current)) {
+
+        /* null value */
+        v->len = 4;
+        v->data = (u_char *) "null";
+
+    } else {
+
+        /* for numbers, arrays, and objects */
+        str = cJSON_PrintUnformatted(current);
+        if (str == NULL) {
+            goto failed;
+        }
+
+        v->len = ngx_strlen(str);
+
+        result = ngx_pnalloc(r->pool, v->len);
+        if (result == NULL) {
+            cJSON_free(str);
+            goto failed;
+        }
+
+        ngx_memcpy(result, str, v->len);
+        v->data = result;
+
+        cJSON_free(str);
+    }
+
+    cJSON_Delete(json);
+
+    return NGX_OK;
+
+not_found:
+
+    cJSON_Delete(json);
+
+    v->not_found = 1;
+
+    return NGX_OK;
+
+failed:
+
+    ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                  "http var: extract json string failed");
+
+    cJSON_Delete(json);
+
+    return NGX_ERROR;
+}
+
+#endif
 
 
 #if (NGX_PCRE)
