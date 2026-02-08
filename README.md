@@ -62,31 +62,31 @@ var $bool_var or str1 str2...;
 
 #### String Judgement ####
 # Checks if the string is empty, returns 1 or 0
-var $bool_var if_empty str;
+var $bool_var empty str;
 
 # Checks if the string is non-empty, returns 1 or 0
-var $bool_var if_not_empty str;
+var $bool_var not_empty str;
 
-# Checks if the string is a number, returns 1 or 0
-var $bool_var if_is_num str;
+# Checks if the string is a number, returns 1 or 0. Only decimal numbers are allowed. negative numbers and fractions are supported.
+var $bool_var is_num str;
 
 # Checks if the strings are equal, returns 1 or 0
-var $bool_var if_str_eq [-i] str1 str2;
+var $bool_var str_eq [-i] str1 str2;
 
 # Checks if the strings are not equal, returns 1 or 0
-var $bool_var if_str_ne [-i] str1 str2;
+var $bool_var str_ne [-i] str1 str2;
 
 # Checks if the string has the specified prefix, returns 1 or 0
-var $bool_var if_starts_with [-i] str prefix;
+var $bool_var starts_with [-i] str prefix;
 
 # Checks if the string has the specified suffix, returns 1 or 0
-var $bool_var if_ends_with [-i] str suffix;
+var $bool_var ends_with [-i] str suffix;
 
 # Checks if the substring is present, returns 1 or 0
-var $bool_var if_find [-i] str sub_str;
+var $bool_var find [-i] str sub_str;
 
 # Checks if the str1 is one of str2 .. strn, returns 1 or 0
-var $bool_var if_str_in [-i] str1 str2 str3 .. strn;
+var $bool_var str_in [-i] str1 str2 str3 .. strn;
 
 #### General String Operations ####
 # Set the value directly of the variable
@@ -135,7 +135,7 @@ var $new_var extract_param [-i] param_name src_string [separator] [delimiter];
 
 #### Regex Judgement ####
 # Check if regex matches, returns 1 or 0
-var $bool_var if_re_match [-i] src_str match_regex;
+var $bool_var re_match [-i] src_str match_regex;
 
 
 #### Regex Operations ####
@@ -148,28 +148,28 @@ var $new_var re_sub [-i] src_str regex replacement;
 
 #### Mathematical Judgement ####
 # Check if numbers are equal, returns 1 or 0
-var $bool_var if_eq num1 num2;
+var $bool_var eq num1 num2;
 
 # Check if numbers are not equal, returns 1 or 0
-var $bool_var if_ne num1 num2;
+var $bool_var ne num1 num2;
 
 # Check if less than, returns 1 or 0
-var $bool_var if_lt num1 num2;
+var $bool_var lt num1 num2;
 
 # Check if less than or equal, returns 1 or 0
-var $bool_var if_le num1 num2;
+var $bool_var le num1 num2;
 
 # Check if greater than, returns 1 or 0
-var $bool_var if_gt num1 num2;
+var $bool_var gt num1 num2;
 
 # Check if greater than or equal, returns 1 or 0
-var $bool_var if_ge num1 num2;
+var $bool_var ge num1 num2;
 
 # Check if is within the start_num end_num range, if end_num is not specified, the range is [0, start_num], return 1 or 0
-var $bool_var if_range num start_num [end_num];
+var $bool_var range num start_num [end_num];
 
 # Check if number is one of num2 .. numn, returns 1 or 0
-var $bool_var if_in num1 num2 .. numn;
+var $bool_var in num1 num2 .. numn;
 
 ### Mathematical Operations ####
 # Absolute value (returns original format without negative sign)
@@ -321,7 +321,7 @@ var $new_var hmac_sha512 src_str secret;
 # Determine if the current time meets the given time range, requires at least one parameter.
 # Returns 1 if all conditions are met, otherwise returns 0.
 # The day of the week is represented by 0-6, where sunday is 0, and timezone format is gmt+0800
-var $bool_var if_time_range [year=year_range] [month=month_range] [day=day_range] [wday=wday_range(0-6)] [hour=hour_range] [min=min_range] [sec=sec_range] [gmt | gmt+0000];
+var $bool_var time_range [year=year_range] [month=month_range] [day=day_range] [wday=wday_range(0-6)] [hour=hour_range] [min=min_range] [sec=sec_range] [gmt | gmt+0000];
 
 
 #### Time Format ####
@@ -349,7 +349,7 @@ var $new_var unix_time src_time date_format [timezone];
 
 #### IP range judgment ####
 # Determine whether the ip address is within the ip, cidr or ipv4 range, if yes, return 1, otherwise return 0
-var $bool_var if_ip_range ip_str [ipv4 | ipv6 | cidr | ipv4_range ] ...;
+var $bool_var ip_range ip_str [ipv4 | ipv6 | cidr | ipv4_range ] ...;
 
 
 All parameters except regular expressions can contain variables. However, incorrect parameter values ​​will cause the function calculation result to be empty.

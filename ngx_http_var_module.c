@@ -25,15 +25,15 @@ typedef enum {
     NGX_HTTP_VAR_OP_OR,
     NGX_HTTP_VAR_OP_NOT,
 
-    NGX_HTTP_VAR_OP_IF_EMPTY,
-    NGX_HTTP_VAR_OP_IF_NOT_EMPTY,
-    NGX_HTTP_VAR_OP_IF_IS_NUM,
-    NGX_HTTP_VAR_OP_IF_STR_EQ,
-    NGX_HTTP_VAR_OP_IF_STR_NE,
-    NGX_HTTP_VAR_OP_IF_STARTS_WITH,
-    NGX_HTTP_VAR_OP_IF_ENDS_WITH,
-    NGX_HTTP_VAR_OP_IF_FIND,
-    NGX_HTTP_VAR_OP_IF_STR_IN,
+    NGX_HTTP_VAR_OP_EMPTY,
+    NGX_HTTP_VAR_OP_NOT_EMPTY,
+    NGX_HTTP_VAR_OP_IS_NUM,
+    NGX_HTTP_VAR_OP_STR_EQ,
+    NGX_HTTP_VAR_OP_STR_NE,
+    NGX_HTTP_VAR_OP_STARTS_WITH,
+    NGX_HTTP_VAR_OP_ENDS_WITH,
+    NGX_HTTP_VAR_OP_FIND,
+    NGX_HTTP_VAR_OP_STR_IN,
 
     NGX_HTTP_VAR_OP_SET,
     NGX_HTTP_VAR_OP_LEN,
@@ -50,20 +50,20 @@ typedef enum {
     NGX_HTTP_VAR_OP_EXTRACT_PARAM,
 
 #if (NGX_PCRE)
-    NGX_HTTP_VAR_OP_IF_RE_MATCH,
+    NGX_HTTP_VAR_OP_RE_MATCH,
 
     NGX_HTTP_VAR_OP_RE_CAPTURE,
     NGX_HTTP_VAR_OP_RE_SUB,
 #endif
 
-    NGX_HTTP_VAR_OP_IF_EQ,
-    NGX_HTTP_VAR_OP_IF_NE,
-    NGX_HTTP_VAR_OP_IF_LT,
-    NGX_HTTP_VAR_OP_IF_LE,
-    NGX_HTTP_VAR_OP_IF_GT,
-    NGX_HTTP_VAR_OP_IF_GE,
-    NGX_HTTP_VAR_OP_IF_RANGE,
-    NGX_HTTP_VAR_OP_IF_IN,
+    NGX_HTTP_VAR_OP_EQ,
+    NGX_HTTP_VAR_OP_NE,
+    NGX_HTTP_VAR_OP_LT,
+    NGX_HTTP_VAR_OP_LE,
+    NGX_HTTP_VAR_OP_GT,
+    NGX_HTTP_VAR_OP_GE,
+    NGX_HTTP_VAR_OP_RANGE,
+    NGX_HTTP_VAR_OP_IN,
 
     NGX_HTTP_VAR_OP_ABS,
     NGX_HTTP_VAR_OP_MAX,
@@ -119,13 +119,13 @@ typedef enum {
     NGX_HTTP_VAR_OP_HMAC_SHA512,
 #endif
 
-    NGX_HTTP_VAR_OP_IF_TIME_RANGE,
+    NGX_HTTP_VAR_OP_TIME_RANGE,
 
     NGX_HTTP_VAR_OP_GMT_TIME,
     NGX_HTTP_VAR_OP_LOCAL_TIME,
     NGX_HTTP_VAR_OP_UNIX_TIME,
 
-    NGX_HTTP_VAR_OP_IF_IP_RANGE,
+    NGX_HTTP_VAR_OP_IP_RANGE,
 
     NGX_HTTP_VAR_OP_UNKNOWN
 } ngx_http_var_operator_e;
@@ -216,23 +216,23 @@ static ngx_int_t ngx_http_var_exec_or(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_exec_not(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
-static ngx_int_t ngx_http_var_exec_if_empty(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_empty(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_if_not_empty(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_not_empty(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_if_is_num(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_is_num(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_if_str_eq(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_str_eq(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_if_str_ne(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_str_ne(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_if_starts_with(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_starts_with(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_if_ends_with(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_ends_with(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_if_find(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_find(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_if_str_in(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_str_in(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 static ngx_int_t ngx_http_var_exec_set(ngx_http_request_t *r,
@@ -263,7 +263,7 @@ static ngx_int_t ngx_http_var_exec_extract_param(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 #if (NGX_PCRE)
-static ngx_int_t ngx_http_var_exec_if_re_match(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_re_match(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 static ngx_int_t ngx_http_var_exec_re_capture(ngx_http_request_t *r,
@@ -272,21 +272,21 @@ static ngx_int_t ngx_http_var_exec_re_sub(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 #endif
 
-static ngx_int_t ngx_http_var_exec_if_eq(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_eq(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_if_ne(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_ne(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_if_lt(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_lt(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_if_le(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_le(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_if_gt(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_gt(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_if_ge(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_ge(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_if_range(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_range(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_if_in(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_in(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 static ngx_int_t ngx_http_var_exec_abs(ngx_http_request_t *r,
@@ -391,7 +391,7 @@ static ngx_int_t ngx_http_var_exec_hmac_sha512(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 #endif
 
-static ngx_int_t ngx_http_var_exec_if_time_range(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_time_range(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_exec_gmt_time(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -400,7 +400,7 @@ static ngx_int_t ngx_http_var_exec_local_time(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_exec_unix_time(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
-static ngx_int_t ngx_http_var_exec_if_ip_range(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_ip_range(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
 
@@ -409,15 +409,15 @@ static ngx_http_var_operator_enum_t  ngx_http_var_operators[] = {
     { ngx_string("or"),               NGX_HTTP_VAR_OP_OR,              2, 99 },
     { ngx_string("not"),              NGX_HTTP_VAR_OP_NOT,             1, 1  },
 
-    { ngx_string("if_empty"),         NGX_HTTP_VAR_OP_IF_EMPTY,        1, 1  },
-    { ngx_string("if_not_empty"),     NGX_HTTP_VAR_OP_IF_NOT_EMPTY,    1, 1  },
-    { ngx_string("if_is_num"),        NGX_HTTP_VAR_OP_IF_IS_NUM,       1, 1  },
-    { ngx_string("if_str_eq"),        NGX_HTTP_VAR_OP_IF_STR_EQ,       2, 2  },
-    { ngx_string("if_str_ne"),        NGX_HTTP_VAR_OP_IF_STR_NE,       2, 2  },
-    { ngx_string("if_starts_with"),   NGX_HTTP_VAR_OP_IF_STARTS_WITH,  2, 2  },
-    { ngx_string("if_ends_with"),     NGX_HTTP_VAR_OP_IF_ENDS_WITH,    2, 2  },
-    { ngx_string("if_find"),          NGX_HTTP_VAR_OP_IF_FIND,         2, 2  },
-    { ngx_string("if_str_in"),        NGX_HTTP_VAR_OP_IF_STR_IN,       3, 99 },
+    { ngx_string("empty"),            NGX_HTTP_VAR_OP_EMPTY,           1, 1  },
+    { ngx_string("not_empty"),        NGX_HTTP_VAR_OP_NOT_EMPTY,       1, 1  },
+    { ngx_string("is_num"),           NGX_HTTP_VAR_OP_IS_NUM,          1, 1  },
+    { ngx_string("str_eq"),           NGX_HTTP_VAR_OP_STR_EQ,          2, 2  },
+    { ngx_string("str_ne"),           NGX_HTTP_VAR_OP_STR_NE,          2, 2  },
+    { ngx_string("starts_with"),      NGX_HTTP_VAR_OP_STARTS_WITH,     2, 2  },
+    { ngx_string("ends_with"),        NGX_HTTP_VAR_OP_ENDS_WITH,       2, 2  },
+    { ngx_string("find"),             NGX_HTTP_VAR_OP_FIND,            2, 2  },
+    { ngx_string("str_in"),           NGX_HTTP_VAR_OP_STR_IN,          3, 99 },
 
     { ngx_string("set"),              NGX_HTTP_VAR_OP_SET,            1, 1  },
     { ngx_string("len"),              NGX_HTTP_VAR_OP_LEN,             1, 1  },
@@ -434,20 +434,20 @@ static ngx_http_var_operator_enum_t  ngx_http_var_operators[] = {
     { ngx_string("extract_param"),    NGX_HTTP_VAR_OP_EXTRACT_PARAM,   2, 4  },
 
 #if (NGX_PCRE)
-    { ngx_string("if_re_match"),      NGX_HTTP_VAR_OP_IF_RE_MATCH,     2, 2  },
+    { ngx_string("re_match"),         NGX_HTTP_VAR_OP_RE_MATCH,        2, 2  },
 
     { ngx_string("re_capture"),       NGX_HTTP_VAR_OP_RE_CAPTURE,      3, 3  },
     { ngx_string("re_sub"),           NGX_HTTP_VAR_OP_RE_SUB,          3, 3  },
 #endif
 
-    { ngx_string("if_eq"),            NGX_HTTP_VAR_OP_IF_EQ,           2, 2  },
-    { ngx_string("if_ne"),            NGX_HTTP_VAR_OP_IF_NE,           2, 2  },
-    { ngx_string("if_lt"),            NGX_HTTP_VAR_OP_IF_LT,           2, 2  },
-    { ngx_string("if_le"),            NGX_HTTP_VAR_OP_IF_LE,           2, 2  },
-    { ngx_string("if_gt"),            NGX_HTTP_VAR_OP_IF_GT,           2, 2  },
-    { ngx_string("if_ge"),            NGX_HTTP_VAR_OP_IF_GE,           2, 2  },
-    { ngx_string("if_range"),         NGX_HTTP_VAR_OP_IF_RANGE,        2, 3  },
-    { ngx_string("if_in"),            NGX_HTTP_VAR_OP_IF_IN,           3, 99 },
+    { ngx_string("eq"),               NGX_HTTP_VAR_OP_EQ,              2, 2  },
+    { ngx_string("ne"),               NGX_HTTP_VAR_OP_NE,              2, 2  },
+    { ngx_string("lt"),               NGX_HTTP_VAR_OP_LT,              2, 2  },
+    { ngx_string("le"),               NGX_HTTP_VAR_OP_LE,              2, 2  },
+    { ngx_string("gt"),               NGX_HTTP_VAR_OP_GT,              2, 2  },
+    { ngx_string("ge"),               NGX_HTTP_VAR_OP_GE,              2, 2  },
+    { ngx_string("range"),            NGX_HTTP_VAR_OP_RANGE,           2, 3  },
+    { ngx_string("in"),               NGX_HTTP_VAR_OP_IN,              3, 99 },
 
     { ngx_string("abs"),              NGX_HTTP_VAR_OP_ABS,             1, 1  },
     { ngx_string("max"),              NGX_HTTP_VAR_OP_MAX,             2, 2  },
@@ -505,13 +505,13 @@ static ngx_http_var_operator_enum_t  ngx_http_var_operators[] = {
     { ngx_string("hmac_sha512"),      NGX_HTTP_VAR_OP_HMAC_SHA512,     2, 2  },
 #endif
 
-    { ngx_string("if_time_range"),    NGX_HTTP_VAR_OP_IF_TIME_RANGE,   1, 8  },
+    { ngx_string("time_range"),       NGX_HTTP_VAR_OP_TIME_RANGE,      1, 8  },
 
     { ngx_string("gmt_time"),         NGX_HTTP_VAR_OP_GMT_TIME,        1, 2  },
     { ngx_string("local_time"),       NGX_HTTP_VAR_OP_LOCAL_TIME,      1, 2  },
     { ngx_string("unix_time"),        NGX_HTTP_VAR_OP_UNIX_TIME,       0, 3  },
 
-    { ngx_string("if_ip_range"),      NGX_HTTP_VAR_OP_IF_IP_RANGE,     2, 99 },
+    { ngx_string("ip_range"),         NGX_HTTP_VAR_OP_IP_RANGE,        2, 99 },
 
     { ngx_null_string,                NGX_HTTP_VAR_OP_UNKNOWN,         0, 0  }
 };
@@ -742,7 +742,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 #if (NGX_PCRE)
 
-    if (op == NGX_HTTP_VAR_OP_IF_RE_MATCH
+    if (op == NGX_HTTP_VAR_OP_RE_MATCH
         || op == NGX_HTTP_VAR_OP_RE_CAPTURE
         || op == NGX_HTTP_VAR_OP_RE_SUB)
     {
@@ -811,7 +811,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         cur++;
 
-        if (op != NGX_HTTP_VAR_OP_IF_RE_MATCH) {
+        if (op != NGX_HTTP_VAR_OP_RE_MATCH) {
             if (args != 2) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "http var: re_capture or re_sub "
@@ -1046,40 +1046,40 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_exec_not(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_EMPTY:
-        rc = ngx_http_var_exec_if_empty(r, v, var);
+    case NGX_HTTP_VAR_OP_EMPTY:
+        rc = ngx_http_var_exec_empty(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_NOT_EMPTY:
-        rc = ngx_http_var_exec_if_not_empty(r, v, var);
+    case NGX_HTTP_VAR_OP_NOT_EMPTY:
+        rc = ngx_http_var_exec_not_empty(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_IS_NUM:
-        rc = ngx_http_var_exec_if_is_num(r, v, var);
+    case NGX_HTTP_VAR_OP_IS_NUM:
+        rc = ngx_http_var_exec_is_num(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_STR_EQ:
-        rc = ngx_http_var_exec_if_str_eq(r, v, var);
+    case NGX_HTTP_VAR_OP_STR_EQ:
+        rc = ngx_http_var_exec_str_eq(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_STR_NE:
-        rc = ngx_http_var_exec_if_str_ne(r, v, var);
+    case NGX_HTTP_VAR_OP_STR_NE:
+        rc = ngx_http_var_exec_str_ne(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_STARTS_WITH:
-        rc = ngx_http_var_exec_if_starts_with(r, v, var);
+    case NGX_HTTP_VAR_OP_STARTS_WITH:
+        rc = ngx_http_var_exec_starts_with(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_ENDS_WITH:
-        rc = ngx_http_var_exec_if_ends_with(r, v, var);
+    case NGX_HTTP_VAR_OP_ENDS_WITH:
+        rc = ngx_http_var_exec_ends_with(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_FIND:
-        rc = ngx_http_var_exec_if_find(r, v, var);
+    case NGX_HTTP_VAR_OP_FIND:
+        rc = ngx_http_var_exec_find(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_STR_IN:
-        rc = ngx_http_var_exec_if_str_in(r, v, var);
+    case NGX_HTTP_VAR_OP_STR_IN:
+        rc = ngx_http_var_exec_str_in(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_SET:
@@ -1131,8 +1131,8 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         break;
 
 #if (NGX_PCRE)
-    case NGX_HTTP_VAR_OP_IF_RE_MATCH:
-        rc = ngx_http_var_exec_if_re_match(r, v, var);
+    case NGX_HTTP_VAR_OP_RE_MATCH:
+        rc = ngx_http_var_exec_re_match(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_RE_CAPTURE:
@@ -1144,36 +1144,36 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         break;
 #endif
 
-    case NGX_HTTP_VAR_OP_IF_EQ:
-        rc = ngx_http_var_exec_if_eq(r, v, var);
+    case NGX_HTTP_VAR_OP_EQ:
+        rc = ngx_http_var_exec_eq(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_NE:
-        rc = ngx_http_var_exec_if_ne(r, v, var);
+    case NGX_HTTP_VAR_OP_NE:
+        rc = ngx_http_var_exec_ne(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_LT:
-        rc = ngx_http_var_exec_if_lt(r, v, var);
+    case NGX_HTTP_VAR_OP_LT:
+        rc = ngx_http_var_exec_lt(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_LE:
-        rc = ngx_http_var_exec_if_le(r, v, var);
+    case NGX_HTTP_VAR_OP_LE:
+        rc = ngx_http_var_exec_le(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_GT:
-        rc = ngx_http_var_exec_if_gt(r, v, var);
+    case NGX_HTTP_VAR_OP_GT:
+        rc = ngx_http_var_exec_gt(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_GE:
-        rc = ngx_http_var_exec_if_ge(r, v, var);
+    case NGX_HTTP_VAR_OP_GE:
+        rc = ngx_http_var_exec_ge(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_RANGE:
-        rc = ngx_http_var_exec_if_range(r, v, var);
+    case NGX_HTTP_VAR_OP_RANGE:
+        rc = ngx_http_var_exec_range(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_IN:
-        rc = ngx_http_var_exec_if_in(r, v, var);
+    case NGX_HTTP_VAR_OP_IN:
+        rc = ngx_http_var_exec_in(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_ABS:
@@ -1366,8 +1366,8 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         break;
 #endif
 
-    case NGX_HTTP_VAR_OP_IF_TIME_RANGE:
-        rc = ngx_http_var_exec_if_time_range(r, v, var);
+    case NGX_HTTP_VAR_OP_TIME_RANGE:
+        rc = ngx_http_var_exec_time_range(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_GMT_TIME:
@@ -1382,8 +1382,8 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_exec_unix_time(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_IF_IP_RANGE:
-        rc = ngx_http_var_exec_if_ip_range(r, v, var);
+    case NGX_HTTP_VAR_OP_IP_RANGE:
+        rc = ngx_http_var_exec_ip_range(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_EXTRACT_PARAM:
@@ -2062,7 +2062,7 @@ ngx_http_var_exec_not(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_if_empty(ngx_http_request_t *r,
+ngx_http_var_exec_empty(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -2087,7 +2087,7 @@ ngx_http_var_exec_if_empty(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_if_not_empty(ngx_http_request_t *r,
+ngx_http_var_exec_not_empty(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -2112,7 +2112,7 @@ ngx_http_var_exec_if_not_empty(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_if_is_num(ngx_http_request_t *r,
+ngx_http_var_exec_is_num(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -2137,7 +2137,7 @@ ngx_http_var_exec_if_is_num(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_if_str_eq(ngx_http_request_t *r,
+ngx_http_var_exec_str_eq(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -2177,10 +2177,10 @@ ngx_http_var_exec_if_str_eq(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_if_str_ne(ngx_http_request_t *r,
+ngx_http_var_exec_str_ne(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
-    if (ngx_http_var_exec_if_str_eq(r, v, var) != NGX_OK) {
+    if (ngx_http_var_exec_str_eq(r, v, var) != NGX_OK) {
         return NGX_ERROR;
     }
 
@@ -2192,7 +2192,7 @@ ngx_http_var_exec_if_str_ne(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_if_starts_with(ngx_http_request_t *r,
+ngx_http_var_exec_starts_with(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -2234,7 +2234,7 @@ ngx_http_var_exec_if_starts_with(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_if_ends_with(ngx_http_request_t *r,
+ngx_http_var_exec_ends_with(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -2279,7 +2279,7 @@ ngx_http_var_exec_if_ends_with(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_if_find(ngx_http_request_t *r,
+ngx_http_var_exec_find(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -2324,7 +2324,7 @@ ngx_http_var_exec_if_find(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_if_str_in(ngx_http_request_t *r,
+ngx_http_var_exec_str_in(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -3045,7 +3045,7 @@ ngx_http_var_exec_extract_param(ngx_http_request_t *r,
 #if (NGX_PCRE)
 
 static ngx_int_t
-ngx_http_var_exec_if_re_match(ngx_http_request_t *r,
+ngx_http_var_exec_re_match(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t    *args;
@@ -3183,7 +3183,7 @@ ngx_http_var_exec_re_sub(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_if_eq(ngx_http_request_t *r,
+ngx_http_var_exec_eq(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -3202,7 +3202,7 @@ ngx_http_var_exec_if_eq(ngx_http_request_t *r,
         != NGX_OK)
     {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http var: \"if_eq\" failed to convert "
+                      "http var: \"eq\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
     }
@@ -3220,7 +3220,7 @@ ngx_http_var_exec_if_eq(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_if_ne(ngx_http_request_t *r,
+ngx_http_var_exec_ne(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -3239,7 +3239,7 @@ ngx_http_var_exec_if_ne(ngx_http_request_t *r,
         != NGX_OK)
     {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http var: \"if_ne\" failed to convert "
+                      "http var: \"ne\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
     }
@@ -3257,7 +3257,7 @@ ngx_http_var_exec_if_ne(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_if_lt(ngx_http_request_t *r,
+ngx_http_var_exec_lt(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -3276,7 +3276,7 @@ ngx_http_var_exec_if_lt(ngx_http_request_t *r,
         != NGX_OK)
     {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http var: \"if_lt\" failed to convert "
+                      "http var: \"lt\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
     }
@@ -3294,7 +3294,7 @@ ngx_http_var_exec_if_lt(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_if_le(ngx_http_request_t *r,
+ngx_http_var_exec_le(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -3313,7 +3313,7 @@ ngx_http_var_exec_if_le(ngx_http_request_t *r,
         != NGX_OK)
     {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http var: \"if_le\" failed to convert "
+                      "http var: \"le\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
     }
@@ -3331,7 +3331,7 @@ ngx_http_var_exec_if_le(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_if_gt(ngx_http_request_t *r,
+ngx_http_var_exec_gt(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -3350,7 +3350,7 @@ ngx_http_var_exec_if_gt(ngx_http_request_t *r,
         != NGX_OK)
     {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http var: \"if_gt\" failed to convert "
+                      "http var: \"gt\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
     }
@@ -3368,7 +3368,7 @@ ngx_http_var_exec_if_gt(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_if_ge(ngx_http_request_t *r,
+ngx_http_var_exec_ge(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -3387,7 +3387,7 @@ ngx_http_var_exec_if_ge(ngx_http_request_t *r,
         != NGX_OK)
     {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http var: \"if_gt\" failed to convert "
+                      "http var: \"gt\" failed to convert "
                       "values to fixed point");
         return NGX_ERROR;
     }
@@ -3405,7 +3405,7 @@ ngx_http_var_exec_if_ge(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_if_range(ngx_http_request_t *r,
+ngx_http_var_exec_range(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -3419,7 +3419,7 @@ ngx_http_var_exec_if_range(ngx_http_request_t *r,
     }
 
     if (var->args->nelts == 2) {
-        /* 2-arg mode: if_range(num, upper) checks [0, upper] */
+        /* 2-arg mode: range(num, upper) checks [0, upper] */
         if (ngx_http_complex_value(r, &args[1], &val_end) != NGX_OK) {
             return NGX_ERROR;
         }
@@ -3428,7 +3428,7 @@ ngx_http_var_exec_if_range(ngx_http_request_t *r,
             != NGX_OK)
         {
             ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                          "http var: \"if_range\" failed to convert "
+                          "http var: \"range\" failed to convert "
                           "values (2-arg mode: num, upper) to fixed point");
             return NGX_ERROR;
         }
@@ -3439,7 +3439,7 @@ ngx_http_var_exec_if_range(ngx_http_request_t *r,
         return NGX_OK;
     }
 
-    /* 3-arg mode: if_range(num, start, end) checks [start, end] */
+    /* 3-arg mode: range(num, start, end) checks [start, end] */
     if (ngx_http_complex_value(r, &args[1], &val_start) != NGX_OK
         || ngx_http_complex_value(r, &args[2], &val_end) != NGX_OK)
     {
@@ -3450,7 +3450,7 @@ ngx_http_var_exec_if_range(ngx_http_request_t *r,
                                        &fp_val, &fp_start, &fp_end) != NGX_OK)
     {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                        "http var: \"if_range\" failed to convert "
+                        "http var: \"range\" failed to convert "
                         "values (3-arg mode: num, start, end) to fixed point");
         return NGX_ERROR;
     }
@@ -3464,7 +3464,7 @@ ngx_http_var_exec_if_range(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_if_in(ngx_http_request_t *r,
+ngx_http_var_exec_in(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -3489,7 +3489,7 @@ ngx_http_var_exec_if_in(ngx_http_request_t *r,
                                           &fp_val, &fp_cmp) != NGX_OK)
         {
             ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                          "http var: \"if_in\" failed to convert "
+                          "http var: \"in\" failed to convert "
                           "value at position %ui to fixed point", i);
             continue;
         }
@@ -5466,7 +5466,7 @@ ngx_http_var_exec_hmac_sha512(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_if_time_range(ngx_http_request_t *r,
+ngx_http_var_exec_time_range(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -6107,7 +6107,7 @@ set_unix_time:
 
 
 static ngx_int_t
-ngx_http_var_exec_if_ip_range(ngx_http_request_t *r,
+ngx_http_var_exec_ip_range(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
