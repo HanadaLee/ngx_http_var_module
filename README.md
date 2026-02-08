@@ -108,10 +108,10 @@ var $bool_var or str1 str2...;
 
 #### String Judgement ####
 # Checks if the string is empty, returns 1 or 0
-var $bool_var empty str;
+var $bool_var is_empty str;
 
 # Checks if the string is non-empty, returns 1 or 0
-var $bool_var not_empty str;
+var $bool_var is_not_empty str;
 
 # Checks if the string is a number, returns 1 or 0. Only decimal numbers are allowed. negative numbers and fractions are supported.
 var $bool_var is_num str;
@@ -147,14 +147,17 @@ var $new_var upper src_str;
 # Convert to lowercase
 var $new_var lower src_str;
 
-# Trim leading and trailing whitespace characters
-var $new_var trim src_str;
+# Capitalize the first letter of each word (words are separated by non-alphanumeric characters)
+var $new_var initcap src_str;
 
-# Trim leading whitespace characters
-var $new_var ltrim src_str;
+# Trim leading and trailing whitespace characters or other characters
+var $new_var trim src_str [char];
 
-# Trim trailing whitespace characters
-var $new_var rtrim src_str;
+# Trim leading whitespace characters or other characters
+var $new_var ltrim src_str [char];
+
+# Trim trailing whitespace characters or other characters
+var $new_var rtrim src_str [char];
 
 # Reverse the string
 var $new_var reverse src_str;
@@ -207,15 +210,15 @@ var $new_var extract_json json subkey1 [subkey2] [subkey3] ...;
 
 #### Regex Judgement ####
 # Check if regex matches, returns 1 or 0
-var $bool_var re_match [-i] src_str match_regex;
+var $bool_var regex_match [-i] src_str match_regex;
 
 
 #### Regex Operations ####
 # Capture regex
-var $new_var re_capture [-i] src_str regex assign_value;
+var $new_var regex_capture [-i] src_str regex assign_value;
 
 # Substitute regex
-var $new_var re_sub [-i] src_str regex replacement;
+var $new_var regex_sub [-i] src_str regex replacement;
 
 
 #### Mathematical Judgement ####

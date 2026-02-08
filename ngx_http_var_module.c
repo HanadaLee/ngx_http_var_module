@@ -43,6 +43,7 @@ typedef enum {
     NGX_HTTP_VAR_OP_LEN,
     NGX_HTTP_VAR_OP_UPPER,
     NGX_HTTP_VAR_OP_LOWER,
+    NGX_HTTP_VAR_OP_INITCAP,
     NGX_HTTP_VAR_OP_TRIM,
     NGX_HTTP_VAR_OP_LTRIM,
     NGX_HTTP_VAR_OP_RTRIM,
@@ -58,10 +59,10 @@ typedef enum {
 #endif
 
 #if (NGX_PCRE)
-    NGX_HTTP_VAR_OP_RE_MATCH,
+    NGX_HTTP_VAR_OP_REGEX_MATCH,
 
-    NGX_HTTP_VAR_OP_RE_CAPTURE,
-    NGX_HTTP_VAR_OP_RE_SUB,
+    NGX_HTTP_VAR_OP_REGEX_CAPTURE,
+    NGX_HTTP_VAR_OP_REGEX_SUB,
 #endif
 
     NGX_HTTP_VAR_OP_EQ,
@@ -225,9 +226,9 @@ static ngx_int_t ngx_http_var_exec_or(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_exec_not(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
-static ngx_int_t ngx_http_var_exec_empty(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_is_empty(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_not_empty(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_is_not_empty(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_exec_is_num(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -251,6 +252,8 @@ static ngx_int_t ngx_http_var_exec_len(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_exec_upper(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_exec_lower(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+static ngx_int_t ngx_http_var_exec_initcap(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 static ngx_int_t ngx_http_var_exec_trim(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -277,12 +280,12 @@ static ngx_int_t ngx_http_var_exec_extract_json(ngx_http_request_t *r,
 #endif
 
 #if (NGX_PCRE)
-static ngx_int_t ngx_http_var_exec_re_match(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_regex_match(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
-static ngx_int_t ngx_http_var_exec_re_capture(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_regex_capture(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
-static ngx_int_t ngx_http_var_exec_re_sub(ngx_http_request_t *r,
+static ngx_int_t ngx_http_var_exec_regex_sub(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 #endif
 
@@ -425,8 +428,8 @@ static ngx_http_var_operator_enum_t  ngx_http_var_operators[] = {
     { ngx_string("or"),               NGX_HTTP_VAR_OP_OR,              2, 99 },
     { ngx_string("not"),              NGX_HTTP_VAR_OP_NOT,             1, 1  },
 
-    { ngx_string("empty"),            NGX_HTTP_VAR_OP_EMPTY,           1, 1  },
-    { ngx_string("not_empty"),        NGX_HTTP_VAR_OP_NOT_EMPTY,       1, 1  },
+    { ngx_string("is_empty"),         NGX_HTTP_VAR_OP_IS_EMPTY,        1, 1  },
+    { ngx_string("is_not_empty"),     NGX_HTTP_VAR_OP_IS_NOT_EMPTY,    1, 1  },
     { ngx_string("is_num"),           NGX_HTTP_VAR_OP_IS_NUM,          1, 1  },
     { ngx_string("str_eq"),           NGX_HTTP_VAR_OP_STR_EQ,          2, 2  },
     { ngx_string("str_ne"),           NGX_HTTP_VAR_OP_STR_NE,          2, 2  },
@@ -439,9 +442,10 @@ static ngx_http_var_operator_enum_t  ngx_http_var_operators[] = {
     { ngx_string("len"),              NGX_HTTP_VAR_OP_LEN,             1, 1  },
     { ngx_string("upper"),            NGX_HTTP_VAR_OP_UPPER,           1, 1  },
     { ngx_string("lower"),            NGX_HTTP_VAR_OP_LOWER,           1, 1  },
-    { ngx_string("trim"),             NGX_HTTP_VAR_OP_TRIM,            1, 1  },
-    { ngx_string("ltrim"),            NGX_HTTP_VAR_OP_LTRIM,           1, 1  },
-    { ngx_string("rtrim"),            NGX_HTTP_VAR_OP_RTRIM,           1, 1  },
+    { ngx_string("initcap"),          NGX_HTTP_VAR_OP_INITCAP,         1, 1  },
+    { ngx_string("trim"),             NGX_HTTP_VAR_OP_TRIM,            1, 2  },
+    { ngx_string("ltrim"),            NGX_HTTP_VAR_OP_LTRIM,           1, 2  },
+    { ngx_string("rtrim"),            NGX_HTTP_VAR_OP_RTRIM,           1, 2  },
     { ngx_string("reverse"),          NGX_HTTP_VAR_OP_REVERSE,         1, 1  },
     { ngx_string("position"),         NGX_HTTP_VAR_OP_POSITION,        2, 2  },
     { ngx_string("repeat"),           NGX_HTTP_VAR_OP_REPEAT,          2, 2  },
@@ -454,10 +458,10 @@ static ngx_http_var_operator_enum_t  ngx_http_var_operators[] = {
 #endif
 
 #if (NGX_PCRE)
-    { ngx_string("re_match"),         NGX_HTTP_VAR_OP_RE_MATCH,        2, 2  },
+    { ngx_string("regex_match"),      NGX_HTTP_VAR_OP_REGEX_MATCH,     2, 2  },
 
-    { ngx_string("re_capture"),       NGX_HTTP_VAR_OP_RE_CAPTURE,      3, 3  },
-    { ngx_string("re_sub"),           NGX_HTTP_VAR_OP_RE_SUB,          3, 3  },
+    { ngx_string("regex_capture"),    NGX_HTTP_VAR_OP_REGEX_CAPTURE,   3, 3  },
+    { ngx_string("regex_sub"),        NGX_HTTP_VAR_OP_REGEX_SUB,       3, 3  },
 #endif
 
     { ngx_string("eq"),               NGX_HTTP_VAR_OP_EQ,              2, 2  },
@@ -763,9 +767,9 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 #if (NGX_PCRE)
 
-    if (op == NGX_HTTP_VAR_OP_RE_MATCH
-        || op == NGX_HTTP_VAR_OP_RE_CAPTURE
-        || op == NGX_HTTP_VAR_OP_RE_SUB)
+    if (op == NGX_HTTP_VAR_OP_REGEX_MATCH
+        || op == NGX_HTTP_VAR_OP_REGEX_CAPTURE
+        || op == NGX_HTTP_VAR_OP_REGEX_SUB)
     {
         if (args < 2) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -799,7 +803,7 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         cur++;
 
-        if (op == NGX_HTTP_VAR_OP_RE_SUB) {
+        if (op == NGX_HTTP_VAR_OP_REGEX_SUB) {
             regex_len = value[cur].len + 2;
             regex.data = ngx_pnalloc(cf->pool, regex_len);
             if (regex.data == NULL) {
@@ -832,10 +836,10 @@ ngx_http_var_create_variable(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         cur++;
 
-        if (op != NGX_HTTP_VAR_OP_RE_MATCH) {
+        if (op != NGX_HTTP_VAR_OP_REGEX_MATCH) {
             if (args != 2) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "http var: re_capture or re_sub "
+                               "http var: regex_capture or regex_sub "
                                "operators requires 3 arguments");
                 return NGX_CONF_ERROR;
             }
@@ -1067,12 +1071,12 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_exec_not(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_EMPTY:
-        rc = ngx_http_var_exec_empty(r, v, var);
+    case NGX_HTTP_VAR_OP_IS_EMPTY:
+        rc = ngx_http_var_exec_is_empty(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_NOT_EMPTY:
-        rc = ngx_http_var_exec_not_empty(r, v, var);
+    case NGX_HTTP_VAR_OP_IS_NOT_EMPTY:
+        rc = ngx_http_var_exec_is_not_empty(r, v, var);
         break;
 
     case NGX_HTTP_VAR_OP_IS_NUM:
@@ -1119,6 +1123,10 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
         rc = ngx_http_var_exec_lower(r, v, var);
         break;
 
+    case NGX_HTTP_VAR_OP_INITCAP:
+        rc = ngx_http_var_exec_initcap(r, v, var);
+        break;
+
     case NGX_HTTP_VAR_OP_TRIM:
         rc = ngx_http_var_exec_trim(r, v, var);
         break;
@@ -1162,16 +1170,16 @@ ngx_http_var_evaluate_variable(ngx_http_request_t *r,
 #endif
 
 #if (NGX_PCRE)
-    case NGX_HTTP_VAR_OP_RE_MATCH:
-        rc = ngx_http_var_exec_re_match(r, v, var);
+    case NGX_HTTP_VAR_OP_REGEX_MATCH:
+        rc = ngx_http_var_exec_regex_match(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_RE_CAPTURE:
-        rc = ngx_http_var_exec_re_capture(r, v, var);
+    case NGX_HTTP_VAR_OP_REGEX_CAPTURE:
+        rc = ngx_http_var_exec_regex_capture(r, v, var);
         break;
 
-    case NGX_HTTP_VAR_OP_RE_SUB:
-        rc = ngx_http_var_exec_re_sub(r, v, var);
+    case NGX_HTTP_VAR_OP_REGEX_SUB:
+        rc = ngx_http_var_exec_regex_sub(r, v, var);
         break;
 #endif
 
@@ -2093,7 +2101,7 @@ ngx_http_var_exec_not(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_empty(ngx_http_request_t *r,
+ngx_http_var_exec_is_empty(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -2118,7 +2126,7 @@ ngx_http_var_exec_empty(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_not_empty(ngx_http_request_t *r,
+ngx_http_var_exec_is_not_empty(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
@@ -2514,11 +2522,64 @@ ngx_http_var_exec_lower(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_trim(ngx_http_request_t *r,
+ngx_http_var_exec_initcap(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
     ngx_str_t                  val;
+    ngx_uint_t                 i, in_word;
+    u_char                     c;
+
+    args = var->args->elts;
+
+    if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    v->len = val.len;
+
+    if (v->len == 0) {
+        v->data = (u_char *) "";
+        return NGX_OK;
+    }
+
+    v->data = ngx_pnalloc(r->pool, v->len);
+    if (v->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    in_word = 0;
+
+    for (i = 0; i < v->len; i++) {
+        c = val.data[i];
+
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+            || (c >= '0' && c <= '9'))
+        {
+            if (in_word) {
+                v->data[i] = ngx_tolower(c);
+
+            } else {
+                v->data[i] = ngx_toupper(c);
+                in_word = 1;
+            }
+
+        } else {
+            v->data[i] = c;
+            in_word = 0;
+        }
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_var_exec_trim(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
+{
+    ngx_http_complex_value_t  *args;
+    ngx_str_t                  val, s;
     u_char                    *start, *end;
 
     args = var->args->elts;
@@ -2536,14 +2597,35 @@ ngx_http_var_exec_trim(ngx_http_request_t *r,
     start = val.data;
     end = val.data + val.len - 1;
 
-    /* Trim left */
-    while (start <= end && ngx_http_var_isspace(*start)) {
-        start++;
-    }
+    if (var->args->nelts == 2) {
 
-    /* Trim right */
-    while (end >= start && ngx_http_var_isspace(*end)) {
-        end--;
+        if (ngx_http_complex_value(r, &args[1], &s) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        if (s.len != 1) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "http var: invalid trim char");
+            return NGX_ERROR;
+        }
+
+        while (start <= end && *start == s.data[0]) {
+            start++;
+        }
+
+        while (end >= start && *end == s.data[0]) {
+            end--;
+        }
+
+    } else {
+
+        while (start <= end && ngx_http_var_isspace(*start)) {
+            start++;
+        }
+
+        while (end >= start && ngx_http_var_isspace(*end)) {
+            end--;
+        }
     }
 
     v->data = start;
@@ -2558,7 +2640,7 @@ ngx_http_var_exec_ltrim(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  val;
+    ngx_str_t                  val, s;
     u_char                    *start, *end;
 
     args = var->args->elts;
@@ -2576,9 +2658,27 @@ ngx_http_var_exec_ltrim(ngx_http_request_t *r,
     start = val.data;
     end = val.data + val.len - 1;
 
-    /* Trim left */
-    while (start <= end && ngx_http_var_isspace(*start)) {
-        start++;
+    if (var->args->nelts == 2) {
+
+        if (ngx_http_complex_value(r, &args[1], &s) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        if (s.len != 1) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "http var: invalid trim char");
+            return NGX_ERROR;
+        }
+
+        while (start <= end && *start == s.data[0]) {
+            start++;
+        }
+
+    } else {
+
+        while (start <= end && ngx_http_var_isspace(*start)) {
+            start++;
+        }
     }
 
     v->data = start;
@@ -2593,7 +2693,7 @@ ngx_http_var_exec_rtrim(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  val;
+    ngx_str_t                  val, s;
     u_char                    *start, *end;
 
     args = var->args->elts;
@@ -2611,9 +2711,27 @@ ngx_http_var_exec_rtrim(ngx_http_request_t *r,
     start = val.data;
     end = val.data + val.len - 1;
 
-    /* Trim right */
-    while (end >= start && ngx_http_var_isspace(*end)) {
-        end--;
+    if (var->args->nelts == 2) {
+
+        if (ngx_http_complex_value(r, &args[1], &s) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        if (s.len != 1) {
+            ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
+                          "http var: invalid trim char");
+            return NGX_ERROR;
+        }
+
+        while (end >= start && *end == s.data[0]) {
+            end--;
+        }
+
+    } else {
+
+        while (end >= start && ngx_http_var_isspace(*end)) {
+            end--;
+        }
     }
 
     v->data = start;
@@ -2726,7 +2844,7 @@ ngx_http_var_exec_repeat(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t  *args;
-    ngx_str_t                  val, times_str;
+    ngx_str_t                  val, s;
     ngx_int_t                  times;
     u_char                    *p;
     ngx_uint_t                 i;
@@ -2734,15 +2852,15 @@ ngx_http_var_exec_repeat(ngx_http_request_t *r,
     args = var->args->elts;
 
     if (ngx_http_complex_value(r, &args[0], &val) != NGX_OK
-        || ngx_http_complex_value(r, &args[1], &times_str) != NGX_OK)
+        || ngx_http_complex_value(r, &args[1], &s) != NGX_OK)
     {
         return NGX_ERROR;
     }
 
-    times = ngx_atoi(times_str.data, times_str.len);
+    times = ngx_atoi(s.data, s.len);
     if (times == NGX_ERROR) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
-                      "http var: invalid repeat times \"%V\"", &times_str);
+                      "http var: invalid repeat times \"%V\"", &s);
         return NGX_ERROR;
     }
 
@@ -3264,7 +3382,7 @@ failed:
 #if (NGX_PCRE)
 
 static ngx_int_t
-ngx_http_var_exec_re_match(ngx_http_request_t *r,
+ngx_http_var_exec_regex_match(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t    *args;
@@ -3298,7 +3416,7 @@ ngx_http_var_exec_re_match(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_re_capture(ngx_http_request_t *r,
+ngx_http_var_exec_regex_capture(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t    *args;
@@ -3337,7 +3455,7 @@ ngx_http_var_exec_re_capture(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_var_exec_re_sub(ngx_http_request_t *r,
+ngx_http_var_exec_regex_sub(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var)
 {
     ngx_http_complex_value_t    *args;
