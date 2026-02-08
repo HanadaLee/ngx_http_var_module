@@ -6500,7 +6500,7 @@ ngx_http_var_exec_cidr(ngx_http_request_t *r,
     }
 
     ipv4_bits = ngx_atoi(s.data, s.len);
-    if (ipv4_bits == NGX_ERROR || ipv4_bits = 0 || ipv4_bits > 32) {
+    if (ipv4_bits == NGX_ERROR || ipv4_bits == 0 || ipv4_bits > 32) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "http var: invalid IPv4 network bits: \"%V\"", &s);
         return NGX_ERROR;
@@ -6513,7 +6513,7 @@ ngx_http_var_exec_cidr(ngx_http_request_t *r,
         }
 
         ipv6_bits = ngx_atoi(s.data, s.len);
-        if (ipv6_bits == NGX_ERROR || ipv6_bits = 0 || ipv6_bits > 128) {
+        if (ipv6_bits == NGX_ERROR || ipv6_bits == 0 || ipv6_bits > 128) {
             ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                           "http var: invalid IPv6 network bits: \"%V\"", &s);
             return NGX_ERROR;
