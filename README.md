@@ -9,6 +9,8 @@
 - [Status](#status)
 - [Synopsis](#synopsis)
 - [Installation](#installation)
+  - [Prerequisites](#prerequisites)
+  - [Build Module](#build-module)
 - [Directives](#directives)
   - [var](#var)
 - [Author](#author)
@@ -33,7 +35,40 @@ server {
 
 # Installation
 
-To use theses modules, configure your nginx branch with `--add-module=/path/to/ngx_http_var_module`.
+## Prerequisites
+
+To enable JSON extraction functionality (`extract_json` operation), you need to install the cJSON library first:
+
+**Debian/Ubuntu:**
+```bash
+sudo apt-get install libcjson-dev
+```
+
+**CentOS/RHEL:**
+```bash
+sudo yum install cjson-devel
+```
+
+**macOS:**
+```bash
+brew install cjson
+```
+
+**Build from source:**
+```bash
+git clone https://github.com/DaveGamble/cJSON.git
+cd cJSON
+mkdir build && cd build
+cmake ..
+make
+sudo make install
+```
+
+If cJSON is not installed, the module will still compile successfully but the `extract_json` operation will not be available.
+
+## Build Module
+
+To use this module, configure your nginx branch with `--add-module=/path/to/ngx_http_var_module`.
 
 # Directives
 
@@ -144,11 +179,30 @@ var $new_var extract_param [-i] param_name src_string [separator] [delimiter];
 # var $extraed_arg_bar extract_param bar "foo=123&bar=456&baz=789" & =;
 
 #### JSON operation ####
-# Extract json value from a valid json string. 
+# Extract json value from a valid json string.
+# Requires cJSON library to be installed (see Installation section)
 var $new_var extract_json json subkey1 [subkey2] [subkey3] ...;
 
-# example: The value of $new_var will be c in the following expression. [uint] represents the key number in the array.
-# var $new_var extract_json '{"a":{"b":["c",3]}}' a b [0];
+# Supports nested object keys and array indices [n]
+# Returns string values without quotes, other types as JSON strings
+# Arrays and objects are returned as compact JSON strings
+
+# Examples:
+# Extract from nested object
+# var $new_var extract_json '{"a":{"b":{"c":3}}}' a b c;
+# Result: 3
+
+# Extract from array using [index]
+# var $new_var extract_json '{"users":[{"name":"Alice"},{"name":"Bob"}]}' users [0] name;
+# Result: Alice
+
+# Extract array as JSON string
+# var $items extract_json '{"data":[1,2,3]}' data;
+# Result: [1,2,3]
+
+# Extract object as JSON string
+# var $user extract_json '{"user":{"name":"Bob","age":30}}' user;
+# Result: {"name":"Bob","age":30}
 
 
 #### Regex Judgement ####

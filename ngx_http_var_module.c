@@ -270,6 +270,11 @@ static ngx_int_t ngx_http_var_exec_replace(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_exec_extract_param(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
 
+#if (NGX_HAVE_CJSON)
+static ngx_int_t ngx_http_var_exec_extract_json(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
+#endif
+
 #if (NGX_PCRE)
 static ngx_int_t ngx_http_var_exec_re_match(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_variable_t *var);
@@ -427,7 +432,7 @@ static ngx_http_var_operator_enum_t  ngx_http_var_operators[] = {
     { ngx_string("contains"),         NGX_HTTP_VAR_OP_CONTAINS,        2, 2  },
     { ngx_string("str_in"),           NGX_HTTP_VAR_OP_STR_IN,          3, 99 },
 
-    { ngx_string("set"),              NGX_HTTP_VAR_OP_SET,            1, 1  },
+    { ngx_string("set"),              NGX_HTTP_VAR_OP_SET,             1, 1  },
     { ngx_string("len"),              NGX_HTTP_VAR_OP_LEN,             1, 1  },
     { ngx_string("upper"),            NGX_HTTP_VAR_OP_UPPER,           1, 1  },
     { ngx_string("lower"),            NGX_HTTP_VAR_OP_LOWER,           1, 1  },
