@@ -432,15 +432,15 @@ var $bool_var ip_range ip_str [ipv4 | ipv6 | cidr | ipv4_range ] ...;
 # If ipv6_network_bits is not specified, it will use the same value as ipv4_network_bits
 # Returns only the network address without the prefix length (e.g., "10.0.0.0" not "10.0.0.0/8")
 var $new_var cidr ipv4/ipv6 ipv4_network_bits [ipv6_network_bits];
-
+```
 
 All parameters except regular expressions can contain variables. However, incorrect parameter values ​​will cause the function calculation result to be empty.
 
-Variables defined with the var directive can be overwritten by directives such as `set` and `auth_request_set`.
+Variables defined with the `var` directive can be overwritten by directives such as `set` and `auth_request_set`.
 
-The if parameter enables conditional var. var will not be assign a value if the condition evaluates to “0” or an empty string. And it will continue to look for subsequent definitions of this variable.
+The `if` parameter enables conditional variable. `var` will not be assign a value if the condition evaluates to “0” or an empty string. And it will continue to look for subsequent definitions of this variable.
 
-```nginx
+```
 # When request header A is present, the value of the variable is 'have-header-a'
 var $new_var set have-header-a if=$http_a;
 
