@@ -2192,7 +2192,7 @@ static ngx_int_t
 ngx_http_var_exec_str_ne(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_rule_t *rule)
 {
-    if (ngx_http_var_exec_str_eq(r, v, var) != NGX_OK) {
+    if (ngx_http_var_exec_str_eq(r, v, rule) != NGX_OK) {
         return NGX_ERROR;
     }
 
@@ -5386,7 +5386,7 @@ static ngx_int_t
 ngx_http_var_exec_escape_uri(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_rule_t *rule)
 {
-    return ngx_http_var_utils_escape_uri(r, v, var, NGX_ESCAPE_URI);
+    return ngx_http_var_utils_escape_uri(r, v, rule, NGX_ESCAPE_URI);
 }
 
 
@@ -5394,7 +5394,7 @@ static ngx_int_t
 ngx_http_var_exec_escape_args(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_rule_t *rule)
 {
-    return ngx_http_var_utils_escape_uri(r, v, var, NGX_ESCAPE_ARGS);
+    return ngx_http_var_utils_escape_uri(r, v, rule, NGX_ESCAPE_ARGS);
 }
 
 
@@ -5402,7 +5402,7 @@ static ngx_int_t
 ngx_http_var_exec_escape_uri_component(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_rule_t *rule)
 {
-    return ngx_http_var_utils_escape_uri(r, v, var, NGX_ESCAPE_URI_COMPONENT);
+    return ngx_http_var_utils_escape_uri(r, v, rule, NGX_ESCAPE_URI_COMPONENT);
 }
 
 
@@ -5410,7 +5410,7 @@ static ngx_int_t
 ngx_http_var_exec_escape_html(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_rule_t *rule)
 {
-    return ngx_http_var_utils_escape_uri(r, v, var, NGX_ESCAPE_HTML);
+    return ngx_http_var_utils_escape_uri(r, v, rule, NGX_ESCAPE_HTML);
 }
 
 
@@ -5697,7 +5697,7 @@ static ngx_int_t
 ngx_http_var_exec_sha224(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_rule_t *rule)
 {
-    return ngx_http_var_utils_sha(r, v, var, EVP_sha224(), 28);
+    return ngx_http_var_utils_sha(r, v, rule, EVP_sha224(), 28);
 }
 
 
@@ -5705,7 +5705,7 @@ static ngx_int_t
 ngx_http_var_exec_sha256(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_rule_t *rule)
 {
-    return ngx_http_var_utils_sha(r, v, var, EVP_sha256(), 32);
+    return ngx_http_var_utils_sha(r, v, rule, EVP_sha256(), 32);
 }
 
 
@@ -5713,7 +5713,7 @@ static ngx_int_t
 ngx_http_var_exec_sha384(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_rule_t *rule)
 {
-    return ngx_http_var_utils_sha(r, v, var, EVP_sha384(), 48);
+    return ngx_http_var_utils_sha(r, v, rule, EVP_sha384(), 48);
 }
 
 
@@ -5721,7 +5721,7 @@ static ngx_int_t
 ngx_http_var_exec_sha512(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_rule_t *rule)
 {
-    return ngx_http_var_utils_sha(r, v, var, EVP_sha512(), 64);
+    return ngx_http_var_utils_sha(r, v, rule, EVP_sha512(), 64);
 }
 
 
@@ -5729,7 +5729,7 @@ static ngx_int_t
 ngx_http_var_exec_hmac_md5(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_rule_t *rule)
 {
-    return ngx_http_var_utils_hmac(r, v, var, EVP_md5());
+    return ngx_http_var_utils_hmac(r, v, rule, EVP_md5());
 }
 
 
@@ -5737,7 +5737,7 @@ static ngx_int_t
 ngx_http_var_exec_hmac_sha1(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_rule_t *rule)
 {
-    return ngx_http_var_utils_hmac(r, v, var, EVP_sha1());
+    return ngx_http_var_utils_hmac(r, v, rule, EVP_sha1());
 }
 
 
@@ -5745,7 +5745,7 @@ static ngx_int_t
 ngx_http_var_exec_hmac_sha224(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_rule_t *rule)
 {
-    return ngx_http_var_utils_hmac(r, v, var, EVP_sha224());
+    return ngx_http_var_utils_hmac(r, v, rule, EVP_sha224());
 }
 
 
@@ -5753,7 +5753,7 @@ static ngx_int_t
 ngx_http_var_exec_hmac_sha256(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_rule_t *rule)
 {
-    return ngx_http_var_utils_hmac(r, v, var, EVP_sha256());
+    return ngx_http_var_utils_hmac(r, v, rule, EVP_sha256());
 }
 
 
@@ -5761,7 +5761,7 @@ static ngx_int_t
 ngx_http_var_exec_hmac_sha384(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_rule_t *rule)
 {
-    return ngx_http_var_utils_hmac(r, v, var, EVP_sha384());
+    return ngx_http_var_utils_hmac(r, v, rule, EVP_sha384());
 }
 
 
@@ -5769,7 +5769,7 @@ static ngx_int_t
 ngx_http_var_exec_hmac_sha512(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_rule_t *rule)
 {
-    return ngx_http_var_utils_hmac(r, v, var, EVP_sha512());
+    return ngx_http_var_utils_hmac(r, v, rule, EVP_sha512());
 }
 
 #endif
