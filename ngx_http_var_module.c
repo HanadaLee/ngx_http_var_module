@@ -147,8 +147,6 @@ typedef struct {
 
 
 typedef struct {
-    ngx_str_t                      name;        /* variable name */
-    ngx_int_t                      index;       /* variable index */
     ngx_http_var_operator_e        operator;    /* operator type */
     ngx_uint_t                     ignore_case; /* ignore case sensitivity */
     ngx_array_t                   *args;        /* operator extra args */
