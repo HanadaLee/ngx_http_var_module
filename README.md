@@ -175,11 +175,25 @@ var $new_var substr src_str start [len];
 var $new_var replace [-i] src_str src dst;
 
 # Extract parameters
-# Extract a value from a list of parameters. A use case for this is to extract query parameters without having to write a regular expression, but it can be used to look up values in any name/value pair list. If several occurrences of the parameter exist, only the first one is returned. the variable gets a blank value. The delimiter between the name and the value of a parameter is '=' by default, and the parameter separator is '&' by default.
-var $new_var extract_param [-i] param_name src_string [separator] [delimiter];
+# Extract a value from a list of parameters. A use case for this is to extract query parameters without having to write a regular expression, but it can be used to look up values in any name/value pair list. If several occurrences of the parameter exist, only the first one is returned. the variable gets a blank value. The separator and delimiter must be explicitly specified as single characters.
+var $new_var extract_param [-i] src_string separator delimiter param_name;
 
-# example: a query "foo=123&bar=456&baz=789". If the parameter name is bar and the Separator is &, then the resulting variable value will be 456.
-# var $extraed_arg_bar extract_param bar "foo=123&bar=456&baz=789" & =;
+# example: a query "foo=123&bar=456&baz=789". If the parameter name is bar, the Separator is &, and the delimiter is =, then the resulting variable value will be 456.
+# var $extraed_arg_bar extract_param "foo=123&bar=456&baz=789" & = bar;
+
+# Keep parameters
+# Keep only the specified parameters from a name/value pair list. All other parameters are removed. The separator and delimiter must be explicitly specified as single characters.
+var $new_var keep_params [-i] src_string separator delimiter <key1> <key2> ...;
+
+# example: a query "foo=123&bar=456&baz=789". If we keep "foo" and "baz", the result will be "foo=123&baz=789".
+# var $kept keep_params "foo=123&bar=456&baz=789" & = foo baz;
+
+# Remove parameters
+# Remove the specified parameters from a name/value pair list. All other parameters are retained. The separator and delimiter must be explicitly specified as single characters.
+var $new_var remove_params [-i] src_string separator delimiter <key1> <key2> ...;
+
+# example: a query "foo=123&bar=456&baz=789". If we remove "bar", the result will be "foo=123&baz=789".
+# var $removed remove_params "foo=123&bar=456&baz=789" & = bar;
 
 #### JSON operation ####
 # Extract json value from a valid json string.
