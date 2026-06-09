@@ -1936,21 +1936,18 @@ ngx_http_var_utils_filter_params(ngx_http_request_t *r,
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "var: invalid separator: \"%V\"",
                       &key_elts[1]);
-        v->not_found = 1;
-        return NGX_OK;
+        goto return_original;
     }
 
     if (key_elts[2].len != 1) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
                       "var: invalid delimiter: \"%V\"",
                       &key_elts[2]);
-        v->not_found = 1;
-        return NGX_OK;
+        goto return_original;
     }
 
     if (val.len == 0) {
-        v->not_found = 1;
-        return NGX_OK;
+        goto return_original;
     }
 
     /* First pass: calculate result length */
@@ -2125,6 +2122,13 @@ ngx_http_var_utils_filter_params(ngx_http_request_t *r,
 
     v->len = dst - result;
     v->data = result;
+
+    return NGX_OK;
+
+return_original:
+
+    v->len = val.len;
+    v->data = val.data;
 
     return NGX_OK;
 }
