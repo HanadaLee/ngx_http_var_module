@@ -15,7 +15,7 @@
 #include <openssl/hmac.h>
 #endif
 
-#if (NGX_HAVE_CJSON)
+#if (NGX_CJSON)
 #include <cjson/cJSON.h>
 #endif
 
@@ -56,7 +56,7 @@ typedef enum {
     NGX_HTTP_VAR_OP_KEEP_PARAMS,
     NGX_HTTP_VAR_OP_REMOVE_PARAMS,
 
-#if (NGX_HAVE_CJSON)
+#if (NGX_CJSON)
     NGX_HTTP_VAR_OP_EXTRACT_JSON,
 #endif
 
@@ -286,7 +286,7 @@ static ngx_int_t ngx_http_var_exec_keep_params(ngx_http_request_t *r,
 static ngx_int_t ngx_http_var_exec_remove_params(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_rule_t *rule);
 
-#if (NGX_HAVE_CJSON)
+#if (NGX_CJSON)
 static ngx_int_t ngx_http_var_exec_extract_json(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, ngx_http_var_rule_t *rule);
 #endif
@@ -465,7 +465,7 @@ static ngx_http_var_operator_enum_t  ngx_http_var_operators[] = {
     { ngx_string("keep_params"),      NGX_HTTP_VAR_OP_KEEP_PARAMS,     4, 99 },
     { ngx_string("remove_params"),    NGX_HTTP_VAR_OP_REMOVE_PARAMS,   4, 99 },
 
-#if (NGX_HAVE_CJSON)
+#if (NGX_CJSON)
     { ngx_string("extract_json"),     NGX_HTTP_VAR_OP_EXTRACT_JSON,    2, 99 },
 #endif
 
@@ -1191,7 +1191,7 @@ ngx_http_var_evaluate_rule(ngx_http_request_t *r,
     case NGX_HTTP_VAR_OP_REMOVE_PARAMS:
         return ngx_http_var_exec_remove_params(r, v, rule);
 
-#if (NGX_HAVE_CJSON)
+#if (NGX_CJSON)
     case NGX_HTTP_VAR_OP_EXTRACT_JSON:
         return ngx_http_var_exec_extract_json(r, v, rule);
 #endif
@@ -3419,7 +3419,7 @@ ngx_http_var_exec_remove_params(ngx_http_request_t *r,
 }
 
 
-#if (NGX_HAVE_CJSON)
+#if (NGX_CJSON)
 
 static ngx_int_t
 ngx_http_var_exec_extract_json(ngx_http_request_t *r,

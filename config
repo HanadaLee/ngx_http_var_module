@@ -2,7 +2,7 @@ ngx_addon_name=ngx_http_var_module
 
 # Check for cJSON library
 ngx_feature="cJSON library"
-ngx_feature_name="NGX_HAVE_CJSON"
+ngx_feature_name="NGX_CJSON"
 ngx_feature_run=no
 ngx_feature_incs="#include <cjson/cJSON.h>"
 ngx_feature_path=
@@ -12,7 +12,6 @@ ngx_feature_test="cJSON *json = cJSON_Parse(\"{}\"); if (json) cJSON_Delete(json
 
 if [ $ngx_found = yes ]; then
     CORE_LIBS="$CORE_LIBS $ngx_feature_libs"
-    have=NGX_HAVE_CJSON . auto/have
 else
     cat << END
 
