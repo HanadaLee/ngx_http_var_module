@@ -11,6 +11,7 @@
 - [Installation](#installation)
   - [Prerequisites](#prerequisites)
   - [Build Module](#build-module)
+- [Conditional syntax](#conditional-syntax)
 - [Directives](#directives)
   - [var](#var)
 - [Author](#author)
@@ -70,15 +71,26 @@ If cJSON is not installed, the module will still compile successfully but the `e
 
 To use this module, configure your nginx branch with `--add-module=/path/to/ngx_http_var_module`.
 
+To enable named conditions, build `ngx_condition_module` and this module statically in the same nginx configuration.
+
+# Conditional syntax
+
+Conditional syntax is selected at compile time:
+
+- With `ngx_condition_module`, use named `condition` expressions and place `var` inside an `http`, `server`, or `location` `when` block. `if=` and `if!=` parameters are rejected.
+- Without `ngx_condition_module`, `when` is unavailable and legacy `if=`/`if!=` parameters remain supported. `if=` matches a non-empty value other than `"0"`; `if!=` matches an empty value or `"0"`.
+
+If a condition does not match, the definition is skipped and the next definition of the same variable is evaluated.
+
 # Directives
 
 ## var
 
-**Syntax:** *var $new_variable function \[-i\] args... \[if\=condition\]*
+**Syntax:** *var $new_variable function [-i] args...;*
 
 **Default:** *-*
 
-**Context:** *http, server, location*
+**Context:** *http, server, location, http when, server when, location when*
 
 Define a new variable whose value is the result of function calculation. The variable value cannot be cached and is recalculated each time it is used.
 
@@ -452,18 +464,27 @@ All parameters except regular expressions can contain variables. However, incorr
 
 Variables defined with the `var` directive can be overwritten by directives such as `set` and `auth_request_set`.
 
-The `if` parameter enables conditional variable. `var` will not be assign a value if the condition evaluates to “0” or an empty string. And it will continue to look for subsequent definitions of this variable.
+With `ngx_condition_module`, conditional definitions use `when`. Multiple names in one `when` block are combined with AND, and a condition name can be negated with a `!` prefix:
 
-```
+```nginx
+condition has_header_a is_not_empty $http_a;
+condition has_header_b is_not_empty $http_b;
+
 # When request header A is present, the value of the variable is 'have-header-a'
-var $new_var set have-header-a if=$http_a;
+when has_header_a {
+    var $new_var set have-header-a;
+}
 
 # When request header A is not present but request header B is present, the value of the variable is 'have-header-b'
-var $new_var set have-header-b if=$http_b;
+when !has_header_a has_header_b {
+    var $new_var set have-header-b;
+}
 
 # When both request header A and B are not present, the value of the variable is 'not-have-a-or-b'
 var $new_var set not-have-a-or-b;
 ```
+
+Without `ngx_condition_module`, express the same chain with legacy `if=`/`if!=` parameters.
 
 # Author
 
